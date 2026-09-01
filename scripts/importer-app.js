@@ -2405,3 +2405,41 @@ export async function openPokemonImporter() {
 
   return importerApp;
 }
+
+
+
+/* --------------------------------------------------------- */
+/* PUBLIC ASSET SERVICE                                      */
+/* --------------------------------------------------------- */
+
+export async function loadPokemonAssetCatalog() {
+  return loadCatalog();
+}
+
+export function getPokemonAssetPreviewData(
+  entry,
+  activeTab
+) {
+  return getImporterPreviewData(
+    entry,
+    activeTab
+  );
+}
+
+export function refreshPokemonAssetPreviews(
+  root,
+  zoomed = false
+) {
+  return refreshImporterPreviews(
+    root,
+    zoomed
+  );
+}
+
+export async function preparePokemonActorDefinition(
+  entry
+) {
+  return prepareActorDefinition(
+    entry
+  );
+}

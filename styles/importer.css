@@ -312,3 +312,32 @@ input[type="text"] {
 .pokemon-outline-reset {
   margin-top: 8px;
 }
+
+
+/* Character Creator */
+
+.pokemon-character-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.pokemon-character-card {
+  cursor: pointer;
+}
+
+.pokemon-character-card.selected {
+  outline: 2px solid var(--color-border-highlight, #ff6400);
+  outline-offset: -2px;
+}
+
+.pokemon-character-create {
+  margin-left: auto;
+  min-width: 170px;
+}
+
+.pokemon-character-create:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}

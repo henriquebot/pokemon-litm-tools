@@ -1,0 +1,229 @@
+<div class="pokemon-importer-shell pokemon-character-creator-shell">
+
+  <header class="pokemon-importer-header">
+
+    <nav class="pokemon-importer-tabs">
+
+      <button
+        type="button"
+        data-character-mode="trainer"
+        class="{{#if isTrainer}}active{{/if}}"
+      >
+        <i class="fa-solid fa-user"></i>
+        Treinador
+      </button>
+
+      <button
+        type="button"
+        data-character-mode="pokemon"
+        class="{{#if isPokemon}}active{{/if}}"
+      >
+        <i class="fa-solid fa-paw"></i>
+        Pokemon
+      </button>
+
+    </nav>
+
+
+    <div class="pokemon-character-fields">
+
+      <div class="form-group">
+
+        <label>
+          Nome do personagem
+        </label>
+
+        <div class="form-fields">
+
+          <input
+            type="text"
+            data-role="character-name"
+            value="{{characterName}}"
+            placeholder="Nome"
+          >
+
+        </div>
+
+      </div>
+
+
+      <div class="form-group">
+
+        <label>
+          Jogador
+        </label>
+
+        <div class="form-fields">
+
+          <select data-role="character-owner">
+
+            <option value="">
+              Sem jogador definido
+            </option>
+
+            {{#each users}}
+
+              <option
+                value="{{id}}"
+                {{#if selected}}selected{{/if}}
+              >
+                {{name}}
+              </option>
+
+            {{/each}}
+
+          </select>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="pokemon-importer-toolbar">
+
+      <input
+        type="search"
+        data-role="asset-search"
+        placeholder="Buscar visual..."
+        autocomplete="off"
+      >
+
+      {{#if isTrainer}}
+
+        <select data-role="person-type">
+
+          <option value="all">
+            Todos
+          </option>
+
+          <option value="trainer-class">
+            Trainer Classes
+          </option>
+
+          <option value="npc">
+            NPCs
+          </option>
+
+          <option value="named">
+            Personagens
+          </option>
+
+          <option value="player">
+            Protagonistas
+          </option>
+
+          <option value="rival">
+            Rivais
+          </option>
+
+          <option value="professor">
+            Professores
+          </option>
+
+          <option value="gym-leader">
+            Lideres
+          </option>
+
+          <option value="elite-four">
+            Elite Four
+          </option>
+
+          <option value="villain">
+            Viloes
+          </option>
+
+        </select>
+
+      {{/if}}
+
+
+      <button
+        type="button"
+        data-action="createCharacter"
+        class="pokemon-character-create"
+        {{#unless canCreate}}disabled{{/unless}}
+      >
+        <i class="fa-solid fa-user-plus"></i>
+
+        {{#if busy}}
+          Criando...
+        {{else}}
+          Criar personagem
+        {{/if}}
+      </button>
+
+    </div>
+
+  </header>
+
+
+  <div class="pokemon-importer-list pokemon-character-list">
+
+    {{#each items}}
+
+      <article
+        class="pokemon-asset-card pokemon-character-card{{#if selected}} selected{{/if}}"
+        data-character-asset
+        data-search="{{search}}"
+        data-person-type="{{personType}}"
+        data-asset-id="{{id}}"
+        data-asset-name="{{name}}"
+      >
+
+        <div class="pokemon-asset-preview">
+
+          {{#if previewCropped}}
+
+            <div class="pokemon-overworld-preview">
+
+              <img
+                src="{{preview}}"
+                alt="{{name}}"
+                loading="lazy"
+                data-overworld-preview
+                data-preview-columns="{{previewColumns}}"
+                data-preview-rows="{{previewRows}}"
+              >
+
+            </div>
+
+          {{else}}
+
+            <img
+              src="{{preview}}"
+              alt="{{name}}"
+              loading="lazy"
+            >
+
+          {{/if}}
+
+        </div>
+
+
+        <div class="pokemon-asset-info">
+
+          <strong title="{{name}}">
+            {{name}}
+          </strong>
+
+          {{#if meta}}
+            <small>{{meta}}</small>
+          {{/if}}
+
+          {{#if secondaryMeta}}
+            <small class="pokemon-provider">
+              {{secondaryMeta}}
+            </small>
+          {{/if}}
+
+        </div>
+
+      </article>
+
+    {{/each}}
+
+  </div>
+
+</div>

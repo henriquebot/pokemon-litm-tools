@@ -1,4 +1,4 @@
-﻿import {
+import {
   openPokemonImporter,
   handlePokemonImporterCanvasDrop,
   POKEMON_IMPORTER_DRAG_TYPE
@@ -9,6 +9,10 @@ import {
   activateTokenOutline
 } from "./token-outline.js";
 
+import {
+  openPokemonCharacterCreator
+} from "./character-creator-app.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -17,7 +21,7 @@ Hooks.once("init", () => {
   registerTokenOutlineSettings();
 
   console.log(
-    "Pokémon LITM Tools | Inicializando v0.7.0"
+    "Pok?mon LITM Tools | Inicializando v0.7.0"
   );
 
   game.settings.register(
@@ -32,7 +36,8 @@ Hooks.once("init", () => {
   );
 
   game.modules.get(MODULE_ID).api = {
-    openPokemonImporter
+    openPokemonImporter,
+    openPokemonCharacterCreator
   };
 });
 
@@ -54,7 +59,7 @@ Hooks.on(
         "pokemonImporter",
 
       title:
-        "Pokémon Importer",
+        "Pok?mon Importer",
 
       icon:
         "fa-solid fa-dragon",
@@ -70,6 +75,29 @@ Hooks.on(
 
       onChange:
         () => openPokemonImporter()
+    };
+
+    tokenControls.tools.pokemonCharacterCreator = {
+      name:
+        "pokemonCharacterCreator",
+
+      title:
+        "Criar Personagem Pok?mon",
+
+      icon:
+        "fa-solid fa-user-plus",
+
+      order:
+        91,
+
+      button:
+        true,
+
+      visible:
+        true,
+
+      onChange:
+        () => openPokemonCharacterCreator()
     };
   }
 );
@@ -124,11 +152,11 @@ Hooks.once("ready", () => {
     LITM_SYSTEM_ID
   ) {
     console.warn(
-      "Pokémon LITM Tools | Mundo atual não usa Legend in the Mist."
+      "Pok?mon LITM Tools | Mundo atual n?o usa Legend in the Mist."
     );
   }
 
   console.log(
-    "Pokémon LITM Tools | Pronto v0.7.0"
+    "Pok?mon LITM Tools | Pronto v0.7.0"
   );
 });
