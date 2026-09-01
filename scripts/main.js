@@ -13,6 +13,10 @@ import {
   openPokemonCharacterCreator
 } from "./character-creator-app.js";
 
+import {
+  activatePokemonThemePokedexButtons
+} from "./pokemon-links.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -20,8 +24,10 @@ Hooks.once("init", () => {
 
   registerTokenOutlineSettings();
 
+  activatePokemonThemePokedexButtons();
+
   console.log(
-    "Pok\u00e9mon LITM Tools | Inicializando v0.7.0"
+    "Pok\u00e9mon LITM Tools | Inicializando v0.8.0-dev"
   );
 
   game.settings.register(
@@ -152,11 +158,11 @@ Hooks.once("ready", () => {
     LITM_SYSTEM_ID
   ) {
     console.warn(
-      "Pok\u00e9mon LITM Tools | Mundo atual n?o usa Legend in the Mist."
+      "Pok\u00e9mon LITM Tools | Mundo atual nao usa Legend in the Mist."
     );
   }
 
   console.log(
-    "Pok\u00e9mon LITM Tools | Pronto v0.7.0"
+    "Pok\u00e9mon LITM Tools | Pronto v0.8.0-dev"
   );
 });

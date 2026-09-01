@@ -5,7 +5,15 @@ import {
   preparePokemonActorDefinition
 } from "./importer-app.js";
 
-import { createPokemonTeamThemes } from "./pokemon-theme-builder.js";
+import {
+  createPokemonTeamThemes,
+  savePokemonDreamTeam
+} from "./pokemon-theme-builder.js";
+
+import {
+  getPokemonDbUrl,
+  openPokemonDb
+} from "./pokemon-links.js";
 
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
@@ -687,13 +695,15 @@ class PokemonCharacterCreatorApp
 
   teamSlot = 0;
 
+  dreamSelections = [];
+
   busy = false;
 
 
   get totalSteps() {
     return (
       this.mode === "trainer"
-        ? 4
+        ? 5
         : 3
     );
   }
@@ -757,7 +767,11 @@ class PokemonCharacterCreatorApp
       )
       ||
       (
-        this.step === 4
+        (
+          this.step === 4
+          ||
+          this.step === 5
+        )
         &&
         this.mode === "trainer"
       )
@@ -797,6 +811,11 @@ class PokemonCharacterCreatorApp
               entry.portrait
               ??
               entry.sheet,
+
+            pokedexUrl:
+              this.mode === "pokemon"
+                ? getPokemonDbUrl(entry)
+                : null,
 
             selected:
               this.selectedId
@@ -864,6 +883,9 @@ class PokemonCharacterCreatorApp
               entry.portrait
               ??
               entry.sheet,
+
+            pokedexUrl:
+              getPokemonDbUrl(entry),
 
             selected:
               this.teamSelections[
@@ -963,6 +985,53 @@ class PokemonCharacterCreatorApp
     }
 
 
+    let dreamItems = [];
+
+    if (
+      this.step === 5
+      &&
+      this.mode === "trainer"
+    ) {
+      dreamItems =
+        catalog.pokemon.map(
+          entry => ({
+            ...entry,
+
+            preview:
+              entry.preview
+              ??
+              entry.portrait
+              ??
+              entry.sheet,
+
+            pokedexUrl:
+              getPokemonDbUrl(entry),
+
+            inDream:
+              this.dreamSelections.includes(
+                entry.id
+              ),
+
+            meta:
+              "#"
+              +
+              String(
+                entry.dex
+                ??
+                entry.pokemonId
+                ??
+                ""
+              ).padStart(3, "0"),
+
+            ...getPokemonAssetPreviewData(
+              entry,
+              "pokemon"
+            )
+          })
+        );
+    }
+
+
     const users =
       game.users
         .filter(
@@ -1008,6 +1077,14 @@ class PokemonCharacterCreatorApp
         this.mode === "trainer"
         &&
         visualReady
+      )
+      ||
+      (
+        this.step === 4
+        &&
+        this.mode === "trainer"
+        &&
+        this._teamReady()
       );
 
 
@@ -1023,7 +1100,7 @@ class PokemonCharacterCreatorApp
       (
         this.mode === "trainer"
         &&
-        this.step === 4
+        this.step === 5
         &&
         this._teamReady()
       );
@@ -1050,6 +1127,9 @@ class PokemonCharacterCreatorApp
       stepIsTeam:
         this.step === 4,
 
+      stepIsDream:
+        this.step === 5,
+
       isTrainer:
         this.mode === "trainer",
 
@@ -1066,6 +1146,11 @@ class PokemonCharacterCreatorApp
       teamItems,
 
       teamSlots,
+
+      dreamItems,
+
+      dreamCount:
+        this.dreamSelections.length,
 
       teamSize:
         this.teamSize,
@@ -1149,6 +1234,8 @@ class PokemonCharacterCreatorApp
       )
       ||
       this.step === 4
+      ||
+      this.step === 5
     ) {
       refreshPokemonAssetPreviews(
         this.element,
@@ -1191,6 +1278,9 @@ class PokemonCharacterCreatorApp
 
             this.teamSlot =
               0;
+
+            this.dreamSelections =
+              [];
           }
 
           for (
@@ -1385,6 +1475,28 @@ class PokemonCharacterCreatorApp
       "change",
       applyFilter
     );
+
+
+    /* POKEDEX */
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-pokedex-url]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          openPokemonDb(
+            button.dataset.pokedexUrl
+          );
+        }
+      );
+    }
 
 
     /* VISUAL DO PERSONAGEM */
@@ -1690,6 +1802,58 @@ class PokemonCharacterCreatorApp
     }
 
 
+    /* TIME DOS SONHOS */
+
+    for (
+      const card
+      of this.element.querySelectorAll(
+        "[data-dream-asset]"
+      )
+    ) {
+      card.addEventListener(
+        "click",
+        async event => {
+          if (
+            event.target.closest(
+              "[data-pokedex-url]"
+            )
+          ) return;
+
+          const id =
+            card.dataset.assetId;
+
+          if (!id) return;
+
+          const index =
+            this.dreamSelections.indexOf(id);
+
+          if (index >= 0) {
+            this.dreamSelections.splice(
+              index,
+              1
+            );
+          } else {
+            if (
+              this.dreamSelections.length
+              >= 6
+            ) {
+              ui.notifications.warn(
+                "Escolha no maximo 6 Pokemon."
+              );
+              return;
+            }
+
+            this.dreamSelections.push(id);
+          }
+
+          await this.render({
+            force: true
+          });
+        }
+      );
+    }
+
+
     /* VOLTAR */
 
     this.element
@@ -1745,6 +1909,16 @@ class PokemonCharacterCreatorApp
             this.mode === "trainer"
             &&
             !this._visualReady()
+          ) {
+            return;
+          }
+
+          if (
+            this.step === 4
+            &&
+            this.mode === "trainer"
+            &&
+            !this._teamReady()
           ) {
             return;
           }
@@ -1908,6 +2082,36 @@ class PokemonCharacterCreatorApp
               await createPokemonTeamThemes(
                 actor,
                 teamEntries
+              );
+            }
+
+
+            if (
+              this.mode === "trainer"
+            ) {
+              const catalog =
+                await loadPokemonAssetCatalog();
+
+              const byId =
+                new Map(
+                  catalog.pokemon.map(
+                    entry => [
+                      entry.id,
+                      entry
+                    ]
+                  )
+                );
+
+              const dreamEntries =
+                this.dreamSelections
+                  .map(
+                    id => byId.get(id)
+                  )
+                  .filter(Boolean);
+
+              await savePokemonDreamTeam(
+                actor,
+                dreamEntries
               );
             }
 

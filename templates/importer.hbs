@@ -1,4 +1,4 @@
-﻿<div class="pokemon-importer-shell{{#if previewZoomed}} preview-zoomed{{/if}}">
+<div class="pokemon-importer-shell{{#if previewZoomed}} preview-zoomed{{/if}}">
 
   <header class="pokemon-importer-header">
 
@@ -239,6 +239,20 @@
               <small class="pokemon-provider">
                 {{secondaryMeta}}
               </small>
+
+            {{/if}}
+
+            {{#if pokedexUrl}}
+
+              <button
+                type="button"
+                class="pokemon-pokedex-link"
+                data-pokedex-url="{{pokedexUrl}}"
+                title="Abrir no Pok&eacute;monDB"
+              >
+                <i class="fa-solid fa-mobile-screen-button"></i>
+                Pok&eacute;dex
+              </button>
 
             {{/if}}
 

@@ -1,4 +1,9 @@
-﻿const MODULE_ID = "pokemon-litm-tools";
+import {
+  getPokemonDbUrl,
+  openPokemonDb
+} from "./pokemon-links.js";
+
+const MODULE_ID = "pokemon-litm-tools";
 const DYLAN_ID = "dylans-animated-tokens";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -1663,6 +1668,11 @@ class PokemonImporterApp
           .map(entry => ({
             ...entry,
 
+            pokedexUrl:
+              this.activeTab === "pokemon"
+                ? getPokemonDbUrl(entry)
+                : null,
+
             checked:
               this.selected.has(
                 `${entry.category}:${entry.id}`
@@ -1999,6 +2009,28 @@ class PokemonImporterApp
       "change",
       applyFilter
     );
+
+
+    /* POKEDEX */
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-pokedex-url]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          openPokemonDb(
+            button.dataset.pokedexUrl
+          );
+        }
+      );
+    }
 
 
     /* ARRASTAR PARA A SCENE */

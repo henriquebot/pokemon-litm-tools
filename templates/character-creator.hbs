@@ -1,4 +1,4 @@
-﻿<div class="pokemon-importer-shell pokemon-character-creator-shell{{#if previewZoomed}} preview-zoomed{{/if}}">
+<div class="pokemon-importer-shell pokemon-character-creator-shell{{#if previewZoomed}} preview-zoomed{{/if}}">
 
   <header class="pokemon-wizard-progress">
 
@@ -28,6 +28,13 @@
       <div class="pokemon-wizard-step {{#if stepIsTeam}}active{{/if}}">
         <span>4</span>
         Equipe
+      </div>
+
+      <div class="pokemon-wizard-line"></div>
+
+      <div class="pokemon-wizard-step {{#if stepIsDream}}active{{/if}}">
+        <span>5</span>
+        Sonhos
       </div>
 
     {{/if}}
@@ -307,6 +314,18 @@
                   <small class="pokemon-provider">
                     {{secondaryMeta}}
                   </small>
+                {{/if}}
+
+                {{#if pokedexUrl}}
+                  <button
+                    type="button"
+                    class="pokemon-pokedex-link"
+                    data-pokedex-url="{{pokedexUrl}}"
+                    title="Abrir no Pok&eacute;monDB"
+                  >
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    Pok&eacute;dex
+                  </button>
                 {{/if}}
 
               </div>
@@ -602,6 +621,16 @@
                     {{meta}}
                   </small>
 
+                  <button
+                    type="button"
+                    class="pokemon-pokedex-link"
+                    data-pokedex-url="{{pokedexUrl}}"
+                    title="Abrir no Pok&eacute;monDB"
+                  >
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    Pok&eacute;dex
+                  </button>
+
                 </div>
 
               </article>
@@ -635,6 +664,93 @@
   {{/if}}
 
 
+
+  {{#if stepIsDream}}
+
+    <section class="pokemon-wizard-page pokemon-dream-page">
+
+      <h2>
+        Qual &eacute; seu Time dos Sonhos?
+      </h2>
+
+      <p>
+        Escolha at&eacute; 6 Pok&eacute;mon que voc&ecirc; gostaria de encontrar ou ter no futuro.
+        Isso n&atilde;o garante que eles aparecer&atilde;o.
+      </p>
+
+      <div class="pokemon-dream-counter">
+        <i class="fa-solid fa-star"></i>
+        Selecionados:
+        <strong>{{dreamCount}} / 6</strong>
+      </div>
+
+      <div class="pokemon-importer-toolbar pokemon-team-toolbar">
+
+        <input
+          type="search"
+          data-role="asset-search"
+          placeholder="Buscar Pok&eacute;mon..."
+          autocomplete="off"
+        >
+
+        <button
+          type="button"
+          data-action="togglePreviewZoom"
+          class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+        >
+          <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+          Zoom
+        </button>
+
+      </div>
+
+      <div class="pokemon-importer-list pokemon-team-list pokemon-dream-list">
+
+        {{#each dreamItems}}
+
+          <article
+            class="pokemon-asset-card pokemon-character-card pokemon-dream-pokemon{{#if inDream}} selected in-dream{{/if}}"
+            data-dream-asset
+            data-search-card
+            data-search="{{search}}"
+            data-asset-id="{{id}}"
+          >
+
+            <div class="pokemon-asset-preview">
+              <img
+                src="{{preview}}"
+                alt="{{name}}"
+                loading="lazy"
+              >
+            </div>
+
+            <div class="pokemon-asset-info">
+
+              <strong>{{name}}</strong>
+              <small>{{meta}}</small>
+
+              <button
+                type="button"
+                class="pokemon-pokedex-link"
+                data-pokedex-url="{{pokedexUrl}}"
+                title="Abrir no Pok&eacute;monDB"
+              >
+                <i class="fa-solid fa-mobile-screen-button"></i>
+                Pok&eacute;dex
+              </button>
+
+            </div>
+
+          </article>
+
+        {{/each}}
+
+      </div>
+
+    </section>
+
+  {{/if}}
+
   <footer class="pokemon-wizard-footer">
 
     <button
@@ -646,13 +762,11 @@
       Voltar
     </button>
 
-
     <span class="pokemon-wizard-counter">
       Etapa {{step}} de {{totalSteps}}
     </span>
 
-
-    {{#if stepIsTeam}}
+    {{#if stepIsDream}}
 
       <button
         type="button"
@@ -666,19 +780,47 @@
 
     {{else}}
 
-      {{#if stepIsVisual}}
+      {{#if stepIsTeam}}
 
-        {{#if isPokemon}}
+        <button
+          type="button"
+          data-action="wizardNext"
+          class="pokemon-wizard-primary"
+          {{#unless canNext}}disabled{{/unless}}
+        >
+          Pr&oacute;ximo
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
 
-          <button
-            type="button"
-            data-action="wizardFinish"
-            class="pokemon-wizard-primary"
-            {{#unless canFinish}}disabled{{/unless}}
-          >
-            <i class="fa-solid fa-check"></i>
-            Finalizar
-          </button>
+      {{else}}
+
+        {{#if stepIsVisual}}
+
+          {{#if isPokemon}}
+
+            <button
+              type="button"
+              data-action="wizardFinish"
+              class="pokemon-wizard-primary"
+              {{#unless canFinish}}disabled{{/unless}}
+            >
+              <i class="fa-solid fa-check"></i>
+              Finalizar
+            </button>
+
+          {{else}}
+
+            <button
+              type="button"
+              data-action="wizardNext"
+              class="pokemon-wizard-primary"
+              {{#unless canNext}}disabled{{/unless}}
+            >
+              Pr&oacute;ximo
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+
+          {{/if}}
 
         {{else}}
 
@@ -693,18 +835,6 @@
           </button>
 
         {{/if}}
-
-      {{else}}
-
-        <button
-          type="button"
-          data-action="wizardNext"
-          class="pokemon-wizard-primary"
-          {{#unless canNext}}disabled{{/unless}}
-        >
-          Pr&oacute;ximo
-          <i class="fa-solid fa-arrow-right"></i>
-        </button>
 
       {{/if}}
 
