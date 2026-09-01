@@ -13,8 +13,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
+
 
       - name: Get version
         id: vars
@@ -22,50 +24,396 @@ jobs:
         run: |
           echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+
+      - name: Clone Pokemon asset index source
+        shell: bash
+        run: |
+          rm -rf /tmp/pokemon-assets
+
+          git clone \
+            --depth 1 \
+            https://github.com/righthandofvecna/pokemon-assets.git \
+            /tmp/pokemon-assets
+
+
+      - name: Generate trainer catalog
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import json
+          import re
+          import subprocess
+          from pathlib import Path
+          from urllib.parse import quote
+
+          repo = Path("/tmp/pokemon-assets")
+
+          sheet_root = (
+              repo /
+              "img" /
+              "trainers-overworld"
+          )
+
+          portrait_root = (
+              repo /
+              "img" /
+              "trainers-profile"
+          )
+
+          if not sheet_root.exists():
+              raise SystemExit(
+                  f"Missing directory: {sheet_root}"
+              )
+
+          if not portrait_root.exists():
+              raise SystemExit(
+                  f"Missing directory: {portrait_root}"
+              )
+
+          extensions = {
+              ".png",
+              ".webp",
+              ".jpg",
+              ".jpeg"
+          }
+
+          def image_files(root):
+              return sorted(
+                  p
+                  for p in root.rglob("*")
+                  if (
+                      p.is_file()
+                      and
+                      p.suffix.lower() in extensions
+                  )
+              )
+
+          def without_suffix(path):
+              return (
+                  path.with_suffix("")
+                  .as_posix()
+                  .casefold()
+              )
+
+          portrait_files = image_files(
+              portrait_root
+          )
+
+          portraits_by_relative = {}
+
+          portraits_by_stem = {}
+
+          for portrait in portrait_files:
+
+              relative = portrait.relative_to(
+                  portrait_root
+              )
+
+              portraits_by_relative.setdefault(
+                  without_suffix(relative),
+                  portrait
+              )
+
+              portraits_by_stem.setdefault(
+                  portrait.stem.casefold(),
+                  portrait
+              )
+
+          def raw_url(path):
+              relative = (
+                  path
+                  .relative_to(repo)
+                  .as_posix()
+              )
+
+              return (
+                  "https://raw.githubusercontent.com/"
+                  "righthandofvecna/"
+                  "pokemon-assets/"
+                  "main/"
+                  + quote(relative, safe="/")
+              )
+
+          def nice_name(stem):
+              value = re.sub(
+                  r"[_-]+",
+                  " ",
+                  stem
+              )
+
+              value = re.sub(
+                  r"\s+",
+                  " ",
+                  value
+              ).strip()
+
+              return " ".join(
+                  word[:1].upper() + word[1:]
+                  for word in value.split(" ")
+                  if word
+              )
+
+          trainers = []
+
+          for sheet in image_files(sheet_root):
+
+              relative = sheet.relative_to(
+                  sheet_root
+              )
+
+              relative_key = without_suffix(
+                  relative
+              )
+
+              portrait = (
+                  portraits_by_relative.get(
+                      relative_key
+                  )
+                  or
+                  portraits_by_stem.get(
+                      sheet.stem.casefold()
+                  )
+              )
+
+              raw_id = (
+                  relative
+                  .with_suffix("")
+                  .as_posix()
+              )
+
+              asset_id = re.sub(
+                  r"[^a-zA-Z0-9._-]+",
+                  "-",
+                  raw_id
+              ).strip("-").lower()
+
+              group = (
+                  relative.parent.as_posix()
+              )
+
+              if group == ".":
+                  group = ""
+
+              sheet_url = raw_url(sheet)
+
+              portrait_url = (
+                  raw_url(portrait)
+                  if portrait
+                  else None
+              )
+
+              name = nice_name(
+                  sheet.stem
+              )
+
+              trainers.append({
+                  "id": asset_id,
+                  "name": name,
+                  "search": (
+                      f"{name} {group}"
+                      .strip()
+                      .lower()
+                  ),
+                  "group": group,
+                  "sheet": sheet_url,
+                  "portrait": portrait_url,
+                  "preview": (
+                      portrait_url
+                      or
+                      sheet_url
+                  )
+              })
+
+          # Evita publicar silenciosamente
+          # uma release quebrada caso a
+          # estrutura externa mude.
+          if len(trainers) < 20:
+              raise SystemExit(
+                  "Catalog validation failed: "
+                  f"only {len(trainers)} trainers found."
+              )
+
+          commit = subprocess.check_output(
+              [
+                  "git",
+                  "-C",
+                  str(repo),
+                  "rev-parse",
+                  "HEAD"
+              ],
+              text=True
+          ).strip()
+
+          output = {
+              "schemaVersion": 1,
+
+              "source": {
+                  "repository":
+                      "righthandofvecna/pokemon-assets",
+
+                  "commit":
+                      commit
+              },
+
+              "trainers":
+                  trainers
+          }
+
+          Path("data").mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          with open(
+              "data/trainers-catalog.json",
+              "w",
+              encoding="utf-8"
+          ) as f:
+
+              json.dump(
+                  output,
+                  f,
+                  ensure_ascii=False,
+                  indent=2
+              )
+
+              f.write("\n")
+
+          print(
+              f"Trainer catalog: "
+              f"{len(trainers)} entries"
+          )
+          PY
+
+
+      - name: Validate generated catalog
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+
+          with open(
+              "data/trainers-catalog.json",
+              encoding="utf-8"
+          ) as f:
+              data = json.load(f)
+
+          trainers = data["trainers"]
+
+          assert len(trainers) >= 20
+
+          assert all(
+              x.get("id")
+              and
+              x.get("name")
+              and
+              x.get("sheet")
+              for x in trainers
+          )
+
+          print(
+              "Catalog validation OK:",
+              len(trainers)
+          )
+          PY
+
+
       - name: Build Foundry package
         env:
           VERSION: ${{ steps.vars.outputs.version }}
           TAG: ${{ github.ref_name }}
         shell: bash
         run: |
+          rm -rf release
+
           mkdir -p release/package
 
-          cp -R scripts styles templates data README.md release/package/
+          cp -R \
+            scripts \
+            styles \
+            templates \
+            data \
+            README.md \
+            release/package/
 
           python3 <<'PY'
           import json
           import os
 
-          with open("module.json", "r", encoding="utf-8-sig") as f:
+          with open(
+              "module.json",
+              "r",
+              encoding="utf-8-sig"
+          ) as f:
               manifest = json.load(f)
 
           version = os.environ["VERSION"]
           tag = os.environ["TAG"]
 
           manifest["version"] = version
+
           manifest["download"] = (
-              f"https://github.com/henriquebot/pokemon-litm-tools/"
-              f"releases/download/{tag}/pokemon-litm-tools.zip"
+              "https://github.com/"
+              "henriquebot/"
+              "pokemon-litm-tools/"
+              f"releases/download/{tag}/"
+              "pokemon-litm-tools.zip"
           )
 
           for path in [
               "release/package/module.json",
               "release/module.json"
           ]:
-              with open(path, "w", encoding="utf-8") as f:
-                  json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+              with open(
+                  path,
+                  "w",
+                  encoding="utf-8"
+              ) as f:
+
+                  json.dump(
+                      manifest,
+                      f,
+                      ensure_ascii=False,
+                      indent=2
+                  )
+
                   f.write("\n")
           PY
 
           cd release/package
-          zip -r ../pokemon-litm-tools.zip .
+
+          zip -r \
+            ../pokemon-litm-tools.zip \
+            .
+
+
+      - name: Validate release package
+        shell: bash
+        run: |
+          test -f release/package/module.json
+          test -f release/package/scripts/main.js
+          test -f release/package/scripts/importer-app.js
+          test -f release/package/templates/importer.hbs
+          test -f release/package/styles/importer.css
+          test -f release/package/data/trainers-catalog.json
+
+          python3 -m json.tool \
+            release/package/module.json \
+            > /dev/null
+
+          python3 -m json.tool \
+            release/package/data/trainers-catalog.json \
+            > /dev/null
+
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          gh release create "${{ github.ref_name }}" \
+          gh release create \
+            "${{ github.ref_name }}" \
             release/pokemon-litm-tools.zip \
             release/module.json \
             --title "${{ github.ref_name }}" \

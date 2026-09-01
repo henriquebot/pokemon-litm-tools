@@ -1,0 +1,101 @@
+﻿<div class="pokemon-importer-shell">
+
+  <header class="pokemon-importer-header">
+
+    <div class="pokemon-importer-summary">
+      <strong>Trainers</strong>
+
+      <span>
+        <span data-role="visible-count">{{trainerCount}}</span>
+        / {{trainerCount}}
+      </span>
+    </div>
+
+    <input
+      type="search"
+      data-role="trainer-search"
+      placeholder="Buscar Trainer..."
+      autocomplete="off"
+    >
+
+    {{#if dylanActive}}
+      <div class="pokemon-importer-status ok">
+        <i class="fa-solid fa-person-walking"></i>
+        Animação 2D ativa
+      </div>
+    {{else}}
+      <div class="pokemon-importer-status warning">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        Dylan's Animated Tokens não está ativo
+      </div>
+    {{/if}}
+
+  </header>
+
+
+  {{#if catalogError}}
+
+    <div class="pokemon-importer-error">
+      <strong>Erro carregando catálogo</strong>
+      <p>{{catalogError}}</p>
+    </div>
+
+  {{else}}
+
+    <div class="pokemon-importer-list">
+
+      {{#each trainers}}
+
+        <article
+          class="pokemon-trainer-card"
+          data-trainer-card
+          data-search="{{search}}"
+        >
+
+          <div class="pokemon-trainer-preview">
+
+            <img
+              src="{{preview}}"
+              alt="{{name}}"
+              loading="lazy"
+            >
+
+          </div>
+
+
+          <div class="pokemon-trainer-info">
+
+            <strong>
+              {{name}}
+            </strong>
+
+            {{#if group}}
+              <small>
+                {{group}}
+              </small>
+            {{/if}}
+
+          </div>
+
+
+          <button
+            type="button"
+            data-action="importTrainer"
+            data-id="{{id}}"
+          >
+
+            <i class="fa-solid fa-download"></i>
+
+            Importar
+
+          </button>
+
+        </article>
+
+      {{/each}}
+
+    </div>
+
+  {{/if}}
+
+</div>
