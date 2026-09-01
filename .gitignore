@@ -4,3 +4,7 @@ Thumbs.db
 release/
 node_modules/
 data/catalog.json
+
+# Runtime uploads do Foundry
+storage/*
+!storage/.gitkeep
