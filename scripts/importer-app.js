@@ -425,69 +425,144 @@ function cleanAnimation(animation) {
 /* CRIAR ACTOR                                               */
 /* --------------------------------------------------------- */
 
-async function prepareActorAssets(
-  entry
-) {
-  if (
-    entry.sheetLayout
-    ===
-    "gen1Vertical6"
-  ) {
-    return prepareVertical6(entry);
+function getOverworldFrameGrid(entry) {
+  const animation = cleanAnimation(entry.animation);
+
+  if (!animation) return null;
+
+  const frames = Number(animation.animationframes ?? 4);
+
+  switch (animation.sheetstyle) {
+    case "durlReduced":
+      return { columns: 3, rows: 4 };
+
+    case "dlru":
+      return { columns: frames, rows: 4 };
+
+    case "eight":
+      return { columns: frames, rows: 8 };
+
+    default:
+      return null;
+  }
+}
+
+async function createOverworldFrameBlob(sheetBlob, entry) {
+  const grid = getOverworldFrameGrid(entry);
+
+  if (!grid) return null;
+
+  const bitmap = await createImageBitmap(sheetBlob);
+
+  try {
+    const frameW = bitmap.width / grid.columns;
+    const frameH = bitmap.height / grid.rows;
+
+    if (
+      !Number.isInteger(frameW) ||
+      !Number.isInteger(frameH)
+    ) {
+      return null;
+    }
+
+    const canvas = document.createElement("canvas");
+
+    canvas.width = frameW;
+    canvas.height = frameH;
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.drawImage(
+      bitmap,
+      0, 0,
+      frameW, frameH,
+      0, 0,
+      frameW, frameH
+    );
+
+    return await canvasToBlob(canvas);
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function prepareActorAssets(entry) {
+  if (entry.sheetLayout === "gen1Vertical6") {
+    const prepared = await prepareVertical6(entry);
+
+    return {
+      ...prepared,
+      tokenPath: prepared.portraitPath
+    };
   }
 
-  const isPokemon =
-    entry.category === "pokemon";
+  const isPokemon = entry.category === "pokemon";
 
-  const portraitUrl =
-    entry.portrait
-    ||
-    entry.preview
-    ||
-    "icons/svg/mystery-man.svg";
+  const response = await fetch(entry.sheet);
 
-  const [
-    sheetPath,
-    portraitPath
-  ] =
-    await Promise.all([
+  if (!response.ok) {
+    throw new Error(
+      `Falha baixando ${entry.name}: HTTP ${response.status}`
+    );
+  }
 
-      persistRemoteAsset(
-        entry.sheet,
+  const sheetBlob = await response.blob();
 
+  const sheetPath =
+    await uploadBlob(
+      sheetBlob,
+      safeFilename(
+        isPokemon ? "pokemon-sheet" : "person-sheet",
+        entry,
+        entry.sheet
+      )
+    )
+    ?? entry.sheet;
+
+  let tokenPath = sheetPath;
+
+  const tokenBlob =
+    await createOverworldFrameBlob(sheetBlob, entry);
+
+  if (tokenBlob) {
+    tokenPath =
+      await uploadBlob(
+        tokenBlob,
         safeFilename(
           isPokemon
-            ? "pokemon-sheet"
-            : "person-sheet",
+            ? "pokemon-overworld"
+            : "person-overworld",
+          entry
+        )
+      )
+      ?? tokenPath;
+  }
 
+  let portraitPath =
+    tokenPath
+    ?? sheetPath
+    ?? "icons/svg/mystery-man.svg";
+
+  if (entry.portrait) {
+    portraitPath =
+      await persistRemoteAsset(
+        entry.portrait,
+        safeFilename(
+          isPokemon
+            ? "pokemon-portrait"
+            : "person-portrait",
           entry,
-          entry.sheet
+          entry.portrait
         )
-      ),
-
-      portraitUrl.startsWith("icons/")
-        ?
-        Promise.resolve(
-          portraitUrl
-        )
-        :
-        persistRemoteAsset(
-          portraitUrl,
-
-          safeFilename(
-            isPokemon
-              ? "pokemon-portrait"
-              : "person-portrait",
-
-            entry,
-            portraitUrl
-          )
-        )
-    ]);
+      )
+      ?? portraitPath;
+  }
 
   return {
     sheetPath,
-    portraitPath
+    portraitPath,
+    tokenPath
   };
 }
 
