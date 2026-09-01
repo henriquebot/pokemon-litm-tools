@@ -81,6 +81,11 @@ jobs:
             /tmp/pokemon-assets
 
 
+      - name: Add Pokemon height metadata
+        shell: bash
+        run: |
+          node tools/enrich-heights.mjs
+
       - name: Validate catalog
         shell: bash
 
@@ -275,4 +280,5 @@ jobs:
             release/module.json \
             --title "${{ github.ref_name }}" \
             --generate-notes
+
 

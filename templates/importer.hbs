@@ -4,38 +4,22 @@
 
     <nav class="pokemon-importer-tabs">
 
-      <button
-        type="button"
-        data-tab="people"
-        class="{{#if isPeople}}active{{/if}}"
-      >
-        <i class="fa-solid fa-user-group"></i>
-        Pessoas
-        <span>{{peopleCount}}</span>
+      <button type="button" data-tab="people"
+        class="{{#if isPeople}}active{{/if}}">
+        Pessoas <span>{{peopleCount}}</span>
       </button>
 
-      <button
-        type="button"
-        data-tab="pokemon"
-        class="{{#if isPokemon}}active{{/if}}"
-      >
-        <i class="fa-solid fa-paw"></i>
-        Pokémon
-        <span>{{pokemonCount}}</span>
+      <button type="button" data-tab="pokemon"
+        class="{{#if isPokemon}}active{{/if}}">
+        Pokémon <span>{{pokemonCount}}</span>
       </button>
 
-      <button
-        type="button"
-        data-tab="props"
-        class="{{#if isProps}}active{{/if}}"
-      >
-        <i class="fa-solid fa-tree"></i>
-        Props
-        <span>{{propsCount}}</span>
+      <button type="button" data-tab="props"
+        class="{{#if isProps}}active{{/if}}">
+        Props <span>{{propsCount}}</span>
       </button>
 
     </nav>
-
 
     <div class="pokemon-importer-toolbar">
 
@@ -52,36 +36,44 @@
         {{itemCount}}
       </span>
 
+      <button
+        type="button"
+        data-action="importSelected"
+        class="pokemon-import-selected"
+      >
+        <i class="fa-solid fa-download"></i>
+
+        Importar
+
+        (<span data-role="selected-count">{{selectedCount}}</span>)
+      </button>
+
     </div>
 
+    <div class="pokemon-selection-tools">
 
-    {{#unless dylanActive}}
+      <button
+        type="button"
+        data-action="selectVisible"
+      >
+        Selecionar visíveis
+      </button>
 
-      <div class="pokemon-importer-status warning">
+      <button
+        type="button"
+        data-action="clearSelection"
+      >
+        Limpar seleção
+      </button>
 
-        <i class="fa-solid fa-triangle-exclamation"></i>
-
-        Dylan's Animated Tokens não está ativo.
-
-      </div>
-
-    {{/unless}}
+    </div>
 
   </header>
-
 
   {{#if catalogError}}
 
     <div class="pokemon-importer-error">
-
-      <strong>
-        Erro carregando catálogo
-      </strong>
-
-      <p>
-        {{catalogError}}
-      </p>
-
+      {{catalogError}}
     </div>
 
   {{else}}
@@ -96,6 +88,18 @@
           data-search="{{search}}"
         >
 
+          <label class="pokemon-select-box">
+
+            <input
+              type="checkbox"
+              data-select-entry="{{category}}:{{id}}"
+              data-category="{{category}}"
+              data-id="{{id}}"
+              {{#if checked}}checked{{/if}}
+            >
+
+          </label>
+
           <div class="pokemon-asset-preview">
 
             <img
@@ -106,7 +110,6 @@
 
           </div>
 
-
           <div class="pokemon-asset-info">
 
             <strong title="{{name}}">
@@ -114,54 +117,27 @@
             </strong>
 
             {{#if meta}}
-
-              <small>
-                {{meta}}
-              </small>
-
+              <small>{{meta}}</small>
             {{/if}}
-
 
             {{#if isAnimated}}
 
               <small class="pokemon-animation-badge ok">
-
                 <i class="fa-solid fa-person-walking"></i>
-
                 Animado
-
               </small>
 
             {{else}}
 
               {{#unless ../isProps}}
-
                 <small class="pokemon-animation-badge">
-
-                  <i class="fa-solid fa-image"></i>
-
                   Estático
-
                 </small>
-
               {{/unless}}
 
             {{/if}}
 
           </div>
-
-
-          <button
-            type="button"
-            data-entry-id="{{id}}"
-            data-category="{{category}}"
-          >
-
-            <i class="{{buttonIcon}}"></i>
-
-            {{buttonLabel}}
-
-          </button>
 
         </article>
 
