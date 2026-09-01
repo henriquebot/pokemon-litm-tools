@@ -6,21 +6,44 @@ const LITM_SYSTEM_ID =
 
 
 function getActorFromApp(app) {
-  const actor =
-    app?.actor
-    ?? app?.document
-    ?? app?.object
-    ?? null;
+  const candidates = [
+    app?.actor,
+    app?.document,
+    app?.object,
+    app?.options?.document
+  ];
 
-  if (
-    actor?.documentName !== "Actor"
-    ||
-    actor?.type !== "litm-character"
-  ) {
-    return null;
+  for (const actor of candidates) {
+    if (
+      actor?.documentName === "Actor"
+      &&
+      actor?.type === "litm-character"
+    ) {
+      return actor;
+    }
   }
 
-  return actor;
+  return null;
+}
+
+
+function getRootElement(app, html) {
+  const candidates = [
+    html,
+    html?.[0],
+    app?.element,
+    app?.element?.[0],
+    app?._element,
+    app?._element?.[0]
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate instanceof HTMLElement) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 
@@ -475,12 +498,9 @@ async function renderActivePokemonUI(
   }
 
   const root =
-    app?.element
-    ??
-    (
-      html instanceof HTMLElement
-        ? html
-        : html?.[0]
+    getRootElement(
+      app,
+      html
     );
 
   if (!root) {
@@ -522,12 +542,32 @@ async function renderActivePokemonUI(
 
   previousBar?.remove();
 
-  const container =
+  const themeContainer =
     root.querySelector(
-      "#character .litm-character-themebooks-container"
+      ".litm-character-themebooks-container"
     );
 
+  const mainGrid =
+    root.querySelector(
+      ".themebooks-container[data-tab-category='main']"
+    );
+
+  const container =
+    themeContainer
+    ??
+    mainGrid?.parentElement
+    ??
+    null;
+
   if (!container) {
+    console.warn(
+      "Pokemon LITM Tools | Nao encontrei o container da ficha para o seletor de Pokemon ativo.",
+      {
+        actor: actor.name,
+        app: app?.constructor?.name
+      }
+    );
+
     return;
   }
 
@@ -672,15 +712,48 @@ function protectInactivePokemonUpdate(
 }
 
 
+function queueActivePokemonUI(
+  app,
+  html
+) {
+  requestAnimationFrame(
+    () => {
+      void renderActivePokemonUI(
+        app,
+        html
+      ).catch(
+        error => {
+          console.error(
+            "Pokemon LITM Tools | Seletor de Pokemon ativo:",
+            error
+          );
+        }
+      );
+    }
+  );
+}
+
+
 export function activatePokemonActiveThemeUI() {
+  /*
+   * Hook específico da ficha LitM.
+   */
+  Hooks.on(
+    "renderMistEngineLegendInTheMistCharacterSheet",
+    queueActivePokemonUI
+  );
+
+  /*
+   * Fallback para outras variantes/layouts da ficha.
+   */
   Hooks.on(
     "renderApplicationV2",
-    renderActivePokemonUI
+    queueActivePokemonUI
   );
 
   Hooks.on(
     "renderActorSheet",
-    renderActivePokemonUI
+    queueActivePokemonUI
   );
 
   Hooks.on(
