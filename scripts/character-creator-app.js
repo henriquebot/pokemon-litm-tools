@@ -15,6 +15,10 @@ import {
   openPokemonDb
 } from "./pokemon-links.js";
 
+import {
+  createCharacterThemes
+} from "./character-theme-builder.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -27,6 +31,75 @@ const DEFAULT_BACKGROUND =
   "systems/mist-engine-fvtt/assets/default_sheet_background.webp";
 
 let creatorApp = null;
+
+let archetypeCatalogPromise = null;
+
+
+async function loadCharacterArchetypes() {
+  if (!archetypeCatalogPromise) {
+    archetypeCatalogPromise =
+      fetch(
+        `modules/${MODULE_ID}/data/character-archetypes.json`
+      )
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(
+              "Nao foi possivel carregar os arquetipos."
+            );
+          }
+
+          return response.json();
+        })
+        .then(data =>
+          Array.isArray(data?.archetypes)
+            ? data.archetypes
+            : []
+        );
+  }
+
+  return archetypeCatalogPromise;
+}
+
+
+function makeThemeDraft(
+  theme,
+  presetIndex = null
+) {
+  return {
+    presetIndex,
+
+    name:
+      String(
+        theme?.name
+        ?? ""
+      ),
+
+    powerTags:
+      Array.from(
+        {
+          length: 3
+        },
+        (_, index) =>
+          String(
+            theme?.powerTags?.[index]
+            ?? ""
+          )
+      ),
+
+    weaknessTags: [
+      String(
+        theme?.weaknessTags?.[0]
+        ?? ""
+      )
+    ],
+
+    quest:
+      String(
+        theme?.quest
+        ?? ""
+      )
+  };
+}
 
 
 function loadImage(src) {
@@ -697,13 +770,17 @@ class PokemonCharacterCreatorApp
 
   dreamSelections = [];
 
+  archetypeId = null;
+
+  themeDrafts = [];
+
   busy = false;
 
 
   get totalSteps() {
     return (
       this.mode === "trainer"
-        ? 5
+        ? 7
         : 3
     );
   }
@@ -717,6 +794,60 @@ class PokemonCharacterCreatorApp
     }
 
     return !!this.customFile;
+  }
+
+
+  _themesReady() {
+    if (
+      this.mode !== "trainer"
+    ) {
+      return true;
+    }
+
+    if (
+      !Array.isArray(
+        this.themeDrafts
+      )
+      ||
+      this.themeDrafts.length !== 4
+    ) {
+      return false;
+    }
+
+    return this.themeDrafts.every(
+      draft =>
+        !!String(
+          draft?.name
+          ?? ""
+        ).trim()
+        &&
+        (
+          draft?.powerTags
+            ?.some(
+              tag =>
+                !!String(
+                  tag
+                  ?? ""
+                ).trim()
+            )
+        )
+        &&
+        (
+          draft?.weaknessTags
+            ?.some(
+              tag =>
+                !!String(
+                  tag
+                  ?? ""
+                ).trim()
+            )
+        )
+        &&
+        !!String(
+          draft?.quest
+          ?? ""
+        ).trim()
+    );
   }
 
 
@@ -1032,6 +1163,136 @@ class PokemonCharacterCreatorApp
     }
 
 
+    let archetypes = [];
+
+    let selectedArchetype = null;
+
+    if (
+      this.mode === "trainer"
+      &&
+      (
+        this.step === 6
+        ||
+        this.step === 7
+      )
+    ) {
+      archetypes =
+        await loadCharacterArchetypes();
+
+      archetypes =
+        archetypes.map(
+          archetype => ({
+            ...archetype,
+
+            selected:
+              archetype.id
+              ===
+              this.archetypeId
+          })
+        );
+
+      selectedArchetype =
+        archetypes.find(
+          archetype =>
+            archetype.id
+            ===
+            this.archetypeId
+        )
+        ?? null;
+    }
+
+
+    let themeEditorSlots = [];
+
+    if (
+      this.step === 7
+      &&
+      selectedArchetype
+    ) {
+      if (
+        !Array.isArray(
+          this.themeDrafts
+        )
+        ||
+        this.themeDrafts.length !== 4
+      ) {
+        this.themeDrafts =
+          selectedArchetype.themes
+            .slice(0, 4)
+            .map(
+              (theme, index) =>
+                makeThemeDraft(
+                  theme,
+                  index
+                )
+            );
+      }
+
+      themeEditorSlots =
+        this.themeDrafts.map(
+          (draft, slotIndex) => ({
+            index:
+              slotIndex,
+
+            number:
+              slotIndex + 1,
+
+            name:
+              draft.name,
+
+            powerTags:
+              draft.powerTags.map(
+                (name, tagIndex) => ({
+                  index:
+                    tagIndex,
+
+                  name
+                })
+              ),
+
+            weakness:
+              draft.weaknessTags?.[0]
+              ?? "",
+
+            quest:
+              draft.quest,
+
+            presetOptions: [
+              ...selectedArchetype.themes.map(
+                (theme, presetIndex) => ({
+                  value:
+                    String(
+                      presetIndex
+                    ),
+
+                  name:
+                    theme.name,
+
+                  selected:
+                    draft.presetIndex
+                    ===
+                    presetIndex
+                })
+              ),
+
+              {
+                value:
+                  "custom",
+
+                name:
+                  "Personalizado",
+
+                selected:
+                  draft.presetIndex
+                  ===
+                  "custom"
+              }
+            ]
+          })
+        );
+    }
+
+
     const users =
       game.users
         .filter(
@@ -1085,6 +1346,20 @@ class PokemonCharacterCreatorApp
         this.mode === "trainer"
         &&
         this._teamReady()
+      )
+      ||
+      (
+        this.step === 5
+        &&
+        this.mode === "trainer"
+      )
+      ||
+      (
+        this.step === 6
+        &&
+        this.mode === "trainer"
+        &&
+        !!this.archetypeId
       );
 
 
@@ -1100,9 +1375,11 @@ class PokemonCharacterCreatorApp
       (
         this.mode === "trainer"
         &&
-        this.step === 5
+        this.step === 7
         &&
         this._teamReady()
+        &&
+        this._themesReady()
       );
 
 
@@ -1130,6 +1407,12 @@ class PokemonCharacterCreatorApp
       stepIsDream:
         this.step === 5,
 
+      stepIsArchetype:
+        this.step === 6,
+
+      stepIsThemes:
+        this.step === 7,
+
       isTrainer:
         this.mode === "trainer",
 
@@ -1151,6 +1434,18 @@ class PokemonCharacterCreatorApp
 
       dreamCount:
         this.dreamSelections.length,
+
+      archetypes,
+
+      selectedArchetype,
+
+      themeEditorSlots,
+
+      themesReady:
+        this._themesReady(),
+
+      archetypeChosen:
+        !!this.archetypeId,
 
       teamSize:
         this.teamSize,
@@ -1280,6 +1575,12 @@ class PokemonCharacterCreatorApp
               0;
 
             this.dreamSelections =
+              [];
+
+            this.archetypeId =
+              null;
+
+            this.themeDrafts =
               [];
           }
 
@@ -1854,6 +2155,275 @@ class PokemonCharacterCreatorApp
     }
 
 
+    /* ARQUETIPO */
+
+    for (
+      const card
+      of this.element.querySelectorAll(
+        "[data-archetype-id]"
+      )
+    ) {
+      card.addEventListener(
+        "click",
+        () => {
+          const id =
+            card.dataset.archetypeId;
+
+          if (!id) return;
+
+          this.archetypeId =
+            id;
+
+          this.themeDrafts =
+            [];
+
+          for (
+            const other
+            of this.element.querySelectorAll(
+              "[data-archetype-id]"
+            )
+          ) {
+            other.classList.toggle(
+              "selected",
+              other === card
+            );
+          }
+
+          const next =
+            this.element.querySelector(
+              "[data-action='wizardNext']"
+            );
+
+          if (next) {
+            next.disabled =
+              false;
+          }
+        }
+      );
+    }
+
+
+    /* EDITOR DE THEMES */
+
+    const refreshThemeFinish =
+      () => {
+        const finish =
+          this.element.querySelector(
+            "[data-action='wizardFinish']"
+          );
+
+        if (finish) {
+          finish.disabled =
+            !this._themesReady();
+        }
+      };
+
+
+    for (
+      const select
+      of this.element.querySelectorAll(
+        "[data-theme-preset-slot]"
+      )
+    ) {
+      select.addEventListener(
+        "change",
+        async () => {
+          const slot =
+            Number(
+              select.dataset
+                .themePresetSlot
+            );
+
+          if (
+            !Number.isInteger(slot)
+          ) return;
+
+          const archetypes =
+            await loadCharacterArchetypes();
+
+          const archetype =
+            archetypes.find(
+              item =>
+                item.id
+                ===
+                this.archetypeId
+            );
+
+          if (!archetype) return;
+
+          if (
+            select.value
+            ===
+            "custom"
+          ) {
+            this.themeDrafts[slot] =
+              makeThemeDraft(
+                {},
+                "custom"
+              );
+          } else {
+            const presetIndex =
+              Number(
+                select.value
+              );
+
+            const preset =
+              archetype.themes?.[
+                presetIndex
+              ];
+
+            if (!preset) return;
+
+            this.themeDrafts[slot] =
+              makeThemeDraft(
+                preset,
+                presetIndex
+              );
+          }
+
+          await this.render({
+            force:
+              true
+          });
+        }
+      );
+    }
+
+
+    for (
+      const input
+      of this.element.querySelectorAll(
+        "[data-theme-name]"
+      )
+    ) {
+      input.addEventListener(
+        "input",
+        () => {
+          const slot =
+            Number(
+              input.dataset.themeName
+            );
+
+          if (!this.themeDrafts[slot]) {
+            return;
+          }
+
+          this.themeDrafts[slot].name =
+            input.value;
+
+          this.themeDrafts[slot].presetIndex =
+            "custom";
+
+          refreshThemeFinish();
+        }
+      );
+    }
+
+
+    for (
+      const input
+      of this.element.querySelectorAll(
+        "[data-theme-power]"
+      )
+    ) {
+      input.addEventListener(
+        "input",
+        () => {
+          const [
+            slotText,
+            tagText
+          ] =
+            input.dataset.themePower
+              .split(":");
+
+          const slot =
+            Number(slotText);
+
+          const tag =
+            Number(tagText);
+
+          if (
+            !this.themeDrafts[slot]
+          ) return;
+
+          this.themeDrafts[slot]
+            .powerTags[tag] =
+              input.value;
+
+          this.themeDrafts[slot]
+            .presetIndex =
+              "custom";
+
+          refreshThemeFinish();
+        }
+      );
+    }
+
+
+    for (
+      const input
+      of this.element.querySelectorAll(
+        "[data-theme-weakness]"
+      )
+    ) {
+      input.addEventListener(
+        "input",
+        () => {
+          const slot =
+            Number(
+              input.dataset
+                .themeWeakness
+            );
+
+          if (
+            !this.themeDrafts[slot]
+          ) return;
+
+          this.themeDrafts[slot]
+            .weaknessTags[0] =
+              input.value;
+
+          this.themeDrafts[slot]
+            .presetIndex =
+              "custom";
+
+          refreshThemeFinish();
+        }
+      );
+    }
+
+
+    for (
+      const input
+      of this.element.querySelectorAll(
+        "[data-theme-quest]"
+      )
+    ) {
+      input.addEventListener(
+        "input",
+        () => {
+          const slot =
+            Number(
+              input.dataset
+                .themeQuest
+            );
+
+          if (
+            !this.themeDrafts[slot]
+          ) return;
+
+          this.themeDrafts[slot].quest =
+            input.value;
+
+          this.themeDrafts[slot].presetIndex =
+            "custom";
+
+          refreshThemeFinish();
+        }
+      );
+    }
+
+
     /* VOLTAR */
 
     this.element
@@ -1919,6 +2489,16 @@ class PokemonCharacterCreatorApp
             this.mode === "trainer"
             &&
             !this._teamReady()
+          ) {
+            return;
+          }
+
+          if (
+            this.step === 6
+            &&
+            this.mode === "trainer"
+            &&
+            !this.archetypeId
           ) {
             return;
           }
@@ -2112,6 +2692,17 @@ class PokemonCharacterCreatorApp
               await savePokemonDreamTeam(
                 actor,
                 dreamEntries
+              );
+            }
+
+
+            if (
+              this.mode === "trainer"
+            ) {
+              await createCharacterThemes(
+                actor,
+                this.themeDrafts,
+                this.archetypeId
               );
             }
 

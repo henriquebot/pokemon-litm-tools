@@ -37,6 +37,20 @@
         Sonhos
       </div>
 
+      <div class="pokemon-wizard-line"></div>
+
+      <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}">
+        <span>6</span>
+        Perfil
+      </div>
+
+      <div class="pokemon-wizard-line"></div>
+
+      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}">
+        <span>7</span>
+        Themes
+      </div>
+
     {{/if}}
 
   </header>
@@ -678,6 +692,11 @@
         Isso n&atilde;o garante que eles aparecer&atilde;o.
       </p>
 
+      <p class="pokemon-dream-approval-note">
+        As escolhas devem ser aprovadas pelo Mestre e alinhadas
+        ao tipo de aventura que o grupo ir&aacute; jogar.
+      </p>
+
       <div class="pokemon-dream-counter">
         <i class="fa-solid fa-star"></i>
         Selecionados:
@@ -751,6 +770,189 @@
 
   {{/if}}
 
+  {{#if stepIsArchetype}}
+
+    <section class="pokemon-wizard-page pokemon-archetype-page">
+
+      <h2>
+        Que tipo de treinador voc&ecirc; quer ser?
+      </h2>
+
+      <p>
+        Escolha o perfil que mais combina com seu personagem.
+        Isso &eacute; apenas um ponto de partida: seus Themes poder&atilde;o ser personalizados.
+      </p>
+
+      <div class="pokemon-archetype-grid">
+
+        {{#each archetypes}}
+
+          <button
+            type="button"
+            class="pokemon-archetype-card{{#if selected}} selected{{/if}}"
+            data-archetype-id="{{id}}"
+          >
+            <strong>
+              {{name}}
+            </strong>
+
+            <span>
+              {{description}}
+            </span>
+          </button>
+
+        {{/each}}
+
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsThemes}}
+
+    <section class="pokemon-wizard-page pokemon-themes-page">
+
+      <h2>
+        Construa seus Themes
+      </h2>
+
+      <div class="pokemon-theme-guidance">
+        <strong>Como pensar seus Themes:</strong>
+        Power Tags dizem no que seu personagem &eacute; bom.
+        Weakness Tags mostram problemas que tornam a hist&oacute;ria interessante.
+        A Quest &eacute; a pergunta que move aquele Theme.
+      </div>
+
+      {{#if selectedArchetype}}
+
+        <div class="pokemon-theme-editor-heading">
+          <strong>
+            Perfil: {{selectedArchetype.name}}
+          </strong>
+
+          <span>
+            Use as sugest&otilde;es, troque o preset ou escreva algo totalmente seu.
+          </span>
+        </div>
+
+        <div class="pokemon-theme-editor-list">
+
+          {{#each themeEditorSlots}}
+
+            <article class="pokemon-theme-editor-card">
+
+              <header class="pokemon-theme-editor-card-header">
+
+                <span class="pokemon-theme-number">
+                  Theme {{number}}
+                </span>
+
+                <select data-theme-preset-slot="{{index}}">
+                  {{#each presetOptions}}
+                    <option
+                      value="{{value}}"
+                      {{#if selected}}selected{{/if}}
+                    >
+                      {{name}}
+                    </option>
+                  {{/each}}
+                </select>
+
+              </header>
+
+              <label>
+                Nome do Theme
+
+                <input
+                  type="text"
+                  data-theme-name="{{index}}"
+                  value="{{name}}"
+                  placeholder="Ex.: Instinto de Batalha"
+                >
+              </label>
+
+              <div class="pokemon-theme-editor-section">
+
+                <strong>
+                  Power Tags
+                </strong>
+
+                <small>
+                  Frases curtas sobre capacidades, recursos ou qualidades que ajudam voc&ecirc;.
+                </small>
+
+                {{#each powerTags}}
+
+                  <input
+                    type="text"
+                    data-theme-power="{{../index}}:{{index}}"
+                    value="{{name}}"
+                    placeholder="Ex.: Ler o campo de batalha"
+                  >
+
+                {{/each}}
+
+              </div>
+
+              <div class="pokemon-theme-editor-section">
+
+                <strong>
+                  Weakness Tag
+                </strong>
+
+                <small>
+                  Uma limita&ccedil;&atilde;o real que pode complicar suas a&ccedil;&otilde;es.
+                </small>
+
+                <input
+                  type="text"
+                  data-theme-weakness="{{index}}"
+                  value="{{weakness}}"
+                  placeholder="Ex.: Competitivo demais"
+                >
+
+              </div>
+
+              <div class="pokemon-theme-editor-section">
+
+                <strong>
+                  Quest
+                </strong>
+
+                <small>
+                  Uma pergunta aberta que voc&ecirc; quer explorar durante a hist&oacute;ria.
+                </small>
+
+                <input
+                  type="text"
+                  data-theme-quest="{{index}}"
+                  value="{{quest}}"
+                  placeholder="Ex.: Que tipo de treinador quero me tornar?"
+                >
+
+              </div>
+
+            </article>
+
+          {{/each}}
+
+        </div>
+
+      {{/if}}
+
+      <div class="pokemon-theme-rules-note">
+        Durante o jogo, voc&ecirc; ativa Power Tags que ajudam sua a&ccedil;&atilde;o.
+        Weakness Tags podem reduzir seu resultado, mas tamb&eacute;m ajudam o personagem a evoluir.
+        Quests orientam o desenvolvimento e as escolhas do personagem.
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
   <footer class="pokemon-wizard-footer">
 
     <button
@@ -766,7 +968,7 @@
       Etapa {{step}} de {{totalSteps}}
     </span>
 
-    {{#if stepIsDream}}
+    {{#if stepIsThemes}}
 
       <button
         type="button"

@@ -1,0 +1,284 @@
+{
+  "version": 1,
+  "archetypes": [
+    {
+      "id": "trainer",
+      "name": "Treinador Pokémon",
+      "description": "Você vive para treinar, viajar e crescer ao lado de seus Pokémon.",
+      "themes": [
+        {
+          "name": "Instinto de Batalha",
+          "powerTags": [
+            "Ler o campo de batalha",
+            "Estratégia sob pressão",
+            "Virada inesperada"
+          ],
+          "weaknessTags": [
+            "Competitivo demais"
+          ],
+          "quest": "Que tipo de treinador quero me tornar?"
+        },
+        {
+          "name": "Laço com meus Pokémon",
+          "powerTags": [
+            "Entender meu parceiro",
+            "Confiança mútua",
+            "Nunca abandonar um Pokémon"
+          ],
+          "weaknessTags": [
+            "Coloco meus Pokémon antes de mim"
+          ],
+          "quest": "Até onde vai nossa confiança?"
+        },
+        {
+          "name": "Vida na Estrada",
+          "powerTags": [
+            "Conheço rotas e atalhos",
+            "Acampar em qualquer lugar",
+            "Fazer amizade pelo caminho"
+          ],
+          "weaknessTags": [
+            "Sempre em movimento"
+          ],
+          "quest": "Onde realmente pertenço?"
+        },
+        {
+          "name": "Sonho de Grandeza",
+          "powerTags": [
+            "Foco no objetivo",
+            "Inspirar minha equipe",
+            "Levantar depois da derrota"
+          ],
+          "weaknessTags": [
+            "Obcecado por vencer"
+          ],
+          "quest": "O que significa ser o melhor?"
+        }
+      ]
+    },
+
+    {
+      "id": "professor",
+      "name": "Aspirante a Professor",
+      "description": "Você quer compreender Pokémon, fenômenos e mistérios que outros apenas observam.",
+      "themes": [
+        {
+          "name": "Olhar Científico",
+          "powerTags": [
+            "Observar padrões",
+            "Conhecimento Pokémon",
+            "Formular hipóteses rapidamente"
+          ],
+          "weaknessTags": [
+            "Preciso entender tudo"
+          ],
+          "quest": "Que descoberta vai definir meu nome?"
+        },
+        {
+          "name": "Trabalho de Campo",
+          "powerTags": [
+            "Coletar evidências",
+            "Registrar detalhes",
+            "Improvisar instrumentos"
+          ],
+          "weaknessTags": [
+            "Equipamento delicado"
+          ],
+          "quest": "O que existe além dos livros?"
+        },
+        {
+          "name": "Rede Acadêmica",
+          "powerTags": [
+            "Contatos em laboratórios",
+            "Acesso a informações",
+            "Sei quem perguntar"
+          ],
+          "weaknessTags": [
+            "Reputação a zelar"
+          ],
+          "quest": "Em quem posso confiar minha pesquisa?"
+        },
+        {
+          "name": "Fascínio pelo Desconhecido",
+          "powerTags": [
+            "Curiosidade incansável",
+            "Coragem diante do estranho",
+            "Ligar pistas improváveis"
+          ],
+          "weaknessTags": [
+            "Curioso demais"
+          ],
+          "quest": "Qual mistério não consigo deixar de perseguir?"
+        }
+      ]
+    },
+
+    {
+      "id": "photographer",
+      "name": "Fotógrafo Pokémon",
+      "description": "Você viaja atrás de imagens, comportamentos raros e histórias dignas de registro.",
+      "themes": [
+        {
+          "name": "Olho Fotográfico",
+          "powerTags": [
+            "Enquadramento perfeito",
+            "Notar pequenos detalhes",
+            "Capturar o instante"
+          ],
+          "weaknessTags": [
+            "Preciso da foto perfeita"
+          ],
+          "quest": "Qual imagem quero deixar para o mundo?"
+        },
+        {
+          "name": "Caçador de Momentos",
+          "powerTags": [
+            "Paciência",
+            "Passar despercebido",
+            "Antecipar comportamento Pokémon"
+          ],
+          "weaknessTags": [
+            "Me arrisco pelo clique"
+          ],
+          "quest": "Quanto vale uma foto única?"
+        },
+        {
+          "name": "Equipamento de Campo",
+          "powerTags": [
+            "Câmera versátil",
+            "Lente certa para o momento",
+            "Sempre tenho um plano de reserva"
+          ],
+          "weaknessTags": [
+            "Dependo do equipamento"
+          ],
+          "quest": "Como mostrar aquilo que ninguém viu?"
+        },
+        {
+          "name": "Contador de Histórias",
+          "powerTags": [
+            "Ganhar confiança",
+            "Fazer as perguntas certas",
+            "Mostrar emoção"
+          ],
+          "weaknessTags": [
+            "Não consigo ficar indiferente"
+          ],
+          "quest": "Que história merece ser contada?"
+        }
+      ]
+    },
+
+    {
+      "id": "ranger",
+      "name": "Pokémon Ranger",
+      "description": "Você protege pessoas, Pokémon e ambientes onde os dois precisam coexistir.",
+      "themes": [
+        {
+          "name": "Protetor da Natureza",
+          "powerTags": [
+            "Ler rastros",
+            "Sobrevivência",
+            "Conhecer habitats"
+          ],
+          "weaknessTags": [
+            "Não tolero abuso contra Pokémon"
+          ],
+          "quest": "O que estou disposto a proteger?"
+        },
+        {
+          "name": "Captura e Resgate",
+          "powerTags": [
+            "Acalmar Pokémon",
+            "Aproximação segura",
+            "Agir em emergências"
+          ],
+          "weaknessTags": [
+            "Assumo riscos demais"
+          ],
+          "quest": "Quem precisa de mim agora?"
+        },
+        {
+          "name": "Dever Ranger",
+          "powerTags": [
+            "Autoridade local",
+            "Rede de Rangers",
+            "Protocolos de crise"
+          ],
+          "weaknessTags": [
+            "O peso da responsabilidade"
+          ],
+          "quest": "Quando devo seguir as regras e quando devo quebrá-las?"
+        },
+        {
+          "name": "Harmonia com Pokémon",
+          "powerTags": [
+            "Sentir suas intenções",
+            "Criar confiança rapidamente",
+            "Cooperar sem dominar"
+          ],
+          "weaknessTags": [
+            "Evito ferir Pokémon"
+          ],
+          "quest": "Como provar que humanos e Pokémon podem agir juntos?"
+        }
+      ]
+    },
+
+    {
+      "id": "specialist",
+      "name": "Trainer Class / Especialista",
+      "description": "Bug Catcher, Swimmer, Maniac ou qualquer treinador definido por uma especialidade.",
+      "themes": [
+        {
+          "name": "Minha Especialidade",
+          "powerTags": [
+            "Conhecimento profundo da minha área",
+            "Técnica característica",
+            "Reputação entre especialistas"
+          ],
+          "weaknessTags": [
+            "Visão estreita"
+          ],
+          "quest": "Até onde minha especialidade pode me levar?"
+        },
+        {
+          "name": "Meu Estilo",
+          "powerTags": [
+            "Método próprio",
+            "Treino dedicado",
+            "Surpreender quem me subestima"
+          ],
+          "weaknessTags": [
+            "Meu estilo pode ficar previsível"
+          ],
+          "quest": "Como tornar meu estilo realmente único?"
+        },
+        {
+          "name": "Minha Comunidade",
+          "powerTags": [
+            "Conheço meu meio",
+            "Contatos da área",
+            "Falo a linguagem do grupo"
+          ],
+          "weaknessTags": [
+            "Rivalidades antigas"
+          ],
+          "quest": "Qual é meu lugar entre os meus?"
+        },
+        {
+          "name": "Provar meu Valor",
+          "powerTags": [
+            "Determinação",
+            "Aprender com cada derrota",
+            "Não recuar diante de desafios"
+          ],
+          "weaknessTags": [
+            "Tenho algo a provar"
+          ],
+          "quest": "Quando saberei que fui reconhecido?"
+        }
+      ]
+    }
+  ]
+}
