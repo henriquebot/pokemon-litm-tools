@@ -28,18 +28,37 @@
 }
 
 .pokemon-importer-tabs button.active {
-  box-shadow: inset 0 0 0 2px var(--color-border-highlight);
+  box-shadow:
+    inset 0 0 0 2px
+    var(--color-border-highlight);
+}
+
+.pokemon-importer-tabs button span {
+  opacity: .65;
+  font-size: .8em;
 }
 
 .pokemon-importer-toolbar {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns:
+    minmax(180px, 1fr)
+    auto
+    auto
+    auto;
   gap: 8px;
   align-items: center;
 }
 
 .pokemon-importer-toolbar input {
   width: 100%;
+}
+
+.pokemon-importer-toolbar select {
+  min-width: 150px;
+}
+
+.pokemon-count {
+  white-space: nowrap;
 }
 
 .pokemon-selection-tools {
@@ -59,24 +78,33 @@
   padding: 10px;
   display: grid;
   grid-template-columns:
-    repeat(auto-fill, minmax(270px, 1fr));
+    repeat(
+      auto-fill,
+      minmax(280px, 1fr)
+    );
   gap: 8px;
   align-content: start;
 }
 
 .pokemon-asset-card {
   display: grid;
-  grid-template-columns: 28px 72px 1fr;
+  grid-template-columns:
+    28px
+    72px
+    1fr;
   gap: 8px;
   align-items: center;
   min-height: 84px;
   padding: 7px;
-  border: 1px solid var(--color-border-light-primary);
+  border: 1px solid
+    var(--color-border-light-primary);
   border-radius: 6px;
 }
 
 .pokemon-asset-card:has(input:checked) {
-  box-shadow: inset 0 0 0 2px var(--color-border-highlight);
+  box-shadow:
+    inset 0 0 0 2px
+    var(--color-border-highlight);
 }
 
 .pokemon-asset-card[hidden] {
@@ -110,6 +138,15 @@
   image-rendering: pixelated;
 }
 
+.pokemon-vertical6-preview {
+  width: 64px;
+  height: 64px;
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: 100% 600%;
+  image-rendering: pixelated;
+}
+
 .pokemon-asset-info {
   min-width: 0;
   display: flex;
@@ -127,7 +164,23 @@
   opacity: .7;
 }
 
+.pokemon-provider {
+  font-size: .72rem;
+}
+
+.pokemon-animation-badge.ok {
+  opacity: .9;
+}
+
 .pokemon-importer-error {
   margin: 15px;
   padding: 15px;
+}
+
+@media (max-width: 700px) {
+  .pokemon-importer-toolbar {
+    grid-template-columns:
+      1fr
+      auto;
+  }
 }

@@ -6,7 +6,7 @@ const LITM_SYSTEM_ID = "mist-engine-fvtt";
 Hooks.once("init", () => {
 
   console.log(
-    "Pokémon LITM Tools | Inicializando v0.6.0"
+    "Pokémon LITM Tools | Inicializando v0.7.0"
   );
 
   game.settings.register(
@@ -25,33 +25,57 @@ Hooks.once("init", () => {
   };
 });
 
-Hooks.on("getSceneControlButtons", controls => {
-  if (!game.user.isGM) return;
+Hooks.on(
+  "getSceneControlButtons",
+  controls => {
 
-  const tokenControls = controls.tokens;
+    if (!game.user.isGM) return;
 
-  if (!tokenControls?.tools) return;
+    const tokenControls =
+      controls.tokens;
 
-  tokenControls.tools.pokemonImporter = {
-    name: "pokemonImporter",
-    title: "Pokémon Importer",
-    icon: "fa-solid fa-dragon",
-    order: 90,
-    button: true,
-    visible: true,
-    onChange: () => openPokemonImporter()
-  };
-});
+    if (!tokenControls?.tools) {
+      return;
+    }
+
+    tokenControls.tools.pokemonImporter = {
+      name:
+        "pokemonImporter",
+
+      title:
+        "Pokémon Importer",
+
+      icon:
+        "fa-solid fa-dragon",
+
+      order:
+        90,
+
+      button:
+        true,
+
+      visible:
+        true,
+
+      onChange:
+        () => openPokemonImporter()
+    };
+  }
+);
 
 Hooks.once("ready", () => {
 
-  if (game.system.id !== LITM_SYSTEM_ID) {
+  if (
+    game.system.id
+    !==
+    LITM_SYSTEM_ID
+  ) {
     console.warn(
       "Pokémon LITM Tools | Mundo atual não usa Legend in the Mist."
     );
   }
 
   console.log(
-    "Pokémon LITM Tools | Pronto v0.6.0"
+    "Pokémon LITM Tools | Pronto v0.7.0"
   );
 });

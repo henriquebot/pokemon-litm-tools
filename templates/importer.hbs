@@ -4,22 +4,35 @@
 
     <nav class="pokemon-importer-tabs">
 
-      <button type="button" data-tab="people"
-        class="{{#if isPeople}}active{{/if}}">
-        Pessoas <span>{{peopleCount}}</span>
+      <button
+        type="button"
+        data-tab="people"
+        class="{{#if isPeople}}active{{/if}}"
+      >
+        Pessoas
+        <span>{{peopleCount}}</span>
       </button>
 
-      <button type="button" data-tab="pokemon"
-        class="{{#if isPokemon}}active{{/if}}">
-        Pokémon <span>{{pokemonCount}}</span>
+      <button
+        type="button"
+        data-tab="pokemon"
+        class="{{#if isPokemon}}active{{/if}}"
+      >
+        Pokémon
+        <span>{{pokemonCount}}</span>
       </button>
 
-      <button type="button" data-tab="props"
-        class="{{#if isProps}}active{{/if}}">
-        Props <span>{{propsCount}}</span>
+      <button
+        type="button"
+        data-tab="props"
+        class="{{#if isProps}}active{{/if}}"
+      >
+        Props
+        <span>{{propsCount}}</span>
       </button>
 
     </nav>
+
 
     <div class="pokemon-importer-toolbar">
 
@@ -30,25 +43,86 @@
         autocomplete="off"
       >
 
-      <span>
-        <span data-role="visible-count">{{itemCount}}</span>
+      {{#if isPeople}}
+
+        <select data-role="person-type">
+
+          <option value="all">
+            Todos
+          </option>
+
+          <option value="trainer-class">
+            Trainer Classes
+          </option>
+
+          <option value="npc">
+            NPCs
+          </option>
+
+          <option value="named">
+            Personagens
+          </option>
+
+          <option value="player">
+            Protagonistas
+          </option>
+
+          <option value="rival">
+            Rivais
+          </option>
+
+          <option value="professor">
+            Professores
+          </option>
+
+          <option value="gym-leader">
+            Líderes
+          </option>
+
+          <option value="elite-four">
+            Elite Four
+          </option>
+
+          <option value="villain">
+            Vilões
+          </option>
+
+        </select>
+
+      {{/if}}
+
+
+      <span class="pokemon-count">
+
+        <span data-role="visible-count">
+          {{itemCount}}
+        </span>
+
         /
+
         {{itemCount}}
+
       </span>
+
 
       <button
         type="button"
         data-action="importSelected"
         class="pokemon-import-selected"
       >
+
         <i class="fa-solid fa-download"></i>
 
         Importar
 
-        (<span data-role="selected-count">{{selectedCount}}</span>)
+        (<span data-role="selected-count">
+          {{selectedCount}}
+        </span>)
+
       </button>
 
     </div>
+
 
     <div class="pokemon-selection-tools">
 
@@ -70,6 +144,7 @@
 
   </header>
 
+
   {{#if catalogError}}
 
     <div class="pokemon-importer-error">
@@ -86,6 +161,7 @@
           class="pokemon-asset-card"
           data-asset-card
           data-search="{{search}}"
+          data-person-type="{{personType}}"
         >
 
           <label class="pokemon-select-box">
@@ -100,15 +176,28 @@
 
           </label>
 
+
           <div class="pokemon-asset-preview">
 
-            <img
-              src="{{preview}}"
-              alt="{{name}}"
-              loading="lazy"
-            >
+            {{#if previewVertical6}}
+
+              <div
+                class="pokemon-vertical6-preview"
+                style="background-image:url('{{preview}}')"
+              ></div>
+
+            {{else}}
+
+              <img
+                src="{{preview}}"
+                alt="{{name}}"
+                loading="lazy"
+              >
+
+            {{/if}}
 
           </div>
+
 
           <div class="pokemon-asset-info">
 
@@ -117,22 +206,39 @@
             </strong>
 
             {{#if meta}}
-              <small>{{meta}}</small>
+
+              <small>
+                {{meta}}
+              </small>
+
+            {{/if}}
+
+            {{#if secondaryMeta}}
+
+              <small class="pokemon-provider">
+                {{secondaryMeta}}
+              </small>
+
             {{/if}}
 
             {{#if isAnimated}}
 
               <small class="pokemon-animation-badge ok">
+
                 <i class="fa-solid fa-person-walking"></i>
+
                 Animado
+
               </small>
 
             {{else}}
 
               {{#unless ../isProps}}
+
                 <small class="pokemon-animation-badge">
                   Estático
                 </small>
+
               {{/unless}}
 
             {{/if}}

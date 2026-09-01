@@ -19,11 +19,11 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
 
         with:
           node-version: "22"
@@ -58,17 +58,25 @@ jobs:
           fi
 
 
-      - name: Clone asset source
+      - name: Clone asset sources
         shell: bash
 
         run: |
 
-          rm -rf /tmp/pokemon-assets
+          rm -rf \
+            /tmp/pokemon-assets \
+            /tmp/gen1recomp-mods
 
           git clone \
             --depth 1 \
             https://github.com/righthandofvecna/pokemon-assets.git \
             /tmp/pokemon-assets
+
+          git clone \
+            --depth 1 \
+            --branch master \
+            https://github.com/LucianoNeo/gen1recomp-mods.git \
+            /tmp/gen1recomp-mods
 
 
       - name: Generate catalog
@@ -78,13 +86,16 @@ jobs:
 
           node \
             tools/build-catalog.mjs \
-            /tmp/pokemon-assets
+            /tmp/pokemon-assets \
+            /tmp/gen1recomp-mods
 
 
       - name: Add Pokemon height metadata
         shell: bash
+
         run: |
           node tools/enrich-heights.mjs
+
 
       - name: Validate catalog
         shell: bash
@@ -104,49 +115,81 @@ jobs:
             );
 
           const animatedPokemon =
-            c.pokemon
-              .filter(
-                x => x.animation
-              )
-              .length;
+            c.pokemon.filter(
+              x => x.animation
+            ).length;
 
-          if (
-            c.people.length < 100
-          ) {
+          const hgss =
+            c.people.filter(
+              x =>
+                x.provider
+                ===
+                "hgss-sprites"
+            );
+
+          const players =
+            c.people.filter(
+              x =>
+                x.personType
+                ===
+                "player"
+            );
+
+          const leaders =
+            c.people.filter(
+              x =>
+                x.personType
+                ===
+                "gym-leader"
+            );
+
+          if (c.people.length < 100) {
             throw new Error(
               `Only ${c.people.length} people`
             );
           }
 
-          if (
-            c.pokemon.length < 200
-          ) {
+          if (hgss.length < 15) {
+            throw new Error(
+              `Only ${hgss.length} HGSS people`
+            );
+          }
+
+          if (players.length < 3) {
+            throw new Error(
+              "Missing player characters"
+            );
+          }
+
+          if (leaders.length < 5) {
+            throw new Error(
+              "Missing Gym Leaders"
+            );
+          }
+
+          if (c.pokemon.length < 200) {
             throw new Error(
               `Only ${c.pokemon.length} Pokémon`
             );
           }
 
-          if (
-            animatedPokemon < 200
-          ) {
+          if (animatedPokemon < 200) {
             throw new Error(
-              `Only ${animatedPokemon} Pokémon have animation metadata`
+              `Only ${animatedPokemon} animated Pokémon`
             );
           }
 
-          if (
-            c.props.length < 1
-          ) {
+          if (c.props.length < 1) {
             throw new Error(
-              "No props found"
+              "No props"
             );
           }
 
           console.log(
             `Validated: ` +
-            `${c.people.length} people, ` +
-            `${c.pokemon.length} Pokémon ` +
-            `(${animatedPokemon} animated), ` +
+            `${c.people.length} people ` +
+            `(${hgss.length} HGSS), ` +
+            `${c.pokemon.length} Pokémon, ` +
             `${c.props.length} props.`
           );
 
@@ -189,14 +232,10 @@ jobs:
 
               manifest = json.load(f)
 
-
           version = os.environ["VERSION"]
-
           ref_name = os.environ["REF_NAME"]
 
-
           manifest["version"] = version
-
 
           manifest["download"] = (
               "https://github.com/"
@@ -205,7 +244,6 @@ jobs:
               f"releases/download/{ref_name}/"
               "pokemon-litm-tools.zip"
           )
-
 
           for target in (
               "release/package/module.json",
@@ -243,15 +281,10 @@ jobs:
         run: |
 
           test -f release/package/module.json
-
           test -f release/package/scripts/main.js
-
           test -f release/package/scripts/importer-app.js
-
           test -f release/package/templates/importer.hbs
-
           test -f release/package/styles/importer.css
-
           test -f release/package/data/catalog.json
 
           python3 -m json.tool \
@@ -280,5 +313,3 @@ jobs:
             release/module.json \
             --title "${{ github.ref_name }}" \
             --generate-notes
-
-
