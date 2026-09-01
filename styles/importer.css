@@ -267,3 +267,16 @@
 img[hidden] {
   display: none !important;
 }
+
+
+.pokemon-asset-card {
+  cursor: grab;
+}
+
+.pokemon-asset-card:active {
+  cursor: grabbing;
+}
+
+.pokemon-asset-card.dragging {
+  opacity: .55;
+}

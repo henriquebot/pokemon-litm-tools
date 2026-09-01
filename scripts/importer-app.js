@@ -2,6 +2,9 @@
 const DYLAN_ID = "dylans-animated-tokens";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
+export const POKEMON_IMPORTER_DRAG_TYPE =
+  "PokemonLITMAsset";
+
 const {
   ApplicationV2,
   HandlebarsApplicationMixin
@@ -834,16 +837,16 @@ async function prepareActorAssets(entry) {
   };
 }
 
-async function createActorFromEntry(
-  entry,
-  folderId = null
+async function prepareActorDefinition(
+  entry
 ) {
   const isPokemon =
     entry.category === "pokemon";
 
   const {
     sheetPath,
-    portraitPath
+    portraitPath,
+    tokenPath
   } =
     await prepareActorAssets(entry);
 
@@ -861,7 +864,7 @@ async function createActorFromEntry(
 
   const moduleFlags = {
     schemaVersion:
-      7,
+      8,
 
     kind:
       isPokemon
@@ -909,7 +912,10 @@ async function createActorFromEntry(
         sheetPath,
 
       portrait:
-        portraitPath
+        portraitPath,
+
+      overworld:
+        tokenPath
     },
 
     animation
@@ -934,6 +940,25 @@ async function createActorFromEntry(
     };
   }
 
+  return {
+    portraitPath,
+    tokenPath,
+    visualScale,
+    moduleFlags,
+    prototypeFlags
+  };
+}
+
+
+async function createActorFromEntry(
+  entry,
+  folderId = null
+) {
+  const definition =
+    await prepareActorDefinition(
+      entry
+    );
+
   const actor =
     await Actor
       .implementation
@@ -949,7 +974,7 @@ async function createActorFromEntry(
           : {}),
 
         img:
-          portraitPath,
+          definition.portraitPath,
 
         prototypeToken: {
           name:
@@ -963,13 +988,13 @@ async function createActorFromEntry(
 
           texture: {
             src:
-              portraitPath,
+              definition.tokenPath,
 
             scaleX:
-              visualScale,
+              definition.visualScale,
 
             scaleY:
-              visualScale
+              definition.visualScale
           },
 
           lockRotation:
@@ -981,18 +1006,18 @@ async function createActorFromEntry(
               .NEUTRAL,
 
           flags:
-            prototypeFlags
+            definition.prototypeFlags
         },
 
         flags: {
           [MODULE_ID]:
-            moduleFlags
+            definition.moduleFlags
         }
       });
 
   if (!actor) {
     throw new Error(
-      `Não foi possível criar ${entry.name}`
+      `N?o foi poss?vel criar ${entry.name}`
     );
   }
 
@@ -1000,11 +1025,209 @@ async function createActorFromEntry(
 }
 
 
+async function ensureActorCurrent(
+  actor,
+  entry
+) {
+  const current =
+    actor.flags?.[
+      MODULE_ID
+    ]
+    ??
+    {};
+
+  if (
+    Number(
+      current.schemaVersion
+      ?? 0
+    ) >= 8
+    &&
+    current.assets?.overworld
+  ) {
+    return actor;
+  }
+
+  const definition =
+    await prepareActorDefinition(
+      entry
+    );
+
+  await actor.update({
+    img:
+      definition.portraitPath,
+
+    prototypeToken: {
+      texture: {
+        src:
+          definition.tokenPath,
+
+        scaleX:
+          definition.visualScale,
+
+        scaleY:
+          definition.visualScale
+      },
+
+      lockRotation:
+        true,
+
+      flags:
+        definition.prototypeFlags
+    },
+
+    flags: {
+      [MODULE_ID]:
+        definition.moduleFlags
+    }
+  });
+
+  return actor;
+}
+
+
+function rememberedActorFolderId() {
+  const id =
+    String(
+      game.settings.get(
+        MODULE_ID,
+        "lastActorFolder"
+      )
+      ??
+      ""
+    );
+
+  if (!id) {
+    return null;
+  }
+
+  const folder =
+    game.folders.get(id);
+
+  return (
+    folder?.type === "Actor"
+      ? id
+      : null
+  );
+}
+
+
+async function getOrCreateActorForEntry(
+  entry
+) {
+  const existing =
+    game.actors.find(
+      actor =>
+        actor.getFlag(
+          MODULE_ID,
+          "assetId"
+        )
+        ===
+        entry.id
+    );
+
+  if (existing) {
+    return ensureActorCurrent(
+      existing,
+      entry
+    );
+  }
+
+  return createActorFromEntry(
+    entry,
+    rememberedActorFolderId()
+  );
+}
+
+
+async function placeActorToken(
+  actor,
+  position
+) {
+  if (
+    !canvas?.ready ||
+    !canvas.scene
+  ) {
+    throw new Error(
+      "Abra uma Scene antes de colocar o token."
+    );
+  }
+
+  const token =
+    await actor.getTokenDocument();
+
+  const gridSize =
+    Number(
+      canvas.dimensions?.size
+      ??
+      canvas.grid?.size
+      ??
+      canvas.scene.grid?.size
+      ??
+      100
+    );
+
+  const width =
+    Number(
+      token.width
+      ??
+      1
+    );
+
+  const height =
+    Number(
+      token.height
+      ??
+      1
+    );
+
+  const centerX =
+    Number(position.x);
+
+  const centerY =
+    Number(position.y);
+
+  token.updateSource({
+    x:
+      centerX
+      -
+      (
+        width
+        *
+        gridSize
+        /
+        2
+      ),
+
+    y:
+      centerY
+      -
+      (
+        height
+        *
+        gridSize
+        /
+        2
+      )
+  });
+
+  await canvas.scene
+    .createEmbeddedDocuments(
+      "Token",
+      [
+        token.toObject()
+      ]
+    );
+}
+
+
 /* --------------------------------------------------------- */
 /* PROPS                                                     */
 /* --------------------------------------------------------- */
 
-async function placeProp(entry) {
+async function placeProp(
+  entry,
+  position = null
+) {
   if (
     !canvas?.ready ||
     !canvas.scene
@@ -1039,6 +1262,8 @@ async function placeProp(entry) {
 
   const centerX =
     Number(
+      position?.x
+      ??
       pivot?.x
       ??
       canvas.scene.width / 2
@@ -1046,6 +1271,8 @@ async function placeProp(entry) {
 
   const centerY =
     Number(
+      position?.y
+      ??
       pivot?.y
       ??
       canvas.scene.height / 2
@@ -1073,6 +1300,125 @@ async function placeProp(entry) {
         }
       }]
     );
+}
+
+
+/* --------------------------------------------------------- */
+/* DRAG & DROP                                               */
+/* --------------------------------------------------------- */
+
+function findCatalogEntry(
+  catalog,
+  category,
+  id
+) {
+  return (
+    catalog?.[category]
+      ?.find(
+        entry =>
+          entry.id === id
+      )
+    ??
+    null
+  );
+}
+
+
+export async function handlePokemonImporterCanvasDrop(
+  data
+) {
+  if (
+    !game.user.isGM ||
+    data?.type
+      !==
+      POKEMON_IMPORTER_DRAG_TYPE ||
+    data?.moduleId
+      !==
+      MODULE_ID
+  ) {
+    return false;
+  }
+
+  if (
+    !canvas?.ready ||
+    !canvas.scene
+  ) {
+    ui.notifications.warn(
+      "Abra uma Scene primeiro."
+    );
+
+    return true;
+  }
+
+  const category =
+    String(
+      data.category
+      ??
+      ""
+    );
+
+  const id =
+    String(
+      data.id
+      ??
+      ""
+    );
+
+  const catalog =
+    await loadCatalog();
+
+  const entry =
+    findCatalogEntry(
+      catalog,
+      category,
+      id
+    );
+
+  if (!entry) {
+    throw new Error(
+      `Asset n?o encontrado: ${category}:${id}`
+    );
+  }
+
+  const position = {
+    x:
+      Number(data.x),
+
+    y:
+      Number(data.y)
+  };
+
+  if (
+    !Number.isFinite(position.x) ||
+    !Number.isFinite(position.y)
+  ) {
+    throw new Error(
+      "O Foundry n?o forneceu coordenadas v?lidas para o drop."
+    );
+  }
+
+  if (
+    category === "props"
+  ) {
+    await placeProp(
+      entry,
+      position
+    );
+
+    return true;
+  }
+
+  const actor =
+    await getOrCreateActorForEntry(
+      entry
+    );
+
+  await placeActorToken(
+    actor,
+    position
+  );
+
+  return true;
 }
 
 
@@ -1653,6 +1999,74 @@ class PokemonImporterApp
       "change",
       applyFilter
     );
+
+
+    /* ARRASTAR PARA A SCENE */
+
+    for (
+      const card
+      of this.element
+        .querySelectorAll(
+          "[data-asset-card]"
+        )
+    ) {
+      card.addEventListener(
+        "dragstart",
+
+        event => {
+          const transfer =
+            event.dataTransfer;
+
+          const category =
+            card.dataset.category;
+
+          const id =
+            card.dataset.assetId;
+
+          if (
+            !transfer ||
+            !category ||
+            !id
+          ) {
+            event.preventDefault();
+            return;
+          }
+
+          transfer.effectAllowed =
+            "copy";
+
+          transfer.setData(
+            "text/plain",
+
+            JSON.stringify({
+              type:
+                POKEMON_IMPORTER_DRAG_TYPE,
+
+              moduleId:
+                MODULE_ID,
+
+              category,
+
+              id
+            })
+          );
+
+          card.classList.add(
+            "dragging"
+          );
+        }
+      );
+
+      card.addEventListener(
+        "dragend",
+
+        () => {
+          card.classList.remove(
+            "dragging"
+          );
+        }
+      );
+    }
 
 
     /* CHECKBOX */

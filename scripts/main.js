@@ -1,4 +1,8 @@
-﻿import { openPokemonImporter } from "./importer-app.js";
+﻿import {
+  openPokemonImporter,
+  handlePokemonImporterCanvasDrop,
+  POKEMON_IMPORTER_DRAG_TYPE
+} from "./importer-app.js";
 
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
@@ -62,6 +66,46 @@ Hooks.on(
     };
   }
 );
+
+Hooks.on(
+  "dropCanvasData",
+
+  (
+    canvasInstance,
+    data,
+    event
+  ) => {
+    if (
+      data?.type
+        !==
+        POKEMON_IMPORTER_DRAG_TYPE ||
+      data?.moduleId
+        !==
+        MODULE_ID
+    ) {
+      return;
+    }
+
+    event?.preventDefault();
+
+    void handlePokemonImporterCanvasDrop(
+      data
+    )
+      .catch(error => {
+        console.error(
+          "Pok?mon LITM Tools | Canvas drop:",
+          error
+        );
+
+        ui.notifications.error(
+          "N?o foi poss?vel colocar o asset. Veja F12."
+        );
+      });
+
+    return false;
+  }
+);
+
 
 Hooks.once("ready", () => {
 
