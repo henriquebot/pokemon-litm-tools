@@ -486,7 +486,39 @@ function getImporterPreviewData(
 }
 
 
-function updateOverworldPreviewSize(
+function sizePreviewElement(
+  element,
+  naturalWidth,
+  naturalHeight,
+  zoomed
+) {
+  if (
+    !naturalWidth ||
+    !naturalHeight
+  ) {
+    return;
+  }
+
+  const maxSize =
+    zoomed
+      ? 136
+      : 64;
+
+  const scale =
+    Math.min(
+      maxSize / naturalWidth,
+      maxSize / naturalHeight
+    );
+
+  element.style.width =
+    `${naturalWidth * scale}px`;
+
+  element.style.height =
+    `${naturalHeight * scale}px`;
+}
+
+
+function renderOverworldPreview(
   image,
   zoomed
 ) {
@@ -503,43 +535,29 @@ function updateOverworldPreviewSize(
     );
 
   const naturalWidth =
-    Number(image.naturalWidth);
+    image.naturalWidth;
 
   const naturalHeight =
-    Number(image.naturalHeight);
+    image.naturalHeight;
 
   if (
     !naturalWidth ||
     !naturalHeight ||
-    columns <= 0 ||
-    rows <= 0
+    columns < 1 ||
+    rows < 1
   ) {
     return;
   }
 
   const frameWidth =
-    naturalWidth / columns;
-
-  const frameHeight =
-    naturalHeight / rows;
-
-  const maxSize =
-    zoomed
-      ? 136
-      : 64;
-
-  const scale =
-    Math.min(
-      maxSize / frameWidth,
-      maxSize / frameHeight
+    Math.round(
+      naturalWidth / columns
     );
 
-  if (
-    !Number.isFinite(scale) ||
-    scale <= 0
-  ) {
-    return;
-  }
+  const frameHeight =
+    Math.round(
+      naturalHeight / rows
+    );
 
   const wrapper =
     image.closest(
@@ -548,21 +566,85 @@ function updateOverworldPreviewSize(
 
   if (!wrapper) return;
 
+  let canvas =
+    wrapper.querySelector(
+      "[data-overworld-canvas]"
+    );
+
+  if (!canvas) {
+    canvas =
+      document.createElement(
+        "canvas"
+      );
+
+    canvas.dataset.overworldCanvas =
+      "";
+
+    wrapper.append(canvas);
+  }
+
+  if (
+    canvas.width !== frameWidth ||
+    canvas.height !== frameHeight
+  ) {
+    canvas.width =
+      frameWidth;
+
+    canvas.height =
+      frameHeight;
+
+    const ctx =
+      canvas.getContext(
+        "2d",
+        {
+          alpha: true
+        }
+      );
+
+    ctx.imageSmoothingEnabled =
+      false;
+
+    ctx.clearRect(
+      0,
+      0,
+      frameWidth,
+      frameHeight
+    );
+
+    ctx.drawImage(
+      image,
+
+      0,
+      0,
+      frameWidth,
+      frameHeight,
+
+      0,
+      0,
+      frameWidth,
+      frameHeight
+    );
+  }
+
+  image.hidden =
+    true;
+
+  sizePreviewElement(
+    canvas,
+    frameWidth,
+    frameHeight,
+    zoomed
+  );
+
   wrapper.style.width =
-    `${frameWidth * scale}px`;
+    canvas.style.width;
 
   wrapper.style.height =
-    `${frameHeight * scale}px`;
-
-  image.style.width =
-    `${naturalWidth * scale}px`;
-
-  image.style.height =
-    `${naturalHeight * scale}px`;
+    canvas.style.height;
 }
 
 
-function refreshOverworldPreviews(
+function refreshImporterPreviews(
   root,
   zoomed
 ) {
@@ -574,8 +656,42 @@ function refreshOverworldPreviews(
   ) {
     const update =
       () =>
-        updateOverworldPreviewSize(
+        renderOverworldPreview(
           image,
+          zoomed
+        );
+
+    if (
+      image.complete &&
+      image.naturalWidth
+    ) {
+      update();
+    }
+
+    else {
+      image.addEventListener(
+        "load",
+        update,
+        {
+          once: true
+        }
+      );
+    }
+  }
+
+
+  for (
+    const image
+    of root.querySelectorAll(
+      ".pokemon-asset-preview > img:not([data-overworld-preview])"
+    )
+  ) {
+    const update =
+      () =>
+        sizePreviewElement(
+          image,
+          image.naturalWidth,
+          image.naturalHeight,
           zoomed
         );
 
@@ -1348,7 +1464,7 @@ class PokemonImporterApp
       );
 
 
-    refreshOverworldPreviews(
+    refreshImporterPreviews(
       this.element,
       this.previewZoomed
     );
@@ -1412,7 +1528,7 @@ class PokemonImporterApp
             this.previewZoomed
           );
 
-          refreshOverworldPreviews(
+          refreshImporterPreviews(
             this.element,
             this.previewZoomed
           );

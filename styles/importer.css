@@ -256,3 +256,14 @@
   object-fit: contain;
   image-rendering: pixelated;
 }
+
+
+.pokemon-overworld-preview canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.pokemon-overworld-preview
+img[hidden] {
+  display: none !important;
+}
