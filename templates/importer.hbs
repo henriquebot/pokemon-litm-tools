@@ -1,4 +1,4 @@
-﻿<div class="pokemon-importer-shell">
+﻿<div class="pokemon-importer-shell{{#if previewZoomed}} preview-zoomed{{/if}}">
 
   <header class="pokemon-importer-header">
 
@@ -140,6 +140,16 @@
         Limpar seleção
       </button>
 
+      <button
+        type="button"
+        data-action="togglePreviewZoom"
+        class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+        aria-pressed="{{#if previewZoomed}}true{{else}}false{{/if}}"
+      >
+        <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+        Zoom
+      </button>
+
     </div>
 
   </header>
@@ -179,12 +189,18 @@
 
           <div class="pokemon-asset-preview">
 
-            {{#if previewVertical6}}
+            {{#if previewCropped}}
 
-              <div
-                class="pokemon-vertical6-preview"
-                style="background-image:url('{{preview}}')"
-              ></div>
+              <div class="pokemon-overworld-preview">
+
+                <img
+                  src="{{preview}}"
+                  alt="{{name}}"
+                  loading="lazy"
+                  style="--preview-columns:{{previewColumns}}; --preview-rows:{{previewRows}};"
+                >
+
+              </div>
 
             {{else}}
 

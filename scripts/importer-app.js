@@ -447,6 +447,45 @@ function getOverworldFrameGrid(entry) {
   }
 }
 
+function getImporterPreviewData(
+  entry,
+  activeTab
+) {
+  if (
+    activeTab !== "people" ||
+    entry.portrait
+  ) {
+    return {
+      previewCropped: false,
+      previewColumns: 1,
+      previewRows: 1
+    };
+  }
+
+  const grid =
+    entry.previewMode === "vertical6"
+      ? {
+          columns: 1,
+          rows: 6
+        }
+      : getOverworldFrameGrid(entry);
+
+  if (!grid) {
+    return {
+      previewCropped: false,
+      previewColumns: 1,
+      previewRows: 1
+    };
+  }
+
+  return {
+    previewCropped: true,
+    previewColumns: grid.columns,
+    previewRows: grid.rows
+  };
+}
+
+
 async function createOverworldFrameBlob(sheetBlob, entry) {
   const grid = getOverworldFrameGrid(entry);
 
@@ -1033,6 +1072,9 @@ class PokemonImporterApp
   selected =
     new Map();
 
+  previewZoomed =
+    false;
+
   async _prepareContext(options) {
     const context =
       await super._prepareContext(options);
@@ -1085,10 +1127,10 @@ class PokemonImporterApp
             isAnimated:
               !!entry.animation,
 
-            previewVertical6:
-              entry.previewMode
-              ===
-              "vertical6"
+            ...getImporterPreviewData(
+              entry,
+              this.activeTab
+            )
           }));
 
       return {
@@ -1101,6 +1143,9 @@ class PokemonImporterApp
 
         selectedCount:
           this.selected.size,
+
+        previewZoomed:
+          this.previewZoomed,
 
         peopleCount:
           catalog.people.length,
@@ -1223,6 +1268,58 @@ class PokemonImporterApp
         }
       );
     }
+
+
+    /* ZOOM DAS PREVIEWS */
+
+    this.element
+      .querySelector(
+        "[data-action='togglePreviewZoom']"
+      )
+      ?.addEventListener(
+        "click",
+
+        event => {
+          this.previewZoomed =
+            !this.previewZoomed;
+
+          const shell =
+            this.element.querySelector(
+              ".pokemon-importer-shell"
+            );
+
+          shell?.classList.toggle(
+            "preview-zoomed",
+            this.previewZoomed
+          );
+
+          const button =
+            event.currentTarget;
+
+          button.classList.toggle(
+            "active",
+            this.previewZoomed
+          );
+
+          button.setAttribute(
+            "aria-pressed",
+            String(this.previewZoomed)
+          );
+
+          const icon =
+            button.querySelector("i");
+
+          icon?.classList.toggle(
+            "fa-magnifying-glass-plus",
+            !this.previewZoomed
+          );
+
+          icon?.classList.toggle(
+            "fa-magnifying-glass-minus",
+            this.previewZoomed
+          );
+        }
+      );
 
 
     /* BUSCA + FILTRO */
