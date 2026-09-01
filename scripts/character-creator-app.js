@@ -642,7 +642,7 @@ class PokemonCharacterCreatorApp
     },
 
     window: {
-      title: "Criar Personagem Pok\\u00e9mon",
+      title: "Criar Personagem Pok\u00e9mon",
       icon: "fa-solid fa-user-plus",
       resizable: true
     }
