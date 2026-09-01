@@ -4,7 +4,7 @@ const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
 Hooks.once("init", () => {
-  console.log("Pokémon LITM Tools | Inicializando v0.4.1");
+  console.log("Pokémon LITM Tools | Inicializando v0.5.0");
 
   game.modules.get(MODULE_ID).api = {
     openPokemonImporter
@@ -35,5 +35,6 @@ Hooks.once("ready", () => {
     );
   }
 
-  console.log("Pokémon LITM Tools | Pronto v0.4.1");
+  console.log("Pokémon LITM Tools | Pronto v0.5.0");
 });
+

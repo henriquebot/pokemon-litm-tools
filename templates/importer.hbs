@@ -2,33 +2,70 @@
 
   <header class="pokemon-importer-header">
 
-    <div class="pokemon-importer-summary">
-      <strong>Trainers</strong>
+    <nav class="pokemon-importer-tabs">
+
+      <button
+        type="button"
+        data-tab="people"
+        class="{{#if isPeople}}active{{/if}}"
+      >
+        <i class="fa-solid fa-user-group"></i>
+        Pessoas
+        <span>{{peopleCount}}</span>
+      </button>
+
+      <button
+        type="button"
+        data-tab="pokemon"
+        class="{{#if isPokemon}}active{{/if}}"
+      >
+        <i class="fa-solid fa-paw"></i>
+        Pokémon
+        <span>{{pokemonCount}}</span>
+      </button>
+
+      <button
+        type="button"
+        data-tab="props"
+        class="{{#if isProps}}active{{/if}}"
+      >
+        <i class="fa-solid fa-tree"></i>
+        Props
+        <span>{{propsCount}}</span>
+      </button>
+
+    </nav>
+
+
+    <div class="pokemon-importer-toolbar">
+
+      <input
+        type="search"
+        data-role="asset-search"
+        placeholder="Buscar..."
+        autocomplete="off"
+      >
 
       <span>
-        <span data-role="visible-count">{{trainerCount}}</span>
-        / {{trainerCount}}
+        <span data-role="visible-count">{{itemCount}}</span>
+        /
+        {{itemCount}}
       </span>
+
     </div>
 
-    <input
-      type="search"
-      data-role="trainer-search"
-      placeholder="Buscar Trainer..."
-      autocomplete="off"
-    >
 
-    {{#if dylanActive}}
-      <div class="pokemon-importer-status ok">
-        <i class="fa-solid fa-person-walking"></i>
-        Animação 2D ativa
-      </div>
-    {{else}}
+    {{#unless dylanActive}}
+
       <div class="pokemon-importer-status warning">
+
         <i class="fa-solid fa-triangle-exclamation"></i>
-        Dylan's Animated Tokens não está ativo
+
+        Dylan's Animated Tokens não está ativo.
+
       </div>
-    {{/if}}
+
+    {{/unless}}
 
   </header>
 
@@ -36,23 +73,30 @@
   {{#if catalogError}}
 
     <div class="pokemon-importer-error">
-      <strong>Erro carregando catálogo</strong>
-      <p>{{catalogError}}</p>
+
+      <strong>
+        Erro carregando catálogo
+      </strong>
+
+      <p>
+        {{catalogError}}
+      </p>
+
     </div>
 
   {{else}}
 
     <div class="pokemon-importer-list">
 
-      {{#each trainers}}
+      {{#each items}}
 
         <article
-          class="pokemon-trainer-card"
-          data-trainer-card
+          class="pokemon-asset-card"
+          data-asset-card
           data-search="{{search}}"
         >
 
-          <div class="pokemon-trainer-preview">
+          <div class="pokemon-asset-preview">
 
             <img
               src="{{preview}}"
@@ -63,16 +107,45 @@
           </div>
 
 
-          <div class="pokemon-trainer-info">
+          <div class="pokemon-asset-info">
 
-            <strong>
+            <strong title="{{name}}">
               {{name}}
             </strong>
 
-            {{#if group}}
+            {{#if meta}}
+
               <small>
-                {{group}}
+                {{meta}}
               </small>
+
+            {{/if}}
+
+
+            {{#if isAnimated}}
+
+              <small class="pokemon-animation-badge ok">
+
+                <i class="fa-solid fa-person-walking"></i>
+
+                Animado
+
+              </small>
+
+            {{else}}
+
+              {{#unless ../isProps}}
+
+                <small class="pokemon-animation-badge">
+
+                  <i class="fa-solid fa-image"></i>
+
+                  Estático
+
+                </small>
+
+              {{/unless}}
+
             {{/if}}
 
           </div>
@@ -80,13 +153,13 @@
 
           <button
             type="button"
-            data-action="importTrainer"
-            data-id="{{id}}"
+            data-entry-id="{{id}}"
+            data-category="{{category}}"
           >
 
-            <i class="fa-solid fa-download"></i>
+            <i class="{{buttonIcon}}"></i>
 
-            Importar
+            {{buttonLabel}}
 
           </button>
 
