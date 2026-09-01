@@ -1326,3 +1326,63 @@ input[type="text"] {
     width: 55%;
   }
 }
+
+
+/* Pokemon Active Theme UI */
+
+.pokemon-active-theme-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.8rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid rgba(80, 80, 80, 0.28);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.pokemon-active-theme-bar > i {
+  flex: 0 0 auto;
+}
+
+.pokemon-active-theme-bar label {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.pokemon-active-theme-bar select {
+  flex: 1;
+  min-width: 150px;
+}
+
+.themebook-container.pokemon-theme-inactive {
+  opacity: 0.38;
+  filter: grayscale(0.65);
+}
+
+.themebook-container.pokemon-theme-inactive-edit {
+  opacity: 0.72;
+}
+
+.themebook-container.pokemon-theme-active {
+  position: relative;
+}
+
+.pokemon-active-theme-badge {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.08rem 0.35rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-family: sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+.pokemon-theme-inactive .pt-selectable,
+.pokemon-theme-inactive .wt-selectable,
+.pokemon-theme-inactive [data-action="toggleToBurn"] {
+  cursor: not-allowed !important;
+}

@@ -2966,6 +2966,18 @@ class PokemonCharacterCreatorApp
             }
 
 
+            /*
+             * O LitM cria personagens em
+             * editMode por padrao.
+             * O personagem pronto deve abrir
+             * diretamente no modo de jogo.
+             */
+            await actor.update({
+              "system.editMode":
+                false
+            });
+
+
             ui.notifications.info(
               this.characterName.trim()
               +

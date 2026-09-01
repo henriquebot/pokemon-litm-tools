@@ -17,6 +17,10 @@ import {
   activatePokemonThemePokedexButtons
 } from "./pokemon-links.js";
 
+import {
+  activatePokemonActiveThemeUI
+} from "./pokemon-active-theme.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -25,6 +29,8 @@ Hooks.once("init", () => {
   registerTokenOutlineSettings();
 
   activatePokemonThemePokedexButtons();
+
+  activatePokemonActiveThemeUI();
 
   console.log(
     "Pok\u00e9mon LITM Tools | Inicializando v0.8.0-dev"
