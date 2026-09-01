@@ -389,9 +389,11 @@ async function prepareVertical6(
       )
     ]);
 
+  const cacheKey = Date.now();
+
   return {
-    sheetPath,
-    portraitPath
+    sheetPath: `${sheetPath}?v=${cacheKey}`,
+    portraitPath: `${portraitPath}?v=${cacheKey}`
   };
 }
 
