@@ -12,6 +12,9 @@
                           "minimum":  "14",
                           "verified":  "14"
                       },
+    "scripts":  [
+                    "scripts/lib/pixi-filters.js"
+                ],
     "esmodules":  [
                       "scripts/main.js"
                   ],

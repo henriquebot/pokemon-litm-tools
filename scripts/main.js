@@ -4,10 +4,17 @@
   POKEMON_IMPORTER_DRAG_TYPE
 } from "./importer-app.js";
 
+import {
+  registerTokenOutlineSettings,
+  activateTokenOutline
+} from "./token-outline.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
 Hooks.once("init", () => {
+
+  registerTokenOutlineSettings();
 
   console.log(
     "Pokémon LITM Tools | Inicializando v0.7.0"
@@ -108,6 +115,8 @@ Hooks.on(
 
 
 Hooks.once("ready", () => {
+
+  activateTokenOutline();
 
   if (
     game.system.id
