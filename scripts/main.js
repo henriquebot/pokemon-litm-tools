@@ -93,12 +93,12 @@ Hooks.on(
     )
       .catch(error => {
         console.error(
-          "Pok?mon LITM Tools | Canvas drop:",
+          "Pokemon LITM Tools | Canvas drop:",
           error
         );
 
         ui.notifications.error(
-          "N?o foi poss?vel colocar o asset. Veja F12."
+          "Nao foi possivel colocar o asset. Veja F12."
         );
       });
 

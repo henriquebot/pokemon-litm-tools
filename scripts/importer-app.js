@@ -1017,7 +1017,7 @@ async function createActorFromEntry(
 
   if (!actor) {
     throw new Error(
-      `N?o foi poss?vel criar ${entry.name}`
+      `Nao foi possivel criar ${entry.name}`
     );
   }
 
@@ -1376,7 +1376,7 @@ export async function handlePokemonImporterCanvasDrop(
 
   if (!entry) {
     throw new Error(
-      `Asset n?o encontrado: ${category}:${id}`
+      `Asset nao encontrado: ${category}:${id}`
     );
   }
 
@@ -1393,7 +1393,7 @@ export async function handlePokemonImporterCanvasDrop(
     !Number.isFinite(position.y)
   ) {
     throw new Error(
-      "O Foundry n?o forneceu coordenadas v?lidas para o drop."
+      "O Foundry nao forneceu coordenadas validas para o drop."
     );
   }
 
