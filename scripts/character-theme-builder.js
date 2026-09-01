@@ -50,6 +50,57 @@ export async function createCharacterThemes(
     return [];
   }
 
+  const validDrafts =
+    drafts.length === 4
+    &&
+    drafts.every(
+      draft => {
+        const powerTags =
+          Array.isArray(
+            draft?.powerTags
+          )
+            ? draft.powerTags
+            : [];
+
+        const weaknessTags =
+          Array.isArray(
+            draft?.weaknessTags
+          )
+            ? draft.weaknessTags
+            : [];
+
+        return (
+          !!cleanText(
+            draft?.name
+          )
+          &&
+          powerTags.length === 3
+          &&
+          powerTags.every(
+            tag =>
+              !!cleanText(tag)
+          )
+          &&
+          weaknessTags.length === 1
+          &&
+          !!cleanText(
+            weaknessTags[0]
+          )
+          &&
+          !!cleanText(
+            draft?.quest
+          )
+        );
+      }
+    );
+
+  if (!validDrafts) {
+    throw new Error(
+      "Os 4 Temas precisam ter nome, 3 Tags de Poder, 1 Tag de Fraqueza e Quest."
+    );
+  }
+
+
   const data =
     drafts
       .map(
@@ -84,7 +135,7 @@ export async function createCharacterThemes(
                 draft?.name
               )
               ||
-              `Theme ${index + 1}`,
+              `Tema ${index + 1}`,
 
             type:
               "themebook",

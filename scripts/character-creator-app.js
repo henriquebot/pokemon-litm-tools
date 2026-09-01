@@ -932,41 +932,52 @@ class PokemonCharacterCreatorApp
     }
 
     return this.themeDrafts.every(
-      draft =>
-        !!String(
-          draft?.name
-          ?? ""
-        ).trim()
-        &&
-        (
-          draft?.powerTags
-            ?.some(
-              tag =>
-                !!String(
-                  tag
-                  ?? ""
-                ).trim()
-            )
-        )
-        &&
-        (
-          draft?.weaknessTags
-            ?.some(
-              tag =>
-                !!String(
-                  tag
-                  ?? ""
-                ).trim()
-            )
-        )
-        &&
-        !!String(
-          draft?.quest
-          ?? ""
-        ).trim()
+      draft => {
+        const powerTags =
+          Array.isArray(
+            draft?.powerTags
+          )
+            ? draft.powerTags
+            : [];
+
+        const weaknessTags =
+          Array.isArray(
+            draft?.weaknessTags
+          )
+            ? draft.weaknessTags
+            : [];
+
+        return (
+          !!String(
+            draft?.name
+            ?? ""
+          ).trim()
+          &&
+          powerTags.length === 3
+          &&
+          powerTags.every(
+            tag =>
+              !!String(
+                tag
+                ?? ""
+              ).trim()
+          )
+          &&
+          weaknessTags.length === 1
+          &&
+          !!String(
+            weaknessTags[0]
+            ?? ""
+          ).trim()
+          &&
+          !!String(
+            draft?.quest
+            ?? ""
+          ).trim()
+        );
+      }
     );
   }
-
 
   _teamReady() {
     if (
@@ -2771,6 +2782,12 @@ class PokemonCharacterCreatorApp
             !this._visualReady()
             ||
             !this._teamReady()
+            ||
+            (
+              this.mode === "trainer"
+              &&
+              !this._themesReady()
+            )
           ) {
             return;
           }
