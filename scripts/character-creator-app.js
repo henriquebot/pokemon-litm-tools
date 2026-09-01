@@ -429,6 +429,198 @@ async function createCharacterFromEntry({
 }
 
 
+
+async function uploadCustomCharacterImage(
+  file,
+  mode
+) {
+  const original =
+    String(
+      file?.name
+      ??
+      "custom.png"
+    );
+
+  const ext =
+    original
+      .match(/\.[a-zA-Z0-9]+$/)
+      ?.[0]
+    ??
+    ".png";
+
+  const prefix =
+    mode === "pokemon"
+      ? "custom-pokemon"
+      : "custom-trainer";
+
+  const filename =
+    `${prefix}-${Date.now()}${ext}`;
+
+  const uploadFile =
+    new File(
+      [file],
+      filename,
+      {
+        type:
+          file.type
+          ||
+          "image/png"
+      }
+    );
+
+  const uploaded =
+    await foundry
+      .applications
+      .apps
+      .FilePicker
+      .uploadPersistent(
+        MODULE_ID,
+        "",
+        uploadFile,
+        {
+          overwrite:
+            false
+        },
+        {
+          notify:
+            false
+        }
+      );
+
+  return (
+    uploaded?.path
+    ??
+    uploaded?.url
+    ??
+    uploaded?.file
+    ??
+    null
+  );
+}
+
+
+async function createCharacterFromCustom({
+  mode,
+  name,
+  ownerId,
+  imagePath
+}) {
+  const ownership =
+    ownerId
+      ? {
+          [ownerId]:
+            CONST
+              .DOCUMENT_OWNERSHIP_LEVELS
+              .OWNER
+        }
+      : {};
+
+  const moduleFlags = {
+    schemaVersion:
+      8,
+
+    kind:
+      mode === "pokemon"
+        ? "pokemon"
+        : "person",
+
+    playerCharacter:
+      true,
+
+    customAsset:
+      true,
+
+    assetId:
+      null,
+
+    source: {
+      provider:
+        "custom-upload"
+    },
+
+    assets: {
+      portrait:
+        imagePath,
+
+      overworld:
+        imagePath
+    }
+  };
+
+  let actor = null;
+
+  try {
+    actor =
+      await Actor
+        .implementation
+        .create({
+          name,
+
+          type:
+            "litm-character",
+
+          img:
+            imagePath,
+
+          ownership,
+
+          prototypeToken: {
+            name,
+
+            actorLink:
+              true,
+
+            width:
+              1,
+
+            height:
+              1,
+
+            texture: {
+              src:
+                imagePath
+            },
+
+            lockRotation:
+              true,
+
+            disposition:
+              CONST
+                .TOKEN_DISPOSITIONS
+                .FRIENDLY
+          },
+
+          flags: {
+            [MODULE_ID]:
+              moduleFlags
+          }
+        });
+
+    if (!actor) {
+      throw new Error(
+        "Actor nao criado."
+      );
+    }
+
+    await applyCharacterBackground(
+      actor,
+      imagePath
+    );
+
+    return actor;
+
+  } catch (error) {
+    if (actor) {
+      try {
+        await actor.delete();
+      } catch {}
+    }
+
+    throw error;
+  }
+}
+
+
 class PokemonCharacterCreatorApp
   extends
     HandlebarsApplicationMixin(
@@ -446,7 +638,7 @@ class PokemonCharacterCreatorApp
 
     position: {
       width:
-        820,
+        840,
 
       height:
         760
@@ -454,7 +646,7 @@ class PokemonCharacterCreatorApp
 
     window: {
       title:
-        "Criar Personagem Pokemon",
+        "Criar Personagem Pok\u00e9mon",
 
       icon:
         "fa-solid fa-user-plus",
@@ -477,10 +669,10 @@ class PokemonCharacterCreatorApp
   };
 
 
-  mode =
-    "trainer";
+  step =
+    1;
 
-  selectedId =
+  mode =
     null;
 
   characterName =
@@ -489,10 +681,22 @@ class PokemonCharacterCreatorApp
   ownerId =
     "";
 
-  busy =
-    false;
+  visualSource =
+    "catalog";
+
+  selectedId =
+    null;
+
+  customFile =
+    null;
+
+  customPreviewUrl =
+    null;
 
   previewZoomed =
+    false;
+
+  busy =
     false;
 
 
@@ -504,69 +708,79 @@ class PokemonCharacterCreatorApp
         options
       );
 
-    const catalog =
-      await loadPokemonAssetCatalog();
+    let items = [];
 
-    const source =
-      this.mode === "pokemon"
-        ? catalog.pokemon
-        : catalog.people;
+    if (
+      this.step === 3
+      &&
+      this.visualSource === "catalog"
+      &&
+      this.mode
+    ) {
+      const catalog =
+        await loadPokemonAssetCatalog();
 
-    const previewTab =
-      this.mode === "pokemon"
-        ? "pokemon"
-        : "people";
+      const source =
+        this.mode === "pokemon"
+          ? catalog.pokemon
+          : catalog.people;
 
-    const items =
-      source.map(
-        entry => ({
-          ...entry,
+      const previewTab =
+        this.mode === "pokemon"
+          ? "pokemon"
+          : "people";
 
-          selected:
-            this.selectedId
-            ===
-            entry.id,
+      items =
+        source.map(
+          entry => ({
+            ...entry,
 
-          meta:
-            this.mode === "pokemon"
-              ? (
-                  `#${String(
-                    entry.dex
-                    ??
-                    entry.pokemonId
-                    ??
-                    ""
-                  ).padStart(3, "0")}`
-                  +
-                  (
-                    entry.heightMeters
-                      ? ` - ${entry.heightMeters} m`
-                      : ""
+            selected:
+              this.selectedId
+              ===
+              entry.id,
+
+            meta:
+              this.mode === "pokemon"
+                ? (
+                    `#${String(
+                      entry.dex
+                      ??
+                      entry.pokemonId
+                      ??
+                      ""
+                    ).padStart(3, "0")}`
+                    +
+                    (
+                      entry.heightMeters
+                        ? ` - ${entry.heightMeters} m`
+                        : ""
+                    )
                   )
-                )
-              : (
-                  entry.personTypeLabel
-                  ||
-                  entry.group
-                  ||
-                  ""
-                ),
+                : (
+                    entry.personTypeLabel
+                    ||
+                    entry.group
+                    ||
+                    ""
+                  ),
 
-          secondaryMeta:
-            this.mode === "trainer"
-              ? (
-                  entry.providerLabel
-                  ||
-                  ""
-                )
-              : "",
+            secondaryMeta:
+              this.mode === "trainer"
+                ? (
+                    entry.providerLabel
+                    ||
+                    ""
+                  )
+                : "",
 
-          ...getPokemonAssetPreviewData(
-            entry,
-            previewTab
-          )
-        })
-      );
+            ...getPokemonAssetPreviewData(
+              entry,
+              previewTab
+            )
+          })
+        );
+    }
 
     const users =
       game.users
@@ -589,36 +803,100 @@ class PokemonCharacterCreatorApp
           })
         );
 
+    const canNext =
+      (
+        this.step === 1
+        &&
+        !!this.mode
+      )
+      ||
+      (
+        this.step === 2
+        &&
+        !!this.characterName.trim()
+      );
+
+    const canFinish =
+      this.step === 3
+      &&
+      (
+        (
+          this.visualSource
+          ===
+          "catalog"
+          &&
+          !!this.selectedId
+        )
+        ||
+        (
+          this.visualSource
+          ===
+          "upload"
+          &&
+          !!this.customFile
+        )
+      )
+      &&
+      !this.busy;
+
     return {
       ...context,
 
-      items,
+      step:
+        this.step,
 
-      users,
+      stepIsType:
+        this.step === 1,
+
+      stepIsIdentity:
+        this.step === 2,
+
+      stepIsVisual:
+        this.step === 3,
+
+      isTrainer:
+        this.mode === "trainer",
+
+      isPokemon:
+        this.mode === "pokemon",
 
       characterName:
         this.characterName,
 
-      isTrainer:
-        this.mode
+      users,
+
+      items,
+
+      visualCatalog:
+        this.visualSource
         ===
-        "trainer",
+        "catalog",
 
-      isPokemon:
-        this.mode
+      visualUpload:
+        this.visualSource
         ===
-        "pokemon",
+        "upload",
 
-      canCreate:
-        !!this.selectedId
-        &&
-        !this.busy,
+      customPreviewUrl:
+        this.customPreviewUrl,
 
-      busy:
-        this.busy,
+      customFileName:
+        this.customFile?.name
+        ??
+        "",
 
       previewZoomed:
-        this.previewZoomed
+        this.previewZoomed,
+
+      canBack:
+        this.step > 1,
+
+      canNext,
+
+      canFinish,
+
+      busy:
+        this.busy
     };
   }
 
@@ -632,11 +910,172 @@ class PokemonCharacterCreatorApp
       options
     );
 
-    refreshPokemonAssetPreviews(
-      this.element,
-      this.previewZoomed
+
+    if (
+      this.step === 3
+      &&
+      this.visualSource
+      ===
+      "catalog"
+    ) {
+      refreshPokemonAssetPreviews(
+        this.element,
+        this.previewZoomed
+      );
+    }
+
+
+    /* TIPO */
+
+    for (
+      const button
+      of this.element
+        .querySelectorAll(
+          "[data-character-type]"
+        )
+    ) {
+      button.addEventListener(
+        "click",
+        () => {
+          const newMode =
+            button.dataset.characterType;
+
+          if (
+            !newMode
+            ||
+            newMode === this.mode
+          ) {
+            return;
+          }
+
+          this.mode =
+            newMode;
+
+          this.selectedId =
+            null;
+
+          this.visualSource =
+            "catalog";
+
+          this.customFile =
+            null;
+
+          if (
+            this.customPreviewUrl
+          ) {
+            URL.revokeObjectURL(
+              this.customPreviewUrl
+            );
+          }
+
+          this.customPreviewUrl =
+            null;
+
+          for (
+            const other
+            of this.element
+              .querySelectorAll(
+                "[data-character-type]"
+              )
+          ) {
+            other.classList.toggle(
+              "selected",
+              other === button
+            );
+          }
+
+          const next =
+            this.element.querySelector(
+              "[data-action='wizardNext']"
+            );
+
+          if (next) {
+            next.disabled =
+              false;
+          }
+        }
+      );
+    }
+
+
+    /* IDENTIDADE */
+
+    const nameInput =
+      this.element.querySelector(
+        "[data-role='character-name']"
+      );
+
+    nameInput?.addEventListener(
+      "input",
+      () => {
+        this.characterName =
+          nameInput.value;
+
+        const next =
+          this.element.querySelector(
+            "[data-action='wizardNext']"
+          );
+
+        if (next) {
+          next.disabled =
+            !this.characterName.trim();
+        }
+      }
     );
 
+
+    const ownerSelect =
+      this.element.querySelector(
+        "[data-role='character-owner']"
+      );
+
+    ownerSelect?.addEventListener(
+      "change",
+      () => {
+        this.ownerId =
+          ownerSelect.value;
+      }
+    );
+
+
+    /* ORIGEM DO VISUAL */
+
+    for (
+      const button
+      of this.element
+        .querySelectorAll(
+          "[data-visual-source]"
+        )
+    ) {
+      button.addEventListener(
+        "click",
+        async () => {
+          const source =
+            button.dataset.visualSource;
+
+          if (
+            !source
+            ||
+            source
+            ===
+            this.visualSource
+          ) {
+            return;
+          }
+
+          this.visualSource =
+            source;
+
+          await this.render({
+            force:
+              true
+          });
+        }
+      );
+    }
+
+
+    /* ZOOM */
 
     this.element
       .querySelector(
@@ -671,11 +1110,6 @@ class PokemonCharacterCreatorApp
             this.previewZoomed
           );
 
-          button.setAttribute(
-            "aria-pressed",
-            String(this.previewZoomed)
-          );
-
           const icon =
             button.querySelector("i");
 
@@ -692,70 +1126,7 @@ class PokemonCharacterCreatorApp
       );
 
 
-    const nameInput =
-      this.element.querySelector(
-        "[data-role='character-name']"
-      );
-
-    nameInput?.addEventListener(
-      "input",
-      () => {
-        this.characterName =
-          nameInput.value;
-      }
-    );
-
-
-    const ownerSelect =
-      this.element.querySelector(
-        "[data-role='character-owner']"
-      );
-
-    ownerSelect?.addEventListener(
-      "change",
-      () => {
-        this.ownerId =
-          ownerSelect.value;
-      }
-    );
-
-
-    for (
-      const button
-      of this.element
-        .querySelectorAll(
-          "[data-character-mode]"
-        )
-    ) {
-      button.addEventListener(
-        "click",
-        async () => {
-          const mode =
-            button.dataset
-              .characterMode;
-
-          if (
-            !mode
-            ||
-            mode === this.mode
-          ) {
-            return;
-          }
-
-          this.mode =
-            mode;
-
-          this.selectedId =
-            null;
-
-          await this.render({
-            force:
-              true
-          });
-        }
-      );
-    }
-
+    /* FILTROS */
 
     const search =
       this.element.querySelector(
@@ -801,23 +1172,21 @@ class PokemonCharacterCreatorApp
             ??
             "";
 
-          const searchOK =
-            !query
-            ||
-            haystack.includes(
-              query
-            );
-
-          const typeOK =
-            wantedType === "all"
-            ||
-            cardType === wantedType;
-
           card.hidden =
             !(
-              searchOK
+              (
+                !query
+                ||
+                haystack.includes(
+                  query
+                )
+              )
               &&
-              typeOK
+              (
+                wantedType === "all"
+                ||
+                cardType === wantedType
+              )
             );
         }
       };
@@ -832,6 +1201,8 @@ class PokemonCharacterCreatorApp
       applyFilter
     );
 
+
+    /* SELECIONAR ASSET */
 
     for (
       const card
@@ -861,29 +1232,13 @@ class PokemonCharacterCreatorApp
             );
           }
 
-          if (
-            this.mode === "pokemon"
-            &&
-            !this.characterName.trim()
-          ) {
-            this.characterName =
-              card.dataset.assetName
-              ??
-              "";
-
-            if (nameInput) {
-              nameInput.value =
-                this.characterName;
-            }
-          }
-
-          const createButton =
+          const finish =
             this.element.querySelector(
-              "[data-action='createCharacter']"
+              "[data-action='wizardFinish']"
             );
 
-          if (createButton) {
-            createButton.disabled =
+          if (finish) {
+            finish.disabled =
               false;
           }
         }
@@ -891,9 +1246,124 @@ class PokemonCharacterCreatorApp
     }
 
 
+    /* UPLOAD */
+
+    const fileInput =
+      this.element.querySelector(
+        "[data-role='custom-image']"
+      );
+
+    fileInput?.addEventListener(
+      "change",
+      async () => {
+        const file =
+          fileInput.files?.[0];
+
+        if (!file) return;
+
+        if (
+          !file.type.startsWith(
+            "image/"
+          )
+        ) {
+          ui.notifications.warn(
+            "Escolha um arquivo de imagem."
+          );
+
+          return;
+        }
+
+        if (
+          this.customPreviewUrl
+        ) {
+          URL.revokeObjectURL(
+            this.customPreviewUrl
+          );
+        }
+
+        this.customFile =
+          file;
+
+        this.customPreviewUrl =
+          URL.createObjectURL(
+            file
+          );
+
+        await this.render({
+          force:
+            true
+        });
+      }
+    );
+
+
+    /* NAVEGACAO */
+
     this.element
       .querySelector(
-        "[data-action='createCharacter']"
+        "[data-action='wizardBack']"
+      )
+      ?.addEventListener(
+        "click",
+        async () => {
+          if (
+            this.step <= 1
+          ) {
+            return;
+          }
+
+          this.step--;
+
+          await this.render({
+            force:
+              true
+          });
+        }
+      );
+
+
+    this.element
+      .querySelector(
+        "[data-action='wizardNext']"
+      )
+      ?.addEventListener(
+        "click",
+        async () => {
+          if (
+            this.step === 1
+            &&
+            !this.mode
+          ) {
+            return;
+          }
+
+          if (
+            this.step === 2
+            &&
+            !this.characterName.trim()
+          ) {
+            return;
+          }
+
+          if (
+            this.step < 3
+          ) {
+            this.step++;
+          }
+
+          await this.render({
+            force:
+              true
+          });
+        }
+      );
+
+
+    /* FINALIZAR */
+
+    this.element
+      .querySelector(
+        "[data-action='wizardFinish']"
       )
       ?.addEventListener(
         "click",
@@ -901,39 +1371,12 @@ class PokemonCharacterCreatorApp
           if (
             this.busy
             ||
-            !this.selectedId
+            !this.mode
+            ||
+            !this.characterName.trim()
           ) {
             return;
           }
-
-          const catalog =
-            await loadPokemonAssetCatalog();
-
-          const source =
-            this.mode === "pokemon"
-              ? catalog.pokemon
-              : catalog.people;
-
-          const entry =
-            source.find(
-              item =>
-                item.id
-                ===
-                this.selectedId
-            );
-
-          if (!entry) {
-            ui.notifications.error(
-              "Visual nao encontrado."
-            );
-
-            return;
-          }
-
-          const name =
-            this.characterName.trim()
-            ||
-            entry.name;
 
           this.busy =
             true;
@@ -948,16 +1391,82 @@ class PokemonCharacterCreatorApp
             '<i class="fa-solid fa-spinner fa-spin"></i> Criando...';
 
           try {
-            const actor =
-              await createCharacterFromEntry({
-                entry,
-                name,
-                ownerId:
-                  this.ownerId
-              });
+            let actor;
+
+            if (
+              this.visualSource
+              ===
+              "catalog"
+            ) {
+              const catalog =
+                await loadPokemonAssetCatalog();
+
+              const source =
+                this.mode === "pokemon"
+                  ? catalog.pokemon
+                  : catalog.people;
+
+              const entry =
+                source.find(
+                  item =>
+                    item.id
+                    ===
+                    this.selectedId
+                );
+
+              if (!entry) {
+                throw new Error(
+                  "Visual nao encontrado."
+                );
+              }
+
+              actor =
+                await createCharacterFromEntry({
+                  entry,
+
+                  name:
+                    this.characterName.trim(),
+
+                  ownerId:
+                    this.ownerId
+                });
+
+            } else {
+              if (!this.customFile) {
+                throw new Error(
+                  "Imagem personalizada nao selecionada."
+                );
+              }
+
+              const imagePath =
+                await uploadCustomCharacterImage(
+                  this.customFile,
+                  this.mode
+                );
+
+              if (!imagePath) {
+                throw new Error(
+                  "Upload da imagem falhou."
+                );
+              }
+
+              actor =
+                await createCharacterFromCustom({
+                  mode:
+                    this.mode,
+
+                  name:
+                    this.characterName.trim(),
+
+                  ownerId:
+                    this.ownerId,
+
+                  imagePath
+                });
+            }
 
             ui.notifications.info(
-              `${name} criado com sucesso.`
+              `${this.characterName.trim()} criado com sucesso.`
             );
 
             await this.close();
@@ -969,7 +1478,7 @@ class PokemonCharacterCreatorApp
 
           } catch (error) {
             console.error(
-              "Pokemon LITM Tools | Character Creator:",
+              "Pokemon LITM Tools | Character Wizard:",
               error
             );
 
@@ -984,7 +1493,7 @@ class PokemonCharacterCreatorApp
               false;
 
             button.innerHTML =
-              '<i class="fa-solid fa-user-plus"></i> Criar personagem';
+              '<i class="fa-solid fa-check"></i> Finalizar';
           }
         }
       );

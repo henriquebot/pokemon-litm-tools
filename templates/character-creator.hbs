@@ -1,241 +1,454 @@
 <div class="pokemon-importer-shell pokemon-character-creator-shell{{#if previewZoomed}} preview-zoomed{{/if}}">
 
-  <header class="pokemon-importer-header">
+  <header class="pokemon-wizard-progress">
 
-    <nav class="pokemon-importer-tabs">
-
-      <button
-        type="button"
-        data-character-mode="trainer"
-        class="{{#if isTrainer}}active{{/if}}"
-      >
-        <i class="fa-solid fa-user"></i>
-        Treinador
-      </button>
-
-      <button
-        type="button"
-        data-character-mode="pokemon"
-        class="{{#if isPokemon}}active{{/if}}"
-      >
-        <i class="fa-solid fa-paw"></i>
-        Pokemon
-      </button>
-
-    </nav>
-
-
-    <div class="pokemon-character-fields">
-
-      <div class="form-group">
-
-        <label>
-          Nome do personagem
-        </label>
-
-        <div class="form-fields">
-
-          <input
-            type="text"
-            data-role="character-name"
-            value="{{characterName}}"
-            placeholder="Nome"
-          >
-
-        </div>
-
-      </div>
-
-
-      <div class="form-group">
-
-        <label>
-          Jogador
-        </label>
-
-        <div class="form-fields">
-
-          <select data-role="character-owner">
-
-            <option value="">
-              Sem jogador definido
-            </option>
-
-            {{#each users}}
-
-              <option
-                value="{{id}}"
-                {{#if selected}}selected{{/if}}
-              >
-                {{name}}
-              </option>
-
-            {{/each}}
-
-          </select>
-
-        </div>
-
-      </div>
-
+    <div class="pokemon-wizard-step {{#if stepIsType}}active{{/if}}">
+      <span>1</span>
+      Tipo
     </div>
 
+    <div class="pokemon-wizard-line"></div>
 
-    <div class="pokemon-importer-toolbar">
+    <div class="pokemon-wizard-step {{#if stepIsIdentity}}active{{/if}}">
+      <span>2</span>
+      Identidade
+    </div>
 
-      <input
-        type="search"
-        data-role="asset-search"
-        placeholder="Buscar visual..."
-        autocomplete="off"
-      >
+    <div class="pokemon-wizard-line"></div>
 
-      {{#if isTrainer}}
-
-        <select data-role="person-type">
-
-          <option value="all">
-            Todos
-          </option>
-
-          <option value="trainer-class">
-            Trainer Classes
-          </option>
-
-          <option value="npc">
-            NPCs
-          </option>
-
-          <option value="named">
-            Personagens
-          </option>
-
-          <option value="player">
-            Protagonistas
-          </option>
-
-          <option value="rival">
-            Rivais
-          </option>
-
-          <option value="professor">
-            Professores
-          </option>
-
-          <option value="gym-leader">
-            Lideres
-          </option>
-
-          <option value="elite-four">
-            Elite Four
-          </option>
-
-          <option value="villain">
-            Viloes
-          </option>
-
-        </select>
-
-      {{/if}}
-
-
-      <button
-        type="button"
-        data-action="togglePreviewZoom"
-        class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
-        aria-pressed="{{#if previewZoomed}}true{{else}}false{{/if}}"
-        title="Zoom"
-      >
-        <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
-        Zoom
-      </button>
-
-
-      <button
-        type="button"
-        data-action="createCharacter"
-        class="pokemon-character-create"
-        {{#unless canCreate}}disabled{{/unless}}
-      >
-        <i class="fa-solid fa-user-plus"></i>
-
-        {{#if busy}}
-          Criando...
-        {{else}}
-          Criar personagem
-        {{/if}}
-      </button>
-
+    <div class="pokemon-wizard-step {{#if stepIsVisual}}active{{/if}}">
+      <span>3</span>
+      Visual
     </div>
 
   </header>
 
 
-  <div class="pokemon-importer-list pokemon-character-list">
+  {{#if stepIsType}}
 
-    {{#each items}}
+    <section class="pokemon-wizard-page pokemon-wizard-type-page">
 
-      <article
-        class="pokemon-asset-card pokemon-character-card{{#if selected}} selected{{/if}}"
-        data-character-asset
-        data-search="{{search}}"
-        data-person-type="{{personType}}"
-        data-asset-id="{{id}}"
-        data-asset-name="{{name}}"
-      >
+      <h2>Quem e o personagem?</h2>
 
-        <div class="pokemon-asset-preview">
+      <p>
+        Escolha o tipo de personagem que sera criado.
+      </p>
 
-          {{#if previewCropped}}
+      <div class="pokemon-character-type-grid">
 
-            <div class="pokemon-overworld-preview">
+        <button
+          type="button"
+          class="pokemon-character-type-card {{#if isTrainer}}selected{{/if}}"
+          data-character-type="trainer"
+        >
+          <i class="fa-solid fa-user"></i>
 
-              <img
-                src="{{preview}}"
-                alt="{{name}}"
-                loading="lazy"
-                data-overworld-preview
-                data-preview-columns="{{previewColumns}}"
-                data-preview-rows="{{previewRows}}"
-              >
+          <strong>Treinador</strong>
+
+          <span>
+            Humano com equipe de Pok&eacute;mon.
+          </span>
+        </button>
+
+
+        <button
+          type="button"
+          class="pokemon-character-type-card {{#if isPokemon}}selected{{/if}}"
+          data-character-type="pokemon"
+        >
+          <i class="fa-solid fa-paw"></i>
+
+          <strong>Pok&eacute;mon</strong>
+
+          <span>
+            O proprio personagem e um Pok&eacute;mon.
+          </span>
+        </button>
+
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsIdentity}}
+
+    <section class="pokemon-wizard-page">
+
+      <h2>Identidade</h2>
+
+      <div class="pokemon-character-fields">
+
+        <div class="form-group">
+
+          <label>
+            Nome do personagem
+          </label>
+
+          <div class="form-fields">
+
+            <input
+              type="text"
+              data-role="character-name"
+              value="{{characterName}}"
+              placeholder="Nome"
+              autofocus
+            >
+
+          </div>
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Jogador
+          </label>
+
+          <div class="form-fields">
+
+            <select data-role="character-owner">
+
+              <option value="">
+                Sem jogador definido
+              </option>
+
+              {{#each users}}
+
+                <option
+                  value="{{id}}"
+                  {{#if selected}}selected{{/if}}
+                >
+                  {{name}}
+                </option>
+
+              {{/each}}
+
+            </select>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsVisual}}
+
+    <section class="pokemon-wizard-page pokemon-wizard-visual-page">
+
+      <h2>
+        Escolha o visual
+      </h2>
+
+      <nav class="pokemon-importer-tabs pokemon-visual-source-tabs">
+
+        <button
+          type="button"
+          data-visual-source="catalog"
+          class="{{#if visualCatalog}}active{{/if}}"
+        >
+          <i class="fa-solid fa-images"></i>
+          Catalogo
+        </button>
+
+        <button
+          type="button"
+          data-visual-source="upload"
+          class="{{#if visualUpload}}active{{/if}}"
+        >
+          <i class="fa-solid fa-upload"></i>
+          Imagem personalizada
+        </button>
+
+      </nav>
+
+
+      {{#if visualCatalog}}
+
+        <div class="pokemon-importer-toolbar pokemon-character-visual-toolbar">
+
+          <input
+            type="search"
+            data-role="asset-search"
+            placeholder="Buscar visual..."
+            autocomplete="off"
+          >
+
+          {{#if isTrainer}}
+
+            <select data-role="person-type">
+
+              <option value="all">
+                Todos
+              </option>
+
+              <option value="trainer-class">
+                Trainer Classes
+              </option>
+
+              <option value="npc">
+                NPCs
+              </option>
+
+              <option value="named">
+                Personagens
+              </option>
+
+              <option value="player">
+                Protagonistas
+              </option>
+
+              <option value="rival">
+                Rivais
+              </option>
+
+              <option value="professor">
+                Professores
+              </option>
+
+              <option value="gym-leader">
+                Lideres
+              </option>
+
+              <option value="elite-four">
+                Elite Four
+              </option>
+
+              <option value="villain">
+                Viloes
+              </option>
+
+            </select>
+
+          {{/if}}
+
+
+          <button
+            type="button"
+            data-action="togglePreviewZoom"
+            class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+          >
+            <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+            Zoom
+          </button>
+
+        </div>
+
+
+        <div class="pokemon-importer-list pokemon-character-list">
+
+          {{#each items}}
+
+            <article
+              class="pokemon-asset-card pokemon-character-card{{#if selected}} selected{{/if}}"
+              data-character-asset
+              data-search="{{search}}"
+              data-person-type="{{personType}}"
+              data-asset-id="{{id}}"
+            >
+
+              <div class="pokemon-asset-preview">
+
+                {{#if previewCropped}}
+
+                  <div class="pokemon-overworld-preview">
+
+                    <img
+                      src="{{preview}}"
+                      alt="{{name}}"
+                      loading="lazy"
+                      data-overworld-preview
+                      data-preview-columns="{{previewColumns}}"
+                      data-preview-rows="{{previewRows}}"
+                    >
+
+                  </div>
+
+                {{else}}
+
+                  <img
+                    src="{{preview}}"
+                    alt="{{name}}"
+                    loading="lazy"
+                  >
+
+                {{/if}}
+
+              </div>
+
+
+              <div class="pokemon-asset-info">
+
+                <strong title="{{name}}">
+                  {{name}}
+                </strong>
+
+                {{#if meta}}
+                  <small>{{meta}}</small>
+                {{/if}}
+
+                {{#if secondaryMeta}}
+                  <small class="pokemon-provider">
+                    {{secondaryMeta}}
+                  </small>
+                {{/if}}
+
+              </div>
+
+            </article>
+
+          {{/each}}
+
+        </div>
+
+      {{/if}}
+
+
+      {{#if visualUpload}}
+
+        <div class="pokemon-custom-upload-panel">
+
+          <div class="pokemon-custom-upload-info">
+
+            <h3>
+              Imagem personalizada
+            </h3>
+
+            <p>
+              Nesta versao, o upload personalizado usa uma imagem estatica.
+              Prefira PNG ou WebP com fundo transparente.
+            </p>
+
+            <p>
+              Recomendado: imagem quadrada ou vertical, pelo menos
+              256 px de altura.
+            </p>
+
+            <div class="pokemon-spritesheet-spec">
+
+              <strong>
+                Spritesheet animada planejada:
+              </strong>
+
+              <span>
+                DURL Reduced - 3 colunas x 4 linhas, todos os frames
+                do mesmo tamanho.
+              </span>
+
+              <span>
+                Linhas: baixo, cima, direita, esquerda.
+              </span>
 
             </div>
 
-          {{else}}
 
-            <img
-              src="{{preview}}"
-              alt="{{name}}"
-              loading="lazy"
-            >
+            <label class="pokemon-custom-file-button">
 
-          {{/if}}
+              <i class="fa-solid fa-upload"></i>
+
+              Escolher imagem
+
+              <input
+                type="file"
+                data-role="custom-image"
+                accept="image/png,image/webp,image/jpeg"
+                hidden
+              >
+
+            </label>
+
+          </div>
+
+
+          <div class="pokemon-custom-preview">
+
+            {{#if customPreviewUrl}}
+
+              <img
+                src="{{customPreviewUrl}}"
+                alt="Preview"
+              >
+
+              <strong>
+                {{customFileName}}
+              </strong>
+
+            {{else}}
+
+              <i class="fa-regular fa-image"></i>
+
+              <span>
+                Nenhuma imagem selecionada
+              </span>
+
+            {{/if}}
+
+          </div>
 
         </div>
 
+      {{/if}}
 
-        <div class="pokemon-asset-info">
+    </section>
 
-          <strong title="{{name}}">
-            {{name}}
-          </strong>
+  {{/if}}
 
-          {{#if meta}}
-            <small>{{meta}}</small>
-          {{/if}}
 
-          {{#if secondaryMeta}}
-            <small class="pokemon-provider">
-              {{secondaryMeta}}
-            </small>
-          {{/if}}
+  <footer class="pokemon-wizard-footer">
 
-        </div>
+    <button
+      type="button"
+      data-action="wizardBack"
+      {{#unless canBack}}disabled{{/unless}}
+    >
+      <i class="fa-solid fa-arrow-left"></i>
+      Voltar
+    </button>
 
-      </article>
 
-    {{/each}}
+    <span class="pokemon-wizard-counter">
+      Etapa {{step}} de 3
+    </span>
 
-  </div>
+
+    {{#if stepIsVisual}}
+
+      <button
+        type="button"
+        data-action="wizardFinish"
+        class="pokemon-wizard-primary"
+        {{#unless canFinish}}disabled{{/unless}}
+      >
+        <i class="fa-solid fa-check"></i>
+
+        {{#if busy}}
+          Criando...
+        {{else}}
+          Finalizar
+        {{/if}}
+      </button>
+
+    {{else}}
+
+      <button
+        type="button"
+        data-action="wizardNext"
+        class="pokemon-wizard-primary"
+        {{#unless canNext}}disabled{{/unless}}
+      >
+        Proximo
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+
+    {{/if}}
+
+  </footer>
 
 </div>
