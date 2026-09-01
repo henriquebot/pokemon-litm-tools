@@ -21,7 +21,7 @@ Hooks.once("init", () => {
   registerTokenOutlineSettings();
 
   console.log(
-    "Pok?mon LITM Tools | Inicializando v0.7.0"
+    "Pok\u00e9mon LITM Tools | Inicializando v0.7.0"
   );
 
   game.settings.register(
@@ -59,7 +59,7 @@ Hooks.on(
         "pokemonImporter",
 
       title:
-        "Pok?mon Importer",
+        "Pok\u00e9mon Importer",
 
       icon:
         "fa-solid fa-dragon",
@@ -82,7 +82,7 @@ Hooks.on(
         "pokemonCharacterCreator",
 
       title:
-        "Criar Personagem Pok?mon",
+        "Criar Personagem Pok\u00e9mon",
 
       icon:
         "fa-solid fa-user-plus",
@@ -152,11 +152,11 @@ Hooks.once("ready", () => {
     LITM_SYSTEM_ID
   ) {
     console.warn(
-      "Pok?mon LITM Tools | Mundo atual n?o usa Legend in the Mist."
+      "Pok\u00e9mon LITM Tools | Mundo atual n?o usa Legend in the Mist."
     );
   }
 
   console.log(
-    "Pok?mon LITM Tools | Pronto v0.7.0"
+    "Pok\u00e9mon LITM Tools | Pronto v0.7.0"
   );
 });
