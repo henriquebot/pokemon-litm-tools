@@ -1,11 +1,11 @@
 ﻿const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
+const DYLAN_ID = "dylans-animated-tokens";
 
 Hooks.once("init", () => {
-  console.log("Pokémon LITM Tools | Inicializando");
+  console.log("Pokémon LITM Tools | Inicializando v0.3.0");
 
-  const module = game.modules.get(MODULE_ID);
-  module.api = {
+  game.modules.get(MODULE_ID).api = {
     openImporter
   };
 });
@@ -28,18 +28,37 @@ Hooks.on("getSceneControlButtons", controls => {
 });
 
 Hooks.once("ready", () => {
-  console.log("Pokémon LITM Tools | Pronto");
+  console.log("Pokémon LITM Tools | Pronto v0.3.0");
 });
+
+function getAnimationConfig(preset) {
+  switch (preset) {
+    case "trainer-gen4":
+      return {
+        enabled: true,
+        sheetStyle: "durlReduced",
+        frames: 3,
+        directions: 4
+      };
+
+    default:
+      return {
+        enabled: false
+      };
+  }
+}
 
 async function openImporter() {
   if (!game.user.isGM) return;
 
   if (game.system.id !== LITM_SYSTEM_ID) {
     ui.notifications.error(
-      "Pokémon LITM Tools: este importador precisa do Legend in the Mist."
+      "Pokémon LITM Tools requer Legend in the Mist."
     );
     return;
   }
+
+  const dylanActive = game.modules.get(DYLAN_ID)?.active === true;
 
   const result = await foundry.applications.api.DialogV2.input({
     window: {
@@ -63,17 +82,28 @@ async function openImporter() {
         </div>
 
         <div class="form-group">
-          <label>Sprite / imagem</label>
+          <label>Retrato da ficha</label>
           <div class="form-fields">
             <input
               type="text"
-              name="image"
+              name="portrait"
               placeholder="URL ou caminho no Foundry"
             >
           </div>
           <p class="hint">
-            Pode deixar vazio neste primeiro teste.
+            Imagem usada no Challenge. Pode ficar vazio.
           </p>
+        </div>
+
+        <div class="form-group">
+          <label>Spritesheet do token</label>
+          <div class="form-fields">
+            <input
+              type="text"
+              name="spritesheet"
+              placeholder="URL ou caminho no Foundry"
+            >
+          </div>
         </div>
 
         <div class="form-group">
@@ -84,6 +114,22 @@ async function openImporter() {
               <option value="pokemon">Pokémon</option>
             </select>
           </div>
+        </div>
+
+        <div class="form-group">
+          <label>Animação</label>
+          <div class="form-fields">
+            <select name="animationPreset">
+              <option value="static">Estático</option>
+              <option value="trainer-gen4">
+                Trainer Gen4 / HGSS - 3x4
+              </option>
+            </select>
+          </div>
+          <p class="hint">
+            Dylan's Animated Tokens:
+            ${dylanActive ? "ATIVO" : "NÃO ATIVO"}
+          </p>
         </div>
 
       </div>
@@ -100,48 +146,101 @@ async function openImporter() {
   if (!result) return;
 
   const name = String(result.name ?? "").trim();
+  const portrait =
+    String(result.portrait ?? "").trim() ||
+    "icons/svg/mystery-man.svg";
+
+  const spritesheet =
+    String(result.spritesheet ?? "").trim();
+
+  const kind =
+    String(result.kind ?? "trainer");
+
+  const animationPreset =
+    String(result.animationPreset ?? "static");
 
   if (!name) {
     ui.notifications.warn("Digite um nome.");
     return;
   }
 
-  const image =
-    String(result.image ?? "").trim() ||
-    "icons/svg/mystery-man.svg";
+  const animation = getAnimationConfig(animationPreset);
 
-  const kind =
-    String(result.kind ?? "trainer");
+  if (animation.enabled && !spritesheet) {
+    ui.notifications.warn(
+      "Para animação, informe uma spritesheet."
+    );
+    return;
+  }
+
+  const tokenImage = spritesheet || portrait;
+
+  const pokemonFlags = {
+    schemaVersion: 2,
+    kind,
+    portrait,
+    spritesheet,
+    animationPreset,
+    animation
+  };
+
+  const prototypeFlags = {
+    [MODULE_ID]: pokemonFlags
+  };
+
+  /*
+   * Já gravamos os flags do Dylan mesmo que ele esteja
+   * desativado. Assim não será necessário reimportar
+   * o Actor depois.
+   */
+  if (animation.enabled) {
+    prototypeFlags[DYLAN_ID] = {
+      spritesheet: true,
+      sheetstyle: animation.sheetStyle,
+      animationframes: animation.frames,
+      sheetsrc: spritesheet
+    };
+  }
 
   try {
     const actor = await Actor.implementation.create({
       name,
       type: "litm-npc",
-      img: image,
+
+      // Retrato da ficha, NÃO a spritesheet.
+      img: portrait,
 
       prototypeToken: {
         name,
+
         texture: {
-          src: image
+          src: tokenImage
         },
 
-        disposition: CONST.TOKEN_DISPOSITIONS.NEUTRAL
+        lockRotation: true,
+        disposition: CONST.TOKEN_DISPOSITIONS.NEUTRAL,
+
+        flags: prototypeFlags
       },
 
       flags: {
-        [MODULE_ID]: {
-          schemaVersion: 1,
-          kind,
-          sourceImage: image
-        }
+        [MODULE_ID]: pokemonFlags
       }
     });
 
-    if (!actor) throw new Error("Actor não foi criado.");
+    if (!actor) {
+      throw new Error("Actor não foi criado.");
+    }
 
-    ui.notifications.info(
-      `${name} importado para Actors.`
-    );
+    if (animation.enabled && !dylanActive) {
+      ui.notifications.warn(
+        `${name} foi importado, mas Dylan's Animated Tokens não está ativo.`
+      );
+    } else {
+      ui.notifications.info(
+        `${name} importado com sucesso.`
+      );
+    }
 
     console.log(
       "Pokémon LITM Tools | Actor criado:",
