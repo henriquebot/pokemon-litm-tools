@@ -182,19 +182,15 @@ jobs:
               encoding="utf-8-sig"
           ) as f:
 
-              manifest =
-                  json.load(f)
+              manifest = json.load(f)
 
 
-          version =
-              os.environ["VERSION"]
+          version = os.environ["VERSION"]
 
-          ref_name =
-              os.environ["REF_NAME"]
+          ref_name = os.environ["REF_NAME"]
 
 
-          manifest["version"] =
-              version
+          manifest["version"] = version
 
 
           manifest["download"] = (
@@ -279,3 +275,4 @@ jobs:
             release/module.json \
             --title "${{ github.ref_name }}" \
             --generate-notes
+
