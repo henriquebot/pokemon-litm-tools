@@ -13,17 +13,12 @@ function getActorFromApp(app) {
     app?.options?.document
   ];
 
-  for (const actor of candidates) {
-    if (
+  return candidates.find(
+    actor =>
       actor?.documentName === "Actor"
       &&
       actor?.type === "litm-character"
-    ) {
-      return actor;
-    }
-  }
-
-  return null;
+  ) ?? null;
 }
 
 
@@ -37,13 +32,10 @@ function getRootElement(app, html) {
     app?._element?.[0]
   ];
 
-  for (const candidate of candidates) {
-    if (candidate instanceof HTMLElement) {
-      return candidate;
-    }
-  }
-
-  return null;
+  return candidates.find(
+    candidate =>
+      candidate instanceof HTMLElement
+  ) ?? null;
 }
 
 
@@ -69,22 +61,20 @@ function getPokemonThemes(actor) {
           a.getFlag(
             MODULE_ID,
             "pokemonTeamSlot"
-          )
-          ?? 999
+          ) ?? 999
         )
         -
         Number(
           b.getFlag(
             MODULE_ID,
             "pokemonTeamSlot"
-          )
-          ?? 999
+          ) ?? 999
         )
     );
 }
 
 
-function resolveActiveThemeId(
+function getActiveId(
   actor,
   themes
 ) {
@@ -99,8 +89,6 @@ function resolveActiveThemeId(
     );
 
   if (
-    stored
-    &&
     themes.some(
       theme =>
         theme.id === stored
@@ -113,7 +101,7 @@ function resolveActiveThemeId(
 }
 
 
-function sanitizeTags(tags) {
+function clearSelectedTags(tags) {
   if (!Array.isArray(tags)) {
     return tags;
   }
@@ -121,25 +109,9 @@ function sanitizeTags(tags) {
   return tags.map(
     tag => ({
       ...tag,
-      selected:
-        false,
-      toBurn:
-        false
+      selected: false,
+      toBurn: false
     })
-  );
-}
-
-
-function tagsNeedClear(tags) {
-  return (
-    Array.isArray(tags)
-    &&
-    tags.some(
-      tag =>
-        tag?.selected
-        ||
-        tag?.toBurn
-    )
   );
 }
 
@@ -147,54 +119,49 @@ function tagsNeedClear(tags) {
 async function clearThemeSelection(
   theme
 ) {
+  const power =
+    theme.system.powertags ?? [];
+
+  const weakness =
+    theme.system.weaknesstags ?? [];
+
+  const needsPower =
+    power.some(
+      tag =>
+        tag?.selected
+        ||
+        tag?.toBurn
+    );
+
+  const needsWeakness =
+    weakness.some(
+      tag =>
+        tag?.selected
+        ||
+        tag?.toBurn
+    );
+
+  if (
+    !needsPower
+    &&
+    !needsWeakness
+  ) {
+    return;
+  }
+
   const update = {};
 
-  if (
-    tagsNeedClear(
-      theme.system.powertags
-    )
-  ) {
+  if (needsPower) {
     update["system.powertags"] =
-      sanitizeTags(
-        theme.system.powertags
-      );
+      clearSelectedTags(power);
   }
 
-  if (
-    tagsNeedClear(
-      theme.system.weaknesstags
-    )
-  ) {
+  if (needsWeakness) {
     update["system.weaknesstags"] =
-      sanitizeTags(
-        theme.system.weaknesstags
-      );
+      clearSelectedTags(weakness);
   }
 
-  if (
-    Object.keys(update).length
-  ) {
-    await theme.update(update);
-  }
-}
-
-
-async function clearInactiveSelections(
-  actor,
-  activeId
-) {
-  const themes =
-    getPokemonThemes(actor);
-
-  for (const theme of themes) {
-    if (theme.id === activeId) {
-      continue;
-    }
-
-    await clearThemeSelection(
-      theme
-    );
-  }
+  await theme.update(update);
 }
 
 
@@ -217,12 +184,10 @@ export async function setActivePokemonTheme(
     );
   }
 
-  /*
-   * Remove qualquer Tag que estivesse
-   * selecionada no Pokemon anterior.
-   */
   for (const theme of themes) {
-    if (theme.id !== selected.id) {
+    if (
+      theme.id !== selected.id
+    ) {
       await clearThemeSelection(
         theme
       );
@@ -235,16 +200,13 @@ export async function setActivePokemonTheme(
     selected.id
   );
 
-  actor.sheet?.render?.(
-    false
-  );
-
   return selected;
 }
 
 
-function blockInactivePokemonActions(
-  root
+function installInactiveGuard(
+  root,
+  actor
 ) {
   if (
     root.dataset
@@ -263,13 +225,44 @@ function blockInactivePokemonActions(
       const target =
         event.target.closest(
           [
-            ".pokemon-theme-inactive .pt-selectable",
-            ".pokemon-theme-inactive .wt-selectable",
-            ".pokemon-theme-inactive [data-action='toggleToBurn']"
+            ".pt-selectable[data-item-id]",
+            ".wt-selectable[data-item-id]",
+            "[data-action='toggleToBurn'][data-item-id]"
           ].join(",")
         );
 
       if (!target) {
+        return;
+      }
+
+      const item =
+        actor.items.get(
+          target.dataset.itemId
+        );
+
+      if (
+        !item
+        ||
+        item.getFlag(
+          MODULE_ID,
+          "pokemonTheme"
+        ) !== true
+      ) {
+        return;
+      }
+
+      const themes =
+        getPokemonThemes(actor);
+
+      const activeId =
+        getActiveId(
+          actor,
+          themes
+        );
+
+      if (
+        item.id === activeId
+      ) {
         return;
       }
 
@@ -282,90 +275,13 @@ function blockInactivePokemonActions(
 }
 
 
-function decoratePokemonThemes(
-  root,
-  actor,
-  themes,
-  activeId
-) {
-  const editMode =
-    actor.system.editMode === true;
-
-  for (const theme of themes) {
-    const card =
-      root.querySelector(
-        ".themebook-container[data-id='"
-        + CSS.escape(theme.id)
-        + "']"
-      );
-
-    if (!card) {
-      continue;
-    }
-
-    const active =
-      theme.id === activeId;
-
-    card.classList.toggle(
-      "pokemon-theme-active",
-      active
-    );
-
-    card.classList.toggle(
-      "pokemon-theme-inactive",
-      !active && !editMode
-    );
-
-    card.classList.toggle(
-      "pokemon-theme-inactive-edit",
-      !active && editMode
-    );
-
-    const oldBadge =
-      card.querySelector(
-        "[data-pokemon-active-badge]"
-      );
-
-    oldBadge?.remove();
-
-    if (active) {
-      const heading =
-        card.querySelector(
-          ".theme-name"
-        );
-
-      if (heading) {
-        const badge =
-          document.createElement(
-            "span"
-          );
-
-        badge.dataset
-          .pokemonActiveBadge =
-            "true";
-
-        badge.className =
-          "pokemon-active-theme-badge";
-
-        badge.textContent =
-          "Ativo";
-
-        heading.append(badge);
-      }
-    }
-  }
-}
-
-
-function createActivePokemonBar(
+function createSelector(
   actor,
   themes,
   activeId
 ) {
   const bar =
-    document.createElement(
-      "div"
-    );
+    document.createElement("div");
 
   bar.className =
     "pokemon-active-theme-bar";
@@ -375,25 +291,19 @@ function createActivePokemonBar(
       "true";
 
   const icon =
-    document.createElement(
-      "i"
-    );
+    document.createElement("i");
 
   icon.className =
     "fa-solid fa-bolt";
 
   const label =
-    document.createElement(
-      "label"
-    );
+    document.createElement("label");
 
   label.textContent =
     "Pokémon ativo";
 
   const select =
-    document.createElement(
-      "select"
-    );
+    document.createElement("select");
 
   select.dataset
     .pokemonActiveThemeSelect =
@@ -418,9 +328,9 @@ function createActivePokemonBar(
   }
 
   select.disabled =
-    themes.length <= 1
+    !actor.isOwner
     ||
-    !actor.isOwner;
+    themes.length <= 1;
 
   select.addEventListener(
     "change",
@@ -450,9 +360,9 @@ function createActivePokemonBar(
         );
       } finally {
         if (
-          themes.length > 1
-          &&
           actor.isOwner
+          &&
+          themes.length > 1
         ) {
           select.disabled =
             false;
@@ -508,15 +418,11 @@ async function renderActivePokemonUI(
   }
 
   const activeId =
-    resolveActiveThemeId(
+    getActiveId(
       actor,
       themes
     );
 
-  /*
-   * Corrige automaticamente Actors
-   * antigos que ainda nao tenham flag.
-   */
   const stored =
     actor.getFlag(
       MODULE_ID,
@@ -528,92 +434,49 @@ async function renderActivePokemonUI(
     &&
     actor.isOwner
   ) {
-    void actor.setFlag(
+    await actor.setFlag(
       MODULE_ID,
       "activePokemonThemeId",
       activeId
-    );
-  }
-
-  const previousBar =
-    root.querySelector(
-      "[data-pokemon-active-theme-bar]"
-    );
-
-  previousBar?.remove();
-
-  const themeContainer =
-    root.querySelector(
-      ".litm-character-themebooks-container"
-    );
-
-  const mainGrid =
-    root.querySelector(
-      ".themebooks-container[data-tab-category='main']"
-    );
-
-  const container =
-    themeContainer
-    ??
-    mainGrid?.parentElement
-    ??
-    null;
-
-  if (!container) {
-    console.warn(
-      "Pokemon LITM Tools | Nao encontrei o container da ficha para o seletor de Pokemon ativo.",
-      {
-        actor: actor.name,
-        app: app?.constructor?.name
-      }
     );
 
     return;
   }
 
+  root
+    .querySelector(
+      "[data-pokemon-active-theme-bar]"
+    )
+    ?.remove();
+
+  const container =
+    root.querySelector(
+      ".litm-character-themebooks-container"
+    );
+
+  if (!container) {
+    return;
+  }
+
   container.prepend(
-    createActivePokemonBar(
+    createSelector(
       actor,
       themes,
       activeId
     )
   );
 
-  decoratePokemonThemes(
-    root,
-    actor,
-    themes,
-    activeId
-  );
-
-  blockInactivePokemonActions(
-    root
-  );
-
   /*
-   * Remove selecoes antigas de Pokemon
-   * que nao seja mais o ativo.
+   * Nao alteramos classes, estilos,
+   * opacity ou filtros dos cards LitM.
    */
-  void clearInactiveSelections(
-    actor,
-    activeId
-  ).catch(
-    error => {
-      console.error(
-        "Pokemon LITM Tools | Limpando Pokemon inativo:",
-        error
-      );
-    }
+  installInactiveGuard(
+    root,
+    actor
   );
 }
 
 
-/*
- * Protecao mecanica:
- * mesmo que outra interface tente marcar
- * uma Tag de Pokemon inativo, ela fica
- * desmarcada antes da atualizacao.
- */
 function protectInactivePokemonUpdate(
   item,
   changes
@@ -627,11 +490,6 @@ function protectInactivePokemonUpdate(
       MODULE_ID,
       "pokemonTheme"
     ) !== true
-    ||
-    item.getFlag(
-      MODULE_ID,
-      "themeRole"
-    ) !== "pokemon"
   ) {
     return;
   }
@@ -649,7 +507,7 @@ function protectInactivePokemonUpdate(
     getPokemonThemes(actor);
 
   const activeId =
-    resolveActiveThemeId(
+    getActiveId(
       actor,
       themes
     );
@@ -660,59 +518,31 @@ function protectInactivePokemonUpdate(
     return;
   }
 
-  const directPower =
-    changes["system.powertags"];
-
   if (
     Array.isArray(
-      directPower
+      changes["system.powertags"]
     )
   ) {
     changes["system.powertags"] =
-      sanitizeTags(
-        directPower
+      clearSelectedTags(
+        changes["system.powertags"]
       );
   }
 
-  const directWeakness =
-    changes["system.weaknesstags"];
-
   if (
     Array.isArray(
-      directWeakness
+      changes["system.weaknesstags"]
     )
   ) {
     changes["system.weaknesstags"] =
-      sanitizeTags(
-        directWeakness
-      );
-  }
-
-  if (
-    Array.isArray(
-      changes.system?.powertags
-    )
-  ) {
-    changes.system.powertags =
-      sanitizeTags(
-        changes.system.powertags
-      );
-  }
-
-  if (
-    Array.isArray(
-      changes.system?.weaknesstags
-    )
-  ) {
-    changes.system.weaknesstags =
-      sanitizeTags(
-        changes.system.weaknesstags
+      clearSelectedTags(
+        changes["system.weaknesstags"]
       );
   }
 }
 
 
-function queueActivePokemonUI(
+function queueUI(
   app,
   html
 ) {
@@ -722,12 +552,11 @@ function queueActivePokemonUI(
         app,
         html
       ).catch(
-        error => {
+        error =>
           console.error(
-            "Pokemon LITM Tools | Seletor de Pokemon ativo:",
+            "Pokemon LITM Tools | Seletor:",
             error
-          );
-        }
+          )
       );
     }
   );
@@ -735,25 +564,19 @@ function queueActivePokemonUI(
 
 
 export function activatePokemonActiveThemeUI() {
-  /*
-   * Hook específico da ficha LitM.
-   */
   Hooks.on(
     "renderMistEngineLegendInTheMistCharacterSheet",
-    queueActivePokemonUI
+    queueUI
   );
 
-  /*
-   * Fallback para outras variantes/layouts da ficha.
-   */
   Hooks.on(
     "renderApplicationV2",
-    queueActivePokemonUI
+    queueUI
   );
 
   Hooks.on(
     "renderActorSheet",
-    queueActivePokemonUI
+    queueUI
   );
 
   Hooks.on(
