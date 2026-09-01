@@ -63,6 +63,30 @@ function registerSetting(
 
 export function registerTokenOutlineSettings() {
 
+  game.settings.registerMenu(
+    MODULE_ID,
+    "selectionColorsMenu",
+    {
+      name:
+        "Cores do contorno",
+
+      label:
+        "Configurar cores",
+
+      hint:
+        "Escolha as cores do contorno, disposicoes e brilho.",
+
+      icon:
+        "fa-solid fa-palette",
+
+      restricted:
+        false,
+
+      type:
+        TokenOutlineColorSettings
+    }
+  );
+
   registerSetting(
     "selectionEnabled",
     {
@@ -146,6 +170,9 @@ export function registerTokenOutlineSettings() {
   registerSetting(
     "selectionCustomColor",
     {
+      config:
+        false,
+
       name:
         "Cor unica do contorno",
 
@@ -161,6 +188,9 @@ export function registerTokenOutlineSettings() {
   registerSetting(
     "selectionFriendlyColor",
     {
+      config:
+        false,
+
       name:
         "Cor - amigavel",
 
@@ -176,6 +206,9 @@ export function registerTokenOutlineSettings() {
   registerSetting(
     "selectionNeutralColor",
     {
+      config:
+        false,
+
       name:
         "Cor - neutro",
 
@@ -191,6 +224,9 @@ export function registerTokenOutlineSettings() {
   registerSetting(
     "selectionHostileColor",
     {
+      config:
+        false,
+
       name:
         "Cor - hostil",
 
@@ -206,6 +242,9 @@ export function registerTokenOutlineSettings() {
   registerSetting(
     "selectionSecretColor",
     {
+      config:
+        false,
+
       name:
         "Cor - secreto",
 
@@ -303,6 +342,9 @@ export function registerTokenOutlineSettings() {
   registerSetting(
     "selectionGlowColor",
     {
+      config:
+        false,
+
       name:
         "Cor personalizada do brilho",
 
@@ -1051,4 +1093,390 @@ export function activateTokenOutline() {
 
 
   refreshAll();
+}
+
+
+
+/* --------------------------------------------------------- */
+/* COLOR SETTINGS                                            */
+/* --------------------------------------------------------- */
+
+const TOKEN_OUTLINE_COLOR_DEFAULTS = {
+  selectionCustomColor:
+    "#ffffff",
+
+  selectionFriendlyColor:
+    "#44c7d9",
+
+  selectionNeutralColor:
+    "#f1c40f",
+
+  selectionHostileColor:
+    "#ff3a3a",
+
+  selectionSecretColor:
+    "#9b59b6",
+
+  selectionGlowColor:
+    "#ffffff"
+};
+
+
+function normalizeColorHex(
+  value
+) {
+  let hex =
+    String(
+      value ?? ""
+    )
+      .trim()
+      .replace(
+        /^#/,
+        ""
+      );
+
+  if (
+    /^[0-9a-f]{3}$/i
+      .test(hex)
+  ) {
+    hex =
+      hex
+        .split("")
+        .map(
+          part =>
+            part + part
+        )
+        .join("");
+  }
+
+  if (
+    !/^[0-9a-f]{6}$/i
+      .test(hex)
+  ) {
+    return null;
+  }
+
+  return (
+    "#"
+    +
+    hex.toLowerCase()
+  );
+}
+
+
+class TokenOutlineColorSettings
+  extends
+    foundry.applications.api
+      .HandlebarsApplicationMixin(
+        foundry.applications.api
+          .ApplicationV2
+      ) {
+
+  static DEFAULT_OPTIONS = {
+    tag:
+      "form",
+
+    id:
+      "pokemon-litm-outline-colors",
+
+    classes: [
+      "pokemon-litm-tools",
+      "pokemon-outline-colors"
+    ],
+
+    window: {
+      title:
+        "Cores do contorno"
+    },
+
+    position: {
+      width:
+        460
+    },
+
+    form: {
+      handler:
+        TokenOutlineColorSettings
+          .#onSubmit,
+
+      closeOnSubmit:
+        true
+    }
+  };
+
+
+  static PARTS = {
+    main: {
+      template:
+        `modules/${MODULE_ID}/templates/token-outline-colors.hbs`
+    },
+
+    footer: {
+      template:
+        "templates/generic/form-footer.hbs"
+    }
+  };
+
+
+  async _prepareContext(
+    options
+  ) {
+    const context =
+      await super._prepareContext(
+        options
+      );
+
+    const definitions = [
+      [
+        "selectionCustomColor",
+        "Cor unica"
+      ],
+
+      [
+        "selectionFriendlyColor",
+        "Amigavel"
+      ],
+
+      [
+        "selectionNeutralColor",
+        "Neutro"
+      ],
+
+      [
+        "selectionHostileColor",
+        "Hostil"
+      ],
+
+      [
+        "selectionSecretColor",
+        "Secreto"
+      ],
+
+      [
+        "selectionGlowColor",
+        "Brilho personalizado"
+      ]
+    ];
+
+    const colors =
+      definitions.map(
+        ([key, label]) => ({
+          key,
+
+          label,
+
+          value:
+            normalizeColorHex(
+              setting(key)
+            )
+            ??
+            TOKEN_OUTLINE_COLOR_DEFAULTS[
+              key
+            ]
+        })
+      );
+
+    return {
+      ...context,
+
+      colors,
+
+      buttons: [
+        {
+          type:
+            "submit",
+
+          icon:
+            "fa-solid fa-floppy-disk",
+
+          label:
+            "Salvar"
+        }
+      ]
+    };
+  }
+
+
+  async _onRender(
+    context,
+    options
+  ) {
+    await super._onRender(
+      context,
+      options
+    );
+
+    const root =
+      this.element;
+
+
+    for (
+      const picker
+      of root.querySelectorAll(
+        "[data-color-picker]"
+      )
+    ) {
+      picker.addEventListener(
+        "input",
+
+        () => {
+          const key =
+            picker.dataset
+              .colorPicker;
+
+          const hexInput =
+            root.querySelector(
+              `[data-color-hex="${key}"]`
+            );
+
+          if (hexInput) {
+            hexInput.value =
+              picker.value;
+          }
+        }
+      );
+    }
+
+
+    for (
+      const hexInput
+      of root.querySelectorAll(
+        "[data-color-hex]"
+      )
+    ) {
+      hexInput.addEventListener(
+        "change",
+
+        () => {
+          const key =
+            hexInput.dataset
+              .colorHex;
+
+          const normalized =
+            normalizeColorHex(
+              hexInput.value
+            );
+
+          const picker =
+            root.querySelector(
+              `[data-color-picker="${key}"]`
+            );
+
+          if (!normalized) {
+            hexInput.value =
+              picker?.value
+              ??
+              "#ffffff";
+
+            ui.notifications.warn(
+              "Cor HEX invalida."
+            );
+
+            return;
+          }
+
+          hexInput.value =
+            normalized;
+
+          if (picker) {
+            picker.value =
+              normalized;
+          }
+        }
+      );
+    }
+
+
+    root.querySelector(
+      "[data-action='resetColors']"
+    )
+      ?.addEventListener(
+        "click",
+
+        async () => {
+
+          for (
+            const [
+              key,
+              value
+            ]
+            of Object.entries(
+              TOKEN_OUTLINE_COLOR_DEFAULTS
+            )
+          ) {
+            const picker =
+              root.querySelector(
+                `[data-color-picker="${key}"]`
+              );
+
+            const hexInput =
+              root.querySelector(
+                `[data-color-hex="${key}"]`
+              );
+
+            if (picker) {
+              picker.value =
+                value;
+            }
+
+            if (hexInput) {
+              hexInput.value =
+                value;
+            }
+          }
+
+          await Promise.all(
+            Object.entries(
+              TOKEN_OUTLINE_COLOR_DEFAULTS
+            )
+              .map(
+                ([key, value]) =>
+                  game.settings.set(
+                    MODULE_ID,
+                    key,
+                    value
+                  )
+              )
+          );
+
+          ui.notifications.info(
+            "Cores restauradas."
+          );
+        }
+      );
+  }
+
+
+  static async #onSubmit(
+    event,
+    form,
+    formData
+  ) {
+    const data =
+      formData.object
+      ??
+      {};
+
+    for (
+      const key
+      of Object.keys(
+        TOKEN_OUTLINE_COLOR_DEFAULTS
+      )
+    ) {
+      const value =
+        normalizeColorHex(
+          data[key]
+        );
+
+      if (!value) {
+        continue;
+      }
+
+      await game.settings.set(
+        MODULE_ID,
+        key,
+        value
+      );
+    }
+  }
 }

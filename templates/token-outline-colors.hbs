@@ -1,0 +1,48 @@
+﻿<div class="pokemon-outline-color-settings">
+
+  <p class="hint">
+    Clique na amostra para abrir o seletor de cor
+    ou digite o valor HEX.
+  </p>
+
+  {{#each colors}}
+
+    <div class="form-group">
+
+      <label>
+        {{label}}
+      </label>
+
+      <div class="form-fields pokemon-outline-color-row">
+
+        <input
+          type="color"
+          value="{{value}}"
+          data-color-picker="{{key}}"
+        >
+
+        <input
+          type="text"
+          name="{{key}}"
+          value="{{value}}"
+          maxlength="7"
+          spellcheck="false"
+          data-color-hex="{{key}}"
+        >
+
+      </div>
+
+    </div>
+
+  {{/each}}
+
+  <button
+    type="button"
+    class="pokemon-outline-reset"
+    data-action="resetColors"
+  >
+    <i class="fa-solid fa-rotate-left"></i>
+    Restaurar cores padrao
+  </button>
+
+</div>
