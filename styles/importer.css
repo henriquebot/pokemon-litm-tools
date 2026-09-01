@@ -1355,13 +1355,10 @@ input[type="text"] {
   min-width: 150px;
 }
 
-.themebook-container.pokemon-theme-inactive {
-  opacity: 0.38;
-  filter: grayscale(0.65);
-}
-
+.themebook-container.pokemon-theme-inactive,
 .themebook-container.pokemon-theme-inactive-edit {
-  opacity: 0.72;
+  opacity: 1;
+  filter: none;
 }
 
 .themebook-container.pokemon-theme-active {
