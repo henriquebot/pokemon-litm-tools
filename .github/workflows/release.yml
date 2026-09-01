@@ -1,0 +1,72 @@
+﻿name: Build Foundry Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: vars
+        shell: bash
+        run: |
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Foundry package
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          mkdir -p release/package
+
+          cp -R scripts styles templates data README.md release/package/
+
+          python3 <<'PY'
+          import json
+          import os
+
+          with open("module.json", "r", encoding="utf-8-sig") as f:
+              manifest = json.load(f)
+
+          version = os.environ["VERSION"]
+          tag = os.environ["TAG"]
+
+          manifest["version"] = version
+          manifest["download"] = (
+              f"https://github.com/henriquebot/pokemon-litm-tools/"
+              f"releases/download/{tag}/pokemon-litm-tools.zip"
+          )
+
+          for path in [
+              "release/package/module.json",
+              "release/module.json"
+          ]:
+              with open(path, "w", encoding="utf-8") as f:
+                  json.dump(manifest, f, ensure_ascii=False, indent=2)
+                  f.write("\n")
+          PY
+
+          cd release/package
+          zip -r ../pokemon-litm-tools.zip .
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            release/pokemon-litm-tools.zip \
+            release/module.json \
+            --title "${{ github.ref_name }}" \
+            --generate-notes
