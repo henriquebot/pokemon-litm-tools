@@ -486,6 +486,119 @@ function getImporterPreviewData(
 }
 
 
+function updateOverworldPreviewSize(
+  image,
+  zoomed
+) {
+  const columns =
+    Number(
+      image.dataset.previewColumns
+      ?? 1
+    );
+
+  const rows =
+    Number(
+      image.dataset.previewRows
+      ?? 1
+    );
+
+  const naturalWidth =
+    Number(image.naturalWidth);
+
+  const naturalHeight =
+    Number(image.naturalHeight);
+
+  if (
+    !naturalWidth ||
+    !naturalHeight ||
+    columns <= 0 ||
+    rows <= 0
+  ) {
+    return;
+  }
+
+  const frameWidth =
+    naturalWidth / columns;
+
+  const frameHeight =
+    naturalHeight / rows;
+
+  const maxSize =
+    zoomed
+      ? 136
+      : 64;
+
+  const scale =
+    Math.min(
+      maxSize / frameWidth,
+      maxSize / frameHeight
+    );
+
+  if (
+    !Number.isFinite(scale) ||
+    scale <= 0
+  ) {
+    return;
+  }
+
+  const wrapper =
+    image.closest(
+      ".pokemon-overworld-preview"
+    );
+
+  if (!wrapper) return;
+
+  wrapper.style.width =
+    `${frameWidth * scale}px`;
+
+  wrapper.style.height =
+    `${frameHeight * scale}px`;
+
+  image.style.width =
+    `${naturalWidth * scale}px`;
+
+  image.style.height =
+    `${naturalHeight * scale}px`;
+}
+
+
+function refreshOverworldPreviews(
+  root,
+  zoomed
+) {
+  for (
+    const image
+    of root.querySelectorAll(
+      "[data-overworld-preview]"
+    )
+  ) {
+    const update =
+      () =>
+        updateOverworldPreviewSize(
+          image,
+          zoomed
+        );
+
+    if (
+      image.complete &&
+      image.naturalWidth
+    ) {
+      update();
+    }
+
+    else {
+      image.addEventListener(
+        "load",
+        update,
+        {
+          once: true
+        }
+      );
+    }
+  }
+}
+
+
 async function createOverworldFrameBlob(sheetBlob, entry) {
   const grid = getOverworldFrameGrid(entry);
 
@@ -1235,6 +1348,12 @@ class PokemonImporterApp
       );
 
 
+    refreshOverworldPreviews(
+      this.element,
+      this.previewZoomed
+    );
+
+
     /* ABAS */
 
     for (
@@ -1290,6 +1409,11 @@ class PokemonImporterApp
 
           shell?.classList.toggle(
             "preview-zoomed",
+            this.previewZoomed
+          );
+
+          refreshOverworldPreviews(
+            this.element,
             this.previewZoomed
           );
 
