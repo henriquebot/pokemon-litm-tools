@@ -492,6 +492,9 @@ class PokemonCharacterCreatorApp
   busy =
     false;
 
+  previewZoomed =
+    false;
+
 
   async _prepareContext(
     options
@@ -612,7 +615,10 @@ class PokemonCharacterCreatorApp
         !this.busy,
 
       busy:
-        this.busy
+        this.busy,
+
+      previewZoomed:
+        this.previewZoomed
     };
   }
 
@@ -628,8 +634,62 @@ class PokemonCharacterCreatorApp
 
     refreshPokemonAssetPreviews(
       this.element,
-      false
+      this.previewZoomed
     );
+
+
+    this.element
+      .querySelector(
+        "[data-action='togglePreviewZoom']"
+      )
+      ?.addEventListener(
+        "click",
+        event => {
+          this.previewZoomed =
+            !this.previewZoomed;
+
+          const shell =
+            this.element.querySelector(
+              ".pokemon-character-creator-shell"
+            );
+
+          shell?.classList.toggle(
+            "preview-zoomed",
+            this.previewZoomed
+          );
+
+          refreshPokemonAssetPreviews(
+            this.element,
+            this.previewZoomed
+          );
+
+          const button =
+            event.currentTarget;
+
+          button.classList.toggle(
+            "active",
+            this.previewZoomed
+          );
+
+          button.setAttribute(
+            "aria-pressed",
+            String(this.previewZoomed)
+          );
+
+          const icon =
+            button.querySelector("i");
+
+          icon?.classList.toggle(
+            "fa-magnifying-glass-plus",
+            !this.previewZoomed
+          );
+
+          icon?.classList.toggle(
+            "fa-magnifying-glass-minus",
+            this.previewZoomed
+          );
+        }
+      );
 
 
     const nameInput =

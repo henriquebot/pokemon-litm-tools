@@ -341,3 +341,24 @@ input[type="text"] {
   opacity: .5;
   cursor: not-allowed;
 }
+
+
+/* Character Creator card layout fix */
+
+.pokemon-character-card {
+  grid-template-columns:
+    72px
+    minmax(0, 1fr);
+}
+
+.pokemon-character-creator-shell.preview-zoomed
+.pokemon-character-card {
+  grid-template-columns:
+    144px
+    minmax(0, 1fr);
+}
+
+.pokemon-character-card
+.pokemon-asset-info {
+  min-width: 0;
+}
