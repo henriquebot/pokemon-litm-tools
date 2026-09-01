@@ -48,7 +48,7 @@
 
       <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}">
         <span>7</span>
-        Themes
+        Temas
       </div>
 
     {{/if}}
@@ -244,14 +244,14 @@
             <select data-role="person-type">
 
               <option value="all">Todos</option>
-              <option value="trainer-class">Trainer Classes</option>
+              <option value="trainer-class">Classes de Treinador</option>
               <option value="npc">NPCs</option>
               <option value="named">Personagens</option>
               <option value="player">Protagonistas</option>
               <option value="rival">Rivais</option>
               <option value="professor">Professores</option>
               <option value="gym-leader">L&iacute;deres</option>
-              <option value="elite-four">Elite Four</option>
+              <option value="elite-four">Elite dos Quatro</option>
               <option value="villain">Vil&otilde;es</option>
 
             </select>
@@ -780,26 +780,70 @@
 
       <p>
         Escolha o perfil que mais combina com seu personagem.
-        Isso &eacute; apenas um ponto de partida: seus Themes poder&atilde;o ser personalizados.
+        Ele serve como ponto de partida e seus Temas ainda poder&atilde;o ser personalizados.
       </p>
 
       <div class="pokemon-archetype-grid">
 
         {{#each archetypes}}
 
-          <button
-            type="button"
-            class="pokemon-archetype-card{{#if selected}} selected{{/if}}"
-            data-archetype-id="{{id}}"
+          <article
+            class="pokemon-archetype-option{{#if selected}} selected{{/if}}"
           >
-            <strong>
-              {{name}}
-            </strong>
 
-            <span>
-              {{description}}
-            </span>
-          </button>
+            <button
+              type="button"
+              class="pokemon-archetype-card{{#if selected}} selected{{/if}}"
+              data-archetype-id="{{id}}"
+            >
+              <strong>
+                {{name}}
+              </strong>
+
+              <span>
+                {{description}}
+              </span>
+            </button>
+
+            {{#if selected}}
+
+              {{#if hasVariants}}
+
+                <div class="pokemon-archetype-variant">
+
+                  <label>
+                    {{variantLabel}}
+                  </label>
+
+                  <select data-archetype-variant="{{id}}">
+
+                    <option value="">
+                      Selecione...
+                    </option>
+
+                    {{#each variants}}
+
+                      <option
+                        value="{{id}}"
+                        {{#if selected}}selected{{/if}}
+                      >
+                        {{name}}
+                        {{#if originalName}}
+                          ({{originalName}})
+                        {{/if}}
+                      </option>
+
+                    {{/each}}
+
+                  </select>
+
+                </div>
+
+              {{/if}}
+
+            {{/if}}
+
+          </article>
 
         {{/each}}
 
@@ -815,14 +859,14 @@
     <section class="pokemon-wizard-page pokemon-themes-page">
 
       <h2>
-        Construa seus Themes
+        Construa seus Temas
       </h2>
 
       <div class="pokemon-theme-guidance">
-        <strong>Como pensar seus Themes:</strong>
-        Power Tags dizem no que seu personagem &eacute; bom.
-        Weakness Tags mostram problemas que tornam a hist&oacute;ria interessante.
-        A Quest &eacute; a pergunta que move aquele Theme.
+        <strong>Como pensar seus Temas:</strong>
+        Tags de Poder representam capacidades, recursos e qualidades que ajudam seu personagem.
+        Tags de Fraqueza representam limita&ccedil;&otilde;es que podem complicar suas a&ccedil;&otilde;es.
+        A Quest &eacute; a pergunta que move aquele Tema.
       </div>
 
       {{#if selectedArchetype}}
@@ -830,10 +874,13 @@
         <div class="pokemon-theme-editor-heading">
           <strong>
             Perfil: {{selectedArchetype.name}}
+            {{#if selectedArchetype.selectedVariant}}
+              &mdash; {{selectedArchetype.selectedVariant.name}}
+            {{/if}}
           </strong>
 
           <span>
-            Use as sugest&otilde;es, troque o preset ou escreva algo totalmente seu.
+            Use uma sugest&atilde;o pronta ou escreva algo totalmente seu.
           </span>
         </div>
 
@@ -846,7 +893,7 @@
               <header class="pokemon-theme-editor-card-header">
 
                 <span class="pokemon-theme-number">
-                  Theme {{number}}
+                  Tema {{number}}
                 </span>
 
                 <select data-theme-preset-slot="{{index}}">
@@ -863,7 +910,7 @@
               </header>
 
               <label>
-                Nome do Theme
+                Nome do Tema
 
                 <input
                   type="text"
@@ -876,7 +923,7 @@
               <div class="pokemon-theme-editor-section">
 
                 <strong>
-                  Power Tags
+                  Tags de Poder
                 </strong>
 
                 <small>
@@ -899,7 +946,7 @@
               <div class="pokemon-theme-editor-section">
 
                 <strong>
-                  Weakness Tag
+                  Tag de Fraqueza
                 </strong>
 
                 <small>
@@ -943,9 +990,9 @@
       {{/if}}
 
       <div class="pokemon-theme-rules-note">
-        Durante o jogo, voc&ecirc; ativa Power Tags que ajudam sua a&ccedil;&atilde;o.
-        Weakness Tags podem reduzir seu resultado, mas tamb&eacute;m ajudam o personagem a evoluir.
-        Quests orientam o desenvolvimento e as escolhas do personagem.
+        Durante o jogo, voc&ecirc; usa Tags de Poder que ajudam sua a&ccedil;&atilde;o.
+        Tags de Fraqueza podem dificultar suas a&ccedil;&otilde;es, mas tamb&eacute;m impulsionam a evolu&ccedil;&atilde;o do personagem.
+        As Quests orientam seu desenvolvimento e suas escolhas.
       </div>
 
     </section>

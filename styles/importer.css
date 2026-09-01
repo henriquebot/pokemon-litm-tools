@@ -1040,3 +1040,289 @@ input[type="text"] {
     grid-template-columns: 1fr;
   }
 }
+
+
+
+/* Pokemon Character Wizard - LitM visual polish */
+
+/* --------------------------------------------------------- */
+/* DIVISOR LITM - TODAS AS ETAPAS                            */
+/* --------------------------------------------------------- */
+
+.pokemon-character-creator .pokemon-wizard-page > h2 {
+  margin-bottom: 4px;
+}
+
+.pokemon-character-creator .pokemon-wizard-page > h2::after {
+  content: "";
+  display: block;
+  width: min(330px, 70%);
+  height: 10px;
+  margin: 7px 0 2px;
+  background-image:
+    url("/systems/mist-engine-fvtt/assets/tag-divider.webp");
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: contain;
+  opacity: .72;
+}
+
+.pokemon-character-creator .pokemon-wizard-page > p {
+  max-width: 760px;
+  line-height: 1.45;
+}
+
+
+/* --------------------------------------------------------- */
+/* CARTOES GERAIS                                            */
+/* --------------------------------------------------------- */
+
+.pokemon-character-creator
+:is(
+  .pokemon-character-type-card,
+  .pokemon-archetype-option,
+  .pokemon-upload-choice,
+  .pokemon-theme-editor-card,
+  .pokemon-no-team
+) {
+  border-radius: 6px;
+}
+
+.pokemon-character-creator
+:is(
+  .pokemon-character-type-card,
+  .pokemon-archetype-card
+) {
+  transition:
+    border-color .15s ease,
+    box-shadow .15s ease,
+    transform .15s ease;
+}
+
+.pokemon-character-creator
+:is(
+  .pokemon-character-type-card,
+  .pokemon-archetype-card
+):hover {
+  transform: translateY(-1px);
+}
+
+
+/* --------------------------------------------------------- */
+/* ETAPA 6 - PERFIS                                          */
+/* --------------------------------------------------------- */
+
+.pokemon-archetype-page {
+  overflow-y: auto;
+}
+
+.pokemon-archetype-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 2px 3px 10px;
+}
+
+.pokemon-archetype-option {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border:
+    1px solid
+    var(--color-border-light-primary);
+  background:
+    rgb(255 255 255 / .025);
+}
+
+.pokemon-archetype-option.selected {
+  border-color:
+    var(--color-border-highlight);
+  box-shadow:
+    inset 0 0 0 1px
+    rgb(255 255 255 / .08);
+}
+
+.pokemon-archetype-card {
+  width: 100%;
+  min-height: 78px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.pokemon-archetype-card strong {
+  font-size: .95rem;
+}
+
+.pokemon-archetype-card span {
+  font-size: .78rem;
+  line-height: 1.35;
+  opacity: .78;
+}
+
+.pokemon-archetype-card.selected {
+  box-shadow: none;
+}
+
+.pokemon-archetype-variant {
+  position: relative;
+  padding: 9px 12px 12px;
+}
+
+.pokemon-archetype-variant::before {
+  content: "";
+  display: block;
+  height: 8px;
+  margin: -3px 0 6px;
+  background-image:
+    url("/systems/mist-engine-fvtt/assets/tag-divider.webp");
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 210px auto;
+  opacity: .48;
+}
+
+.pokemon-archetype-variant label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.pokemon-archetype-variant select {
+  width: 100%;
+}
+
+
+/* --------------------------------------------------------- */
+/* ETAPA 7 - TEMAS                                           */
+/* --------------------------------------------------------- */
+
+.pokemon-theme-guidance,
+.pokemon-theme-rules-note {
+  position: relative;
+  background:
+    rgb(255 255 255 / .025);
+}
+
+.pokemon-theme-guidance::after,
+.pokemon-theme-rules-note::before {
+  content: "";
+  display: block;
+  height: 8px;
+  background-image:
+    url("/systems/mist-engine-fvtt/assets/tag-divider.webp");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 240px auto;
+  opacity: .45;
+}
+
+.pokemon-theme-guidance::after {
+  margin-top: 8px;
+}
+
+.pokemon-theme-rules-note::before {
+  margin-bottom: 8px;
+}
+
+.pokemon-theme-editor-heading {
+  padding: 2px 4px;
+}
+
+.pokemon-theme-editor-card {
+  position: relative;
+  border-color:
+    rgb(170 153 128 / .65);
+  background-color:
+    rgb(231 227 224 / .055);
+}
+
+.pokemon-theme-editor-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 5px;
+  background-image:
+    url("/systems/mist-engine-fvtt/assets/tag-divider.webp");
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: 180px auto;
+  opacity: .32;
+  pointer-events: none;
+}
+
+.pokemon-theme-number {
+  font-size: .84rem;
+  letter-spacing: .02em;
+}
+
+.pokemon-theme-editor-section {
+  position: relative;
+  padding-top: 7px;
+}
+
+.pokemon-theme-editor-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 125px;
+  height: 5px;
+  background-image:
+    url("/systems/mist-engine-fvtt/assets/tag-divider.webp");
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: .27;
+}
+
+
+/* --------------------------------------------------------- */
+/* RODAPE DO WIZARD                                          */
+/* --------------------------------------------------------- */
+
+.pokemon-character-creator .pokemon-wizard-footer {
+  position: relative;
+  padding-top: 13px;
+}
+
+.pokemon-character-creator .pokemon-wizard-footer::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 10%;
+  right: 10%;
+  height: 8px;
+  background-image:
+    url("/systems/mist-engine-fvtt/assets/tag-divider.webp");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 260px auto;
+  opacity: .35;
+}
+
+
+/* --------------------------------------------------------- */
+/* RESPONSIVO                                                */
+/* --------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .pokemon-archetype-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pokemon-character-creator
+  .pokemon-wizard-page > h2::after {
+    width: 55%;
+  }
+}
