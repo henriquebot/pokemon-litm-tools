@@ -242,6 +242,20 @@
 
             {{/if}}
 
+            {{#if ../isPokemon}}
+
+              <button
+                type="button"
+                class="pokemon-builder-link"
+                data-pokemon-builder="{{id}}"
+                title="Criar como Challenge ou adicionar a um treinador"
+              >
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                Builder
+              </button>
+
+            {{/if}}
+
             {{#if pokedexUrl}}
 
               <button

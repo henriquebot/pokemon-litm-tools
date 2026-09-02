@@ -3,6 +3,10 @@ import {
   openPokemonDb
 } from "./pokemon-links.js";
 
+import {
+  openPokemonBuilder
+} from "./pokemon-builder.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const DYLAN_ID = "dylans-animated-tokens";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
@@ -166,14 +170,27 @@ async function uploadBlob(
         }
       );
 
-  return (
+  const storedPath =
     uploaded?.path
-    ??
-    uploaded?.url
-    ??
-    uploaded?.file
-    ??
-    null
+    ?? uploaded?.url
+    ?? uploaded?.file
+    ?? null;
+
+  if (!storedPath) return null;
+
+  const separator =
+    storedPath.includes("?")
+      ? "&"
+      : "?";
+
+  return (
+    storedPath
+    +
+    separator
+    +
+    "v="
+    +
+    Date.now().toString(36)
   );
 }
 
@@ -453,11 +470,9 @@ async function prepareVertical6(
       )
     ]);
 
-  const cacheKey = Date.now();
-
   return {
-    sheetPath: `${sheetPath}?v=${cacheKey}`,
-    portraitPath: `${portraitPath}?v=${cacheKey}`
+    sheetPath,
+    portraitPath
   };
 }
 
@@ -924,7 +939,8 @@ async function prepareActorDefinition(
       : 1;
 
   const moduleFlags = {
-    schemaVersion:\n      9,
+    schemaVersion:
+      9,
 
     kind:
       isPokemon
@@ -1100,7 +1116,8 @@ async function ensureActorCurrent(
     Number(
       current.schemaVersion
       ?? 0
-    ) >= 9\n    &&
+    ) >= 9
+    &&
     current.assets?.overworld
   ) {
     return actor;
@@ -2082,6 +2099,85 @@ class PokemonImporterApp
           openPokemonDb(
             button.dataset.pokedexUrl
           );
+        }
+      );
+    }
+
+
+    /* POKEMON BUILDER */
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-pokemon-builder]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+
+        async event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const id =
+            button.dataset
+              .pokemonBuilder;
+
+          if (!id) return;
+
+          const oldHTML =
+            button.innerHTML;
+
+          button.disabled =
+            true;
+
+          button.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i> Builder';
+
+          try {
+            const catalog =
+              await loadCatalog();
+
+            const entry =
+              catalog.pokemon.find(
+                item =>
+                  item.id === id
+              );
+
+            if (!entry) {
+              throw new Error(
+                "Pokemon nao encontrado no catalogo."
+              );
+            }
+
+            await openPokemonBuilder(
+              entry,
+              prepareActorDefinition
+            );
+
+          } catch (error) {
+            console.error(
+              "Pokemon LITM Tools | Builder:",
+              error
+            );
+
+            ui.notifications.error(
+              error?.message
+              ??
+              "Falha no Pokemon Builder."
+            );
+
+          } finally {
+            if (
+              button?.isConnected
+            ) {
+              button.disabled =
+                false;
+
+              button.innerHTML =
+                oldHTML;
+            }
+          }
         }
       );
     }

@@ -88,10 +88,11 @@ function getPokemonTokens(scene, trainerId) {
 }
 
 function stablePath(value) {
-  if (typeof value !== "string") return value;
-  const path = value.trim();
-  if (!path || /^(?:https?:|data:|blob:)/i.test(path)) return path;
-  return path.split(/[?#]/, 1)[0];
+  return (
+    typeof value === "string"
+      ? value.trim()
+      : value
+  );
 }
 
 function visualFor(theme) {
