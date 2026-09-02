@@ -1,0 +1,252 @@
+<div class="pokemon-manager-shell">
+  {{#if hasActors}}
+
+    <header class="pokemon-manager-header">
+      <div>
+        <strong>Treinador</strong>
+        <select data-role="manager-actor" {{#if busy}}disabled{{/if}}>
+          {{#each actors}}
+            <option value="{{id}}" {{#if selected}}selected{{/if}}>
+              {{name}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
+      <div class="pokemon-manager-summary">
+        <span>
+          <i class="fa-solid fa-paw"></i>
+          Time {{teamCount}}/6
+        </span>
+
+        <span>
+          <i class="fa-solid fa-box-archive"></i>
+          PC {{pcCount}}
+        </span>
+      </div>
+    </header>
+
+    <nav class="pokemon-manager-tabs">
+      <button
+        type="button"
+        data-manager-tab="team"
+        class="{{#if tabTeam}}active{{/if}}"
+      >
+        <i class="fa-solid fa-paw"></i>
+        Time
+      </button>
+
+      <button
+        type="button"
+        data-manager-tab="pc"
+        class="{{#if tabPc}}active{{/if}}"
+      >
+        <i class="fa-solid fa-box-archive"></i>
+        PC
+      </button>
+
+      <button
+        type="button"
+        data-manager-tab="items"
+        class="{{#if tabItems}}active{{/if}}"
+      >
+        <i class="fa-solid fa-bag-shopping"></i>
+        Mochila
+      </button>
+
+      <button
+        type="button"
+        data-manager-tab="trade"
+        class="{{#if tabTrade}}active{{/if}}"
+      >
+        <i class="fa-solid fa-right-left"></i>
+        Trocas
+      </button>
+    </nav>
+
+    <main class="pokemon-manager-content">
+
+      {{#if tabTeam}}
+        <section class="pokemon-manager-section">
+          <div class="pokemon-manager-section-heading">
+            <div>
+              <h2>Time Pokémon</h2>
+              <p>
+                Escolha a ordem de seguidores.
+                0 guarda o Pokémon na Pokébola;
+                1–6 define a posição na fila.
+              </p>
+            </div>
+
+            <span>{{teamCount}}/6</span>
+          </div>
+
+          <div class="pokemon-manager-team-grid">
+            {{#each team}}
+              <article class="pokemon-manager-card pokemon-manager-team-card">
+                <span class="pokemon-manager-slot-number">
+                  {{number}}
+                </span>
+
+                <img
+                  src="{{img}}"
+                  alt="{{name}}"
+                  loading="lazy"
+                >
+
+                <div class="pokemon-manager-card-main">
+                  <strong>{{name}}</strong>
+
+                  <label class="pokemon-manager-follow-row">
+                    <span>Seguir</span>
+
+                    <select
+                      data-follower-theme-id="{{id}}"
+                      {{#if ../busy}}disabled{{/if}}
+                    >
+                      {{#each followerOptions}}
+                        <option
+                          value="{{value}}"
+                          {{#if selected}}selected{{/if}}
+                        >
+                          {{value}}
+                        </option>
+                      {{/each}}
+                    </select>
+                  </label>
+                </div>
+
+                <div class="pokemon-manager-card-actions">
+                  <button
+                    type="button"
+                    data-pokedex-url="{{pokedexUrl}}"
+                    title="Abrir Pokédex"
+                  >
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                  </button>
+
+                  <button
+                    type="button"
+                    data-send-to-pc="{{id}}"
+                    title="Enviar para o PC"
+                    {{#if ../busy}}disabled{{/if}}
+                  >
+                    <i class="fa-solid fa-box-archive"></i>
+                  </button>
+                </div>
+              </article>
+            {{/each}}
+
+            {{#each emptySlots}}
+              <article class="pokemon-manager-card pokemon-manager-empty-slot">
+                <span class="pokemon-manager-slot-number">
+                  {{number}}
+                </span>
+
+                <i class="fa-regular fa-circle"></i>
+                <span>Slot vazio</span>
+              </article>
+            {{/each}}
+          </div>
+        </section>
+      {{/if}}
+
+      {{#if tabPc}}
+        <section class="pokemon-manager-section">
+          <div class="pokemon-manager-section-heading">
+            <div>
+              <h2>PC Pokémon</h2>
+              <p>
+                Pokémon pertencentes a este treinador
+                que não estão entre os seis do time.
+              </p>
+            </div>
+
+            <span>{{pcCount}}</span>
+          </div>
+
+          {{#if pcItems.length}}
+            <div class="pokemon-manager-pc-grid">
+              {{#each pcItems}}
+                <article class="pokemon-manager-card pokemon-manager-pc-card">
+                  <img
+                    src="{{img}}"
+                    alt="{{name}}"
+                    loading="lazy"
+                  >
+
+                  <strong>{{name}}</strong>
+
+                  <div class="pokemon-manager-card-actions">
+                    <button
+                      type="button"
+                      data-pokedex-url="{{pokedexUrl}}"
+                      title="Abrir Pokédex"
+                    >
+                      <i class="fa-solid fa-mobile-screen-button"></i>
+                    </button>
+
+                    <button
+                      type="button"
+                      data-add-to-team="{{id}}"
+                      data-pc-source="{{source}}"
+                      title="Adicionar ao time"
+                      {{#if ../teamFull}}disabled{{/if}}
+                      {{#if ../busy}}disabled{{/if}}
+                    >
+                      <i class="fa-solid fa-arrow-up"></i>
+                    </button>
+                  </div>
+                </article>
+              {{/each}}
+            </div>
+          {{else}}
+            <div class="pokemon-manager-empty-state">
+              <i class="fa-solid fa-box-open"></i>
+              <strong>PC vazio</strong>
+              <span>
+                Envie um Pokémon do time para o PC
+                ou dê ownership de um Pokémon ao jogador.
+              </span>
+            </div>
+          {{/if}}
+        </section>
+      {{/if}}
+
+      {{#if tabItems}}
+        <section class="pokemon-manager-coming-soon">
+          <i class="fa-solid fa-bag-shopping"></i>
+          <h2>Mochila</h2>
+          <p>
+            Estrutura reservada para trocar os itens
+            que alimentam as Tags do Theme Backpack.
+          </p>
+        </section>
+      {{/if}}
+
+      {{#if tabTrade}}
+        <section class="pokemon-manager-coming-soon">
+          <i class="fa-solid fa-right-left"></i>
+          <h2>Trocas</h2>
+          <p>
+            Estrutura reservada para transferir Pokémon
+            entre treinadores.
+          </p>
+        </section>
+      {{/if}}
+
+    </main>
+
+  {{else}}
+
+    <div class="pokemon-manager-empty-state pokemon-manager-no-trainer">
+      <i class="fa-solid fa-user-slash"></i>
+      <strong>Nenhum treinador disponível</strong>
+      <span>
+        Crie um personagem Pokémon ou receba ownership
+        de um Actor do tipo personagem.
+      </span>
+    </div>
+
+  {{/if}}
+</div>

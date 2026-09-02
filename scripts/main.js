@@ -14,6 +14,10 @@ import {
 } from "./character-creator-app.js";
 
 import {
+  openPokemonManager
+} from "./pokemon-manager-app.js";
+
+import {
   activatePokemonThemePokedexButtons
 } from "./pokemon-links.js";
 
@@ -49,15 +53,14 @@ Hooks.once("init", () => {
 
   game.modules.get(MODULE_ID).api = {
     openPokemonImporter,
-    openPokemonCharacterCreator
+    openPokemonCharacterCreator,
+    openPokemonManager
   };
 });
 
 Hooks.on(
   "getSceneControlButtons",
   controls => {
-
-    if (!game.user.isGM) return;
 
     const tokenControls =
       controls.tokens;
@@ -66,18 +69,66 @@ Hooks.on(
       return;
     }
 
-    tokenControls.tools.pokemonImporter = {
+    if (game.user.isGM) {
+      tokenControls.tools.pokemonImporter = {
+        name:
+          "pokemonImporter",
+
+        title:
+          "Pokémon Importer",
+
+        icon:
+          "fa-solid fa-dragon",
+
+        order:
+          90,
+
+        button:
+          true,
+
+        visible:
+          true,
+
+        onChange:
+          () => openPokemonImporter()
+      };
+
+      tokenControls.tools.pokemonCharacterCreator = {
+        name:
+          "pokemonCharacterCreator",
+
+        title:
+          "Criar Personagem Pokémon",
+
+        icon:
+          "fa-solid fa-user-plus",
+
+        order:
+          91,
+
+        button:
+          true,
+
+        visible:
+          true,
+
+        onChange:
+          () => openPokemonCharacterCreator()
+      };
+    }
+
+    tokenControls.tools.pokemonManager = {
       name:
-        "pokemonImporter",
+        "pokemonManager",
 
       title:
-        "Pok\u00e9mon Importer",
+        "Pokémon Manager",
 
       icon:
-        "fa-solid fa-dragon",
+        "fa-solid fa-box",
 
       order:
-        90,
+        92,
 
       button:
         true,
@@ -86,33 +137,11 @@ Hooks.on(
         true,
 
       onChange:
-        () => openPokemonImporter()
-    };
-
-    tokenControls.tools.pokemonCharacterCreator = {
-      name:
-        "pokemonCharacterCreator",
-
-      title:
-        "Criar Personagem Pok\u00e9mon",
-
-      icon:
-        "fa-solid fa-user-plus",
-
-      order:
-        91,
-
-      button:
-        true,
-
-      visible:
-        true,
-
-      onChange:
-        () => openPokemonCharacterCreator()
+        () => openPokemonManager()
     };
   }
 );
+
 
 Hooks.on(
   "dropCanvasData",
