@@ -72,11 +72,6 @@ export async function createPokemonTeamThemes(
   }
 
   if (!prepared.length) {
-    await actor.unsetFlag(
-      MODULE_ID,
-      "activePokemonThemeId"
-    );
-
     return [];
   }
 
@@ -110,14 +105,6 @@ export async function createPokemonTeamThemes(
       "Item",
       data
     );
-
-  if (created?.[0]) {
-    await actor.setFlag(
-      MODULE_ID,
-      "activePokemonThemeId",
-      created[0].id
-    );
-  }
 
   return created;
 }

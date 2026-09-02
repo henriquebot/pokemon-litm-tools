@@ -18,10 +18,6 @@ import {
 } from "./pokemon-links.js";
 
 import {
-  activatePokemonActiveThemeUI
-} from "./pokemon-active-theme.js";
-
-import {
   activatePokemonFollowers
 } from "./pokemon-follower.js";
 
@@ -33,8 +29,6 @@ Hooks.once("init", () => {
   registerTokenOutlineSettings();
 
   activatePokemonThemePokedexButtons();
-
-  activatePokemonActiveThemeUI();
 
   activatePokemonFollowers();
 

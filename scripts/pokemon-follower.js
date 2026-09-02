@@ -143,32 +143,9 @@ function getPokemonThemes(actor) {
 }
 
 
-function defaultFollowerOrder(
-  actor,
-  themes
-) {
-  const activeId =
-    actor.getFlag(
-      MODULE_ID,
-      "activePokemonThemeId"
-    );
-
-  if (
-    activeId
-    &&
-    themes.some(
-      theme =>
-        theme.id === activeId
-    )
-  ) {
-    return {
-      [activeId]: 1
-    };
-  }
-
+function defaultFollowerOrder() {
   return {};
 }
-
 
 function normalizeFollowerOrder(
   raw,
