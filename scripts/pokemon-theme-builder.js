@@ -92,6 +92,8 @@ export async function createPokemonTeamThemes(
             pokemonTheme: true,
             pokemonTeamSlot: index,
             themeRole: "pokemon",
+            pokemonInstanceId:
+              foundry.utils.randomID(16),
 
             pokedexUrl:
               getPokemonDbUrl(entry)

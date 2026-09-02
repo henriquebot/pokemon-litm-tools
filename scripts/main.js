@@ -25,6 +25,10 @@ import {
   activatePokemonFollowers
 } from "./pokemon-follower.js";
 
+import {
+  activatePokemonVisualStability
+} from "./pokemon-visual-stability.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -33,6 +37,8 @@ Hooks.once("init", () => {
   registerTokenOutlineSettings();
 
   activatePokemonThemePokedexButtons();
+
+  activatePokemonVisualStability();
 
   activatePokemonFollowers();
 

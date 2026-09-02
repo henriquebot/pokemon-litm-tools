@@ -1,2005 +1,402 @@
 const MODULE_ID = "pokemon-litm-tools";
 const DYLAN_ID = "dylans-animated-tokens";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
-
-const ORDER_FLAG = "followerPokemonOrder";
-const FOLLOW_FLAG = "following";
-const SUSPENDED_FLAG = "followingSuspended";
-
-const reconcileQueues = new Map();
-let warnedFollowUnavailable = false;
-
+const FOLLOWER_FLAG = "followerPokemonThemeId";
+const LEGACY_ORDER_FLAG = "followerPokemonOrder";
+const TOKEN_FLAG = "pokemonFollowerToken";
+const ACTIVE_FLAG = "pokemonFollowerActive";
+const LEGACY_TOKEN_FLAG = "pokemonFollower";
+const FOLLOWING_FLAG = "following";
+const queues = new Map();
+let warned = false;
 
 function isAuthority() {
   if (!game.user?.isGM) return false;
-
-  const gm =
-    game.users
-      .filter(
-        user =>
-          user.active
-          &&
-          user.isGM
-      )
-      .sort(
-        (a, b) =>
-          a.id.localeCompare(b.id)
-      )[0];
-
+  const gm = game.users.filter(u => u.active && u.isGM).sort((a, b) => a.id.localeCompare(b.id))[0];
   return gm?.id === game.user.id;
 }
 
-
-function isFollower(token) {
-  return (
-    token?.getFlag(
-      MODULE_ID,
-      "pokemonFollower"
-    ) === true
-  );
+function canFollow() {
+  if (!game.modules.get(DYLAN_ID)?.active) return false;
+  if (game.modules.get("FollowMe")?.active) return false;
+  try { return game.settings.get(DYLAN_ID, "enableFollow") !== false; }
+  catch { return true; }
 }
 
-
-function canUseDylanFollow() {
-  if (
-    !game.modules.get(DYLAN_ID)?.active
-  ) {
-    return false;
-  }
-
-  if (
-    game.modules.get("FollowMe")?.active
-  ) {
-    return false;
-  }
-
-  try {
-    return (
-      game.settings.get(
-        DYLAN_ID,
-        "enableFollow"
-      ) !== false
-    );
-  } catch {
-    return true;
-  }
+function warnFollow() {
+  if (warned) return;
+  warned = true;
+  ui.notifications.warn("Pokémon Followers: ative 'Enable Token Following' no Dylan's Animated Tokens.");
 }
-
-
-function warnFollowUnavailable() {
-  if (warnedFollowUnavailable) return;
-
-  warnedFollowUnavailable = true;
-
-  ui.notifications.warn(
-    "Pokémon Followers: ative 'Enable Token Following' no Dylan's Animated Tokens."
-  );
-}
-
 
 function gridSize() {
-  return Number(
-    canvas?.grid?.size
-    ??
-    canvas?.dimensions?.size
-    ??
-    canvas?.scene?.grid?.size
-    ??
-    100
-  );
+  return Number(canvas?.grid?.size ?? canvas?.dimensions?.size ?? canvas?.scene?.grid?.size ?? 100);
 }
 
-
-function getPokemonThemes(actor) {
-  if (
-    actor?.documentName !== "Actor"
-    ||
-    actor.type !== "litm-character"
-  ) {
-    return [];
-  }
-
-  return actor.items
-    .filter(
-      item =>
-        item.type === "themebook"
-        &&
-        item.getFlag(
-          MODULE_ID,
-          "pokemonTheme"
-        ) === true
-        &&
-        item.getFlag(
-          MODULE_ID,
-          "themeRole"
-        ) === "pokemon"
-    )
-    .sort(
-      (a, b) =>
-        Number(
-          a.getFlag(
-            MODULE_ID,
-            "pokemonTeamSlot"
-          ) ?? 999
-        )
-        -
-        Number(
-          b.getFlag(
-            MODULE_ID,
-            "pokemonTeamSlot"
-          ) ?? 999
-        )
-    );
+export function getPokemonThemes(actor) {
+  if (actor?.documentName !== "Actor" || actor.type !== "litm-character") return [];
+  return actor.items.filter(item => item.type === "themebook"
+    && item.getFlag(MODULE_ID, "pokemonTheme") === true
+    && item.getFlag(MODULE_ID, "themeRole") === "pokemon")
+    .sort((a, b) => Number(a.getFlag(MODULE_ID, "pokemonTeamSlot") ?? 999)
+      - Number(b.getFlag(MODULE_ID, "pokemonTeamSlot") ?? 999));
 }
 
-
-function normalizeFollowerOrder(
-  raw,
-  themes
-) {
-  const result = {};
-  const used = new Set();
-
-  const source =
-    raw
-    &&
-    typeof raw === "object"
-    &&
-    !Array.isArray(raw)
-      ? raw
-      : {};
-
-  for (const theme of themes) {
-    let position =
-      Number(
-        source[theme.id] ?? 0
-      );
-
-    if (
-      !Number.isInteger(position)
-      ||
-      position < 1
-      ||
-      position > 6
-    ) {
-      continue;
-    }
-
-    while (
-      position <= 6
-      &&
-      used.has(position)
-    ) {
-      position++;
-    }
-
-    if (position > 6) continue;
-
-    used.add(position);
-    result[theme.id] = position;
-  }
-
-  return result;
+function legacyFollowerThemeId(actor) {
+  const valid = new Set(getPokemonThemes(actor).map(t => t.id));
+  const raw = actor?.getFlag(MODULE_ID, LEGACY_ORDER_FLAG);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  return Object.entries(raw).map(([themeId, position]) => ({themeId, position: Number(position)}))
+    .filter(x => valid.has(x.themeId) && Number.isInteger(x.position) && x.position >= 1 && x.position <= 6)
+    .sort((a, b) => a.position - b.position)[0]?.themeId ?? null;
 }
 
-
-export function getPokemonFollowerOrder(
-  actor
-) {
-  const themes =
-    getPokemonThemes(actor);
-
-  return normalizeFollowerOrder(
-    actor?.getFlag(
-      MODULE_ID,
-      ORDER_FLAG
-    ),
-    themes
-  );
+export function getPokemonFollowerThemeId(actor) {
+  const id = actor?.getFlag(MODULE_ID, FOLLOWER_FLAG);
+  if (!id) return null;
+  return getPokemonThemes(actor).some(theme => theme.id === id) ? id : null;
 }
 
-
-export async function setPokemonFollowerOrder(
-  actor,
-  themeId,
-  newPosition
-) {
-  const themes =
-    getPokemonThemes(actor);
-
-  if (
-    !themes.some(
-      theme =>
-        theme.id === themeId
-    )
-  ) {
-    throw new Error(
-      "Pokémon da equipe não encontrado."
-    );
-  }
-
-  const position =
-    Math.max(
-      0,
-      Math.min(
-        6,
-        Number(newPosition) || 0
-      )
-    );
-
-  const order = {
-    ...getPokemonFollowerOrder(actor)
-  };
-
-  delete order[themeId];
-
-  if (position > 0) {
-    let movingId = themeId;
-    let target = position;
-
-    while (
-      movingId
-      &&
-      target <= 6
-    ) {
-      const occupant =
-        Object.keys(order)
-          .find(
-            id =>
-              Number(order[id])
-              === target
-          )
-        ??
-        null;
-
-      order[movingId] = target;
-      movingId = occupant;
-      target++;
-    }
-
-    if (
-      movingId
-      &&
-      target > 6
-    ) {
-      delete order[movingId];
-    }
-  }
-
-  await actor.setFlag(
-    MODULE_ID,
-    ORDER_FLAG,
-    order
-  );
-
-  return order;
+export async function migratePokemonFollowerState(actor) {
+  if (!actor || actor.type !== "litm-character") return null;
+  const raw = actor.getFlag(MODULE_ID, FOLLOWER_FLAG);
+  let current = typeof raw === "string" ? raw : null;
+  const valid = new Set(getPokemonThemes(actor).map(t => t.id));
+  if (current && !valid.has(current)) current = "";
+  if (raw === undefined) current = legacyFollowerThemeId(actor) ?? "";
+  const update = {};
+  if (raw === undefined || raw !== current) update[`flags.${MODULE_ID}.${FOLLOWER_FLAG}`] = current;
+  if (actor.getFlag(MODULE_ID, LEGACY_ORDER_FLAG) !== undefined) update[`flags.${MODULE_ID}.-=${LEGACY_ORDER_FLAG}`] = null;
+  if (Object.keys(update).length) await actor.update(update, {pokemonFollowerSync: true});
+  return current || null;
 }
 
-
-function orderedFollowerThemes(
-  actor
-) {
-  const themes =
-    getPokemonThemes(actor);
-
-  const order =
-    getPokemonFollowerOrder(actor);
-
-  return themes
-    .map(
-      theme => ({
-        theme,
-        order:
-          Number(
-            order[theme.id] ?? 0
-          )
-      })
-    )
-    .filter(
-      entry =>
-        entry.order >= 1
-        &&
-        entry.order <= 6
-    )
-    .sort(
-      (a, b) =>
-        a.order - b.order
-    );
+function isManagedToken(token) {
+  return token?.getFlag(MODULE_ID, TOKEN_FLAG) === true || token?.getFlag(MODULE_ID, LEGACY_TOKEN_FLAG) === true;
+}
+function isLegacyToken(token) {
+  return token?.getFlag(MODULE_ID, LEGACY_TOKEN_FLAG) === true && token?.getFlag(MODULE_ID, TOKEN_FLAG) !== true;
+}
+function isActiveToken(token) { return token?.getFlag(MODULE_ID, ACTIVE_FLAG) === true; }
+function tokenThemeId(token) { return token?.getFlag(MODULE_ID, "pokemonThemeId") ?? null; }
+function trainerForToken(token) {
+  const id = token?.getFlag(MODULE_ID, "trainerTokenId");
+  return id ? token.parent?.tokens?.get(id) ?? null : null;
+}
+function getPokemonTokens(scene, trainerId) {
+  return scene?.tokens.filter(t => isManagedToken(t) && t.getFlag(MODULE_ID, "trainerTokenId") === trainerId) ?? [];
 }
 
+function stablePath(value) {
+  if (typeof value !== "string") return value;
+  const path = value.trim();
+  if (!path || /^(?:https?:|data:|blob:)/i.test(path)) return path;
+  return path.split(/[?#]/, 1)[0];
+}
 
-function getVisual(theme) {
-  const flags =
-    theme?.flags?.[MODULE_ID]
-    ??
-    {};
-
-  const assets =
-    flags.assets
-    ??
-    {};
-
-  const overworld =
-    assets.overworld
-    ??
-    theme.img
-    ??
-    "icons/svg/mystery-man.svg";
-
-  const spritesheet =
-    assets.spritesheet
-    ??
-    overworld;
-
-  const rawScale =
-    Number(
-      flags.tokenScale ?? 1
-    );
-
-  const scale =
-    Number.isFinite(rawScale)
-    &&
-    rawScale > 0
-      ? rawScale
-      : 1;
-
-  const animation =
-    flags.animation
-    &&
-    typeof flags.animation === "object"
-      ? foundry.utils.deepClone(
-          flags.animation
-        )
-      : null;
-
+function visualFor(theme) {
+  const flags = theme?.flags?.[MODULE_ID] ?? {};
+  const assets = flags.assets ?? {};
+  const overworld = stablePath(assets.overworld ?? theme.img ?? "icons/svg/mystery-man.svg");
+  const spritesheet = stablePath(assets.spritesheet ?? overworld);
+  const n = Number(flags.tokenScale ?? 1);
   return {
     overworld,
-    scale,
-
-    dylan:
-      animation
-        ? {
-            ...animation,
-            spritesheet: true,
-            sheetsrc: spritesheet
-          }
-        : {
-            spritesheet: false,
-            sheetsrc: overworld
-          }
+    spritesheet,
+    scale: Number.isFinite(n) && n > 0 ? n : 1,
+    animation: flags.animation && typeof flags.animation === "object" ? foundry.utils.deepClone(flags.animation) : null
   };
 }
 
-
-function linkedPokemonActor(theme) {
-  const id =
-    theme?.getFlag(
-      MODULE_ID,
-      "pokemonActorId"
-    );
-
-  return id
-    ? game.actors.get(id) ?? null
-    : null;
+function behindPosition(trainer) {
+  const s = gridSize();
+  const a = ((Number(trainer.rotation ?? 0) % 360) + 360) % 360;
+  let dx = 0, dy = -s;
+  if (a >= 45 && a < 135) { dx = s; dy = 0; }
+  else if (a >= 135 && a < 225) { dx = 0; dy = s; }
+  else if (a >= 225 && a < 315) { dx = -s; dy = 0; }
+  return {x: Number(trainer.x ?? 0) + dx, y: Number(trainer.y ?? 0) + dy, elevation: Number(trainer.elevation ?? 0)};
 }
 
+function followingData(trainer, follower) {
+  return {who: trainer.id, dist: gridSize(), positions: [
+    {x: Number(follower.x ?? 0), y: Number(follower.y ?? 0)},
+    {x: Number(trainer.x ?? 0), y: Number(trainer.y ?? 0)}
+  ]};
+}
 
-function moduleFlags(
-  trainer,
-  theme,
-  order,
-  suspended = false
-) {
+function tokenFlags(trainer, theme, active) {
+  const tf = theme.flags?.[MODULE_ID] ?? {};
   return {
-    pokemonFollower: true,
-
-    trainerTokenId:
-      trainer.id,
-
-    trainerActorId:
-      trainer.actor?.id
-      ??
-      null,
-
-    pokemonThemeId:
-      theme.id,
-
-    pokemonActorId:
-      theme.getFlag(
-        MODULE_ID,
-        "pokemonActorId"
-      )
-      ??
-      null,
-
-    pokemonAssetId:
-      theme.getFlag(
-        MODULE_ID,
-        "assetId"
-      )
-      ??
-      null,
-
-    followerOrder:
-      order,
-
-    [SUSPENDED_FLAG]:
-      suspended
+    pokemonFollowerToken: true,
+    pokemonFollowerActive: active,
+    trainerTokenId: trainer.id,
+    trainerActorId: trainer.actor?.id ?? null,
+    pokemonThemeId: theme.id,
+    pokemonInstanceId: theme.getFlag(MODULE_ID, "pokemonInstanceId") ?? null,
+    pokemonActorId: theme.getFlag(MODULE_ID, "pokemonActorId") ?? null,
+    pokemonAssetId: theme.getFlag(MODULE_ID, "assetId") ?? null,
+    assets: foundry.utils.deepClone(tf.assets ?? {}),
+    animation: tf.animation && typeof tf.animation === "object" ? foundry.utils.deepClone(tf.animation) : null,
+    tokenScale: Number(tf.tokenScale ?? 1)
   };
 }
 
-
-function behindVector(trainer) {
-  const size =
-    gridSize();
-
-  const angle =
-    (
-      (
-        Number(
-          trainer.rotation ?? 0
-        )
-        %
-        360
-      )
-      +
-      360
-    )
-    %
-    360;
-
-  if (
-    angle >= 45
-    &&
-    angle < 135
-  ) {
-    return {
-      x: size,
-      y: 0
-    };
-  }
-
-  if (
-    angle >= 135
-    &&
-    angle < 225
-  ) {
-    return {
-      x: 0,
-      y: size
-    };
-  }
-
-  if (
-    angle >= 225
-    &&
-    angle < 315
-  ) {
-    return {
-      x: -size,
-      y: 0
-    };
-  }
-
+function createData(trainer, theme) {
+  const visual = visualFor(theme);
+  const linkedId = theme.getFlag(MODULE_ID, "pokemonActorId");
+  const pokemonActor = linkedId ? game.actors.get(linkedId) : null;
+  const actorId = pokemonActor?.id ?? trainer.actor?.id ?? null;
+  const pos = behindPosition(trainer);
+  const dylan = visual.animation ? {...visual.animation, spritesheet: true, sheetsrc: visual.spritesheet}
+    : {spritesheet: false, sheetsrc: visual.spritesheet};
   return {
-    x: 0,
-    y: -size
-  };
-}
-
-
-function chainPosition(
-  trainer,
-  index
-) {
-  const vector =
-    behindVector(trainer);
-
-  return {
-    x:
-      Number(trainer.x ?? 0)
-      +
-      vector.x * index,
-
-    y:
-      Number(trainer.y ?? 0)
-      +
-      vector.y * index,
-
-    elevation:
-      Number(
-        trainer.elevation ?? 0
-      )
-  };
-}
-
-
-function getFollowers(
-  scene,
-  trainerId
-) {
-  return (
-    scene?.tokens.filter(
-      token =>
-        isFollower(token)
-        &&
-        token.getFlag(
-          MODULE_ID,
-          "trainerTokenId"
-        ) === trainerId
-    )
-    ??
-    []
-  );
-}
-
-
-async function deleteFollowers(
-  scene,
-  trainerId
-) {
-  const followers =
-    getFollowers(
-      scene,
-      trainerId
-    );
-
-  if (!followers.length) return;
-
-  await scene.deleteEmbeddedDocuments(
-    "Token",
-    followers.map(
-      token =>
-        token.id
-    ),
-    {
-      pokemonFollowerSync: true
-    }
-  );
-}
-
-
-function followerCreateData(
-  trainer,
-  theme,
-  order,
-  position
-) {
-  const visual =
-    getVisual(theme);
-
-  const pokemonActor =
-    linkedPokemonActor(theme);
-
-  /*
-   * Fallback no Actor do treinador para
-   * que um jogador que possui o treinador
-   * também possa controlar o follower.
-   *
-   * Assim que o Pokémon Manager for aberto,
-   * cada Pokémon recebe seu Actor próprio.
-   */
-  const actorId =
-    pokemonActor?.id
-    ??
-    trainer.actor?.id
-    ??
-    null;
-
-  return {
-    name:
-      theme.name,
-
-    actorId,
-
-    actorLink:
-      Boolean(actorId),
-
-    x:
-      position.x,
-
-    y:
-      position.y,
-
-    elevation:
-      position.elevation,
-
-    width: 1,
-    height: 1,
-
-    locked: false,
-    lockRotation: true,
-
-    rotation:
-      Number(
-        trainer.rotation ?? 0
-      ),
-
-    hidden:
-      Boolean(
-        trainer.hidden
-      ),
-
-    disposition:
-      Number(
-        trainer.disposition
-        ??
-        CONST
-          .TOKEN_DISPOSITIONS
-          .FRIENDLY
-      ),
-
-    displayName:
-      CONST
-        .TOKEN_DISPLAY_MODES
-        .NONE,
-
-    displayBars:
-      CONST
-        .TOKEN_DISPLAY_MODES
-        .NONE,
-
-    texture: {
-      src:
-        visual.overworld,
-
-      scaleX:
-        visual.scale,
-
-      scaleY:
-        visual.scale
-    },
-
-    sight: {
-      enabled: false
-    },
-
+    name: theme.name, actorId, actorLink: false,
+    x: pos.x, y: pos.y, elevation: pos.elevation,
+    width: 1, height: 1, locked: false, lockRotation: true,
+    rotation: Number(trainer.rotation ?? 0), hidden: Boolean(trainer.hidden),
+    disposition: Number(trainer.disposition ?? CONST.TOKEN_DISPOSITIONS.FRIENDLY),
+    displayName: CONST.TOKEN_DISPLAY_MODES.NONE, displayBars: CONST.TOKEN_DISPLAY_MODES.NONE,
+    texture: {src: visual.overworld, scaleX: visual.scale, scaleY: visual.scale},
+    sight: {enabled: false},
     flags: {
-      [MODULE_ID]:
-        moduleFlags(
-          trainer,
-          theme,
-          order,
-          false
-        ),
-
-      [DYLAN_ID]:
-        visual.dylan
+      [MODULE_ID]: tokenFlags(trainer, theme, true),
+      [DYLAN_ID]: {...dylan, [FOLLOWING_FLAG]: {who: trainer.id, dist: gridSize(), positions: [
+        {x: pos.x, y: pos.y}, {x: Number(trainer.x ?? 0), y: Number(trainer.y ?? 0)}
+      ]}}
     }
   };
 }
 
-
-function followerIsSuspended(
-  follower
-) {
-  return (
-    follower?.getFlag(
-      MODULE_ID,
-      SUSPENDED_FLAG
-    ) === true
-  );
+async function deleteIds(scene, ids) {
+  const clean = [...new Set(ids.filter(Boolean))];
+  if (clean.length) await scene.deleteEmbeddedDocuments("Token", clean, {pokemonFollowerSync: true});
 }
 
+async function reconcileTrainer(trainer, {place = false} = {}) {
+  if (!isAuthority() || !trainer?.parent || isManagedToken(trainer) || trainer.actor?.type !== "litm-character") return;
+  const scene = trainer.parent;
+  if (!scene.tokens.get(trainer.id)) return;
+  await migratePokemonFollowerState(trainer.actor);
 
-function followerThemeId(
-  follower
-) {
-  return (
-    follower?.getFlag(
-      MODULE_ID,
-      "pokemonThemeId"
-    )
-    ??
-    null
-  );
-}
+  const themes = getPokemonThemes(trainer.actor);
+  const themeById = new Map(themes.map(t => [t.id, t]));
+  const desired = getPokemonFollowerThemeId(trainer.actor);
+  const all = getPokemonTokens(scene, trainer.id);
+  const byTheme = new Map();
+  const remove = [];
 
+  for (const token of all) {
+    const tid = tokenThemeId(token);
+    if (!tid || !themeById.has(tid) || (isLegacyToken(token) && tid !== desired)) { remove.push(token.id); continue; }
+    if (byTheme.has(tid)) {
+      const old = byTheme.get(tid);
+      if (isActiveToken(token) && !isActiveToken(old)) { remove.push(old.id); byTheme.set(tid, token); }
+      else remove.push(token.id);
+      continue;
+    }
+    byTheme.set(tid, token);
+  }
+  await deleteIds(scene, remove);
 
-function followingData(
-  leader,
-  follower
-) {
-  return {
-    who:
-      leader.id,
+  for (const [tid, token] of [...byTheme]) {
+    if (tid !== desired && isActiveToken(token)) {
+      await deleteIds(scene, [token.id]);
+      byTheme.delete(tid);
+    }
+  }
 
-    dist:
-      gridSize(),
+  if (!desired) {
+    await deleteIds(scene, getPokemonTokens(scene, trainer.id).filter(isActiveToken).map(t => t.id));
+    return;
+  }
 
-    positions: [
-      {
-        x:
-          Number(
-            follower.x ?? 0
-          ),
+  const theme = themeById.get(desired);
+  if (!theme) {
+    await trainer.actor.update({[`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: ""}, {pokemonFollowerSync: true});
+    return;
+  }
+  if (!canFollow()) warnFollow();
 
-        y:
-          Number(
-            follower.y ?? 0
-          )
-      },
+  let follower = getPokemonTokens(scene, trainer.id).find(t => tokenThemeId(t) === desired) ?? null;
+  if (!follower) {
+    const made = await scene.createEmbeddedDocuments("Token", [createData(trainer, theme)], {pokemonFollowerSync: true});
+    follower = made?.[0] ?? null;
+    place = false;
+  }
+  if (!follower) return;
 
-      {
-        x:
-          Number(
-            leader.x ?? 0
-          ),
-
-        y:
-          Number(
-            leader.y ?? 0
-          )
-      }
-    ]
+  const update = {
+    _id: follower.id,
+    locked: false,
+    [`flags.${MODULE_ID}`]: {...(follower.flags?.[MODULE_ID] ?? {}), ...tokenFlags(trainer, theme, true)},
+    [`flags.${DYLAN_ID}.${FOLLOWING_FLAG}`]: followingData(trainer, follower)
   };
+  if (place) {
+    const p = behindPosition(trainer);
+    update.x = p.x; update.y = p.y; update.elevation = p.elevation;
+  }
+  if (follower.hidden !== Boolean(trainer.hidden)) update.hidden = Boolean(trainer.hidden);
+  const disposition = Number(trainer.disposition ?? CONST.TOKEN_DISPOSITIONS.FRIENDLY);
+  if (Number(follower.disposition) !== disposition) update.disposition = disposition;
+
+  await scene.updateEmbeddedDocuments("Token", [update], {
+    follower_updates: [], forced: true, teleport: place, animate: false, pokemonFollowerSync: true
+  });
 }
 
-
-async function reconcileTrainer(
-  trainer,
-  {
-    placeAll = false,
-    placeThemeIds = null,
-    refreshAppearance = false
-  } = {}
-) {
-  if (
-    !isAuthority()
-    ||
-    !trainer?.parent
-    ||
-    isFollower(trainer)
-    ||
-    trainer.actor?.type
-      !==
-      "litm-character"
-  ) {
-    return;
-  }
-
-  const scene =
-    trainer.parent;
-
-  if (
-    !scene.tokens.get(
-      trainer.id
-    )
-  ) {
-    return;
-  }
-
-  const desired =
-    orderedFollowerThemes(
-      trainer.actor
-    );
-
-  const desiredThemeIds =
-    new Set(
-      desired.map(
-        entry =>
-          entry.theme.id
-      )
-    );
-
-  const followers =
-    getFollowers(
-      scene,
-      trainer.id
-    );
-
-  const byTheme =
-    new Map();
-
-  const deleteIds = [];
-
-  for (const follower of followers) {
-    const themeId =
-      followerThemeId(follower);
-
-    if (
-      !themeId
-      ||
-      !desiredThemeIds.has(themeId)
-      ||
-      byTheme.has(themeId)
-    ) {
-      deleteIds.push(
-        follower.id
-      );
-
-      continue;
-    }
-
-    byTheme.set(
-      themeId,
-      follower
-    );
-  }
-
-  if (deleteIds.length) {
-    await scene.deleteEmbeddedDocuments(
-      "Token",
-      deleteIds,
-      {
-        pokemonFollowerSync: true
-      }
-    );
-  }
-
-  const createdThemeIds =
-    new Set();
-
-  const createData = [];
-
-  for (
-    let index = 0;
-    index < desired.length;
-    index++
-  ) {
-    const {
-      theme,
-      order
-    } =
-      desired[index];
-
-    if (
-      byTheme.has(
-        theme.id
-      )
-    ) {
-      continue;
-    }
-
-    createData.push(
-      followerCreateData(
-        trainer,
-        theme,
-        order,
-        chainPosition(
-          trainer,
-          index + 1
-        )
-      )
-    );
-
-    createdThemeIds.add(
-      theme.id
-    );
-  }
-
-  if (createData.length) {
-    const created =
-      await scene
-        .createEmbeddedDocuments(
-          "Token",
-          createData,
-          {
-            pokemonFollowerSync: true
-          }
-        );
-
-    for (const follower of created) {
-      const themeId =
-        followerThemeId(follower);
-
-      if (themeId) {
-        byTheme.set(
-          themeId,
-          follower
-        );
-      }
-    }
-  }
-
-  if (!desired.length) return;
-
-  if (!canUseDylanFollow()) {
-    warnFollowUnavailable();
-    return;
-  }
-
-  const updates = [];
-
-  let leader =
-    trainer;
-
-  let activeIndex = 0;
-
-  for (const entry of desired) {
-    const {
-      theme,
-      order
-    } =
-      entry;
-
-    const follower =
-      byTheme.get(
-        theme.id
-      );
-
-    if (!follower) continue;
-
-    const suspended =
-      followerIsSuspended(
-        follower
-      );
-
-    const moduleUpdate =
-      moduleFlags(
-        trainer,
-        theme,
-        order,
-        suspended
-      );
-
-    if (suspended) {
-      const update = {
-        _id:
-          follower.id,
-
-        locked:
-          false,
-
-        ["flags." + MODULE_ID]:
-          moduleUpdate,
-
-        ["flags." + DYLAN_ID + "." + FOLLOW_FLAG]:
-          null
-      };
-
-      if (
-        follower.hidden
-        !==
-        Boolean(trainer.hidden)
-      ) {
-        update.hidden =
-          Boolean(trainer.hidden);
-      }
-
-      if (
-        Number(
-          follower.disposition
-        )
-        !==
-        Number(
-          trainer.disposition
-          ??
-          CONST
-            .TOKEN_DISPOSITIONS
-            .FRIENDLY
-        )
-      ) {
-        update.disposition =
-          Number(
-            trainer.disposition
-            ??
-            CONST
-              .TOKEN_DISPOSITIONS
-              .FRIENDLY
-          );
-      }
-
-      updates.push(update);
-      continue;
-    }
-
-    activeIndex++;
-
-    const shouldPlace =
-      placeAll
-      ||
-      createdThemeIds.has(
-        theme.id
-      )
-      ||
-      placeThemeIds?.has?.(
-        theme.id
-      );
-
-    const update = {
-      _id:
-        follower.id,
-
-      locked:
-        false,
-
-      ["flags." + MODULE_ID]:
-        moduleUpdate
-    };
-
-    if (shouldPlace) {
-      const position =
-        chainPosition(
-          trainer,
-          activeIndex
-        );
-
-      update.x =
-        position.x;
-
-      update.y =
-        position.y;
-
-      update.elevation =
-        position.elevation;
-    }
-
-    const visual =
-      getVisual(theme);
-
-    const pokemonActor =
-      linkedPokemonActor(theme);
-
-    const desiredActorId =
-      pokemonActor?.id
-      ??
-      trainer.actor?.id
-      ??
-      null;
-
-    if (
-      desiredActorId
-      &&
-      follower.actorId
-        !==
-        desiredActorId
-    ) {
-      update.actorId =
-        desiredActorId;
-
-      update.actorLink =
-        true;
-    }
-
-    if (refreshAppearance) {
-      const currentTexture =
-        follower.texture;
-
-      if (
-        currentTexture?.src
-          !==
-          visual.overworld
-        ||
-        Number(
-          currentTexture?.scaleX ?? 1
-        )
-          !==
-          visual.scale
-        ||
-        Number(
-          currentTexture?.scaleY ?? 1
-        )
-          !==
-          visual.scale
-      ) {
-        update.texture = {
-          src:
-            visual.overworld,
-
-          scaleX:
-            visual.scale,
-
-          scaleY:
-            visual.scale
-        };
-      }
-
-      update[
-        "flags."
-        +
-        DYLAN_ID
-      ] = {
-        ...visual.dylan,
-        [FOLLOW_FLAG]:
-          followingData(
-            leader,
-            follower
-          )
-      };
-    } else {
-      update[
-        "flags."
-        +
-        DYLAN_ID
-        +
-        "."
-        +
-        FOLLOW_FLAG
-      ] =
-        followingData(
-          leader,
-          follower
-        );
-    }
-
-    if (
-      follower.hidden
-      !==
-      Boolean(trainer.hidden)
-    ) {
-      update.hidden =
-        Boolean(trainer.hidden);
-    }
-
-    if (
-      Number(
-        follower.disposition
-      )
-      !==
-      Number(
-        trainer.disposition
-        ??
-        CONST
-          .TOKEN_DISPOSITIONS
-          .FRIENDLY
-      )
-    ) {
-      update.disposition =
-        Number(
-          trainer.disposition
-          ??
-          CONST
-            .TOKEN_DISPOSITIONS
-            .FRIENDLY
-        );
-    }
-
-    updates.push(update);
-
-    leader =
-      follower;
-  }
-
-  if (updates.length) {
-    await scene.updateEmbeddedDocuments(
-      "Token",
-      updates,
-      {
-        follower_updates: [],
-        forced: true,
-        teleport:
-          placeAll
-          ||
-          Boolean(
-            placeThemeIds?.size
-          ),
-        animate: false,
-        pokemonFollowerSync: true
-      }
-    );
-  }
-}
-
-
-function queueReconcile(
-  trainer,
-  options = {}
-) {
-  const sceneId =
-    trainer?.parent?.id;
-
-  const trainerId =
-    trainer?.id;
-
-  if (
-    !sceneId
-    ||
-    !trainerId
-  ) {
-    return Promise.resolve();
-  }
-
-  const key =
-    sceneId
-    +
-    ":"
-    +
-    trainerId;
-
-  const previous =
-    reconcileQueues.get(key)
-    ??
-    Promise.resolve();
-
-  const next =
-    previous
-      .catch(
-        () => {}
-      )
-      .then(
-        () =>
-          reconcileTrainer(
-            trainer,
-            options
-          )
-      )
-      .catch(
-        error => {
-          console.error(
-            "Pokemon LITM Tools | Pokémon follower:",
-            error
-          );
-        }
-      );
-
-  reconcileQueues.set(
-    key,
-    next
-  );
-
-  void next.finally(
-    () => {
-      if (
-        reconcileQueues.get(key)
-        === next
-      ) {
-        reconcileQueues.delete(
-          key
-        );
-      }
-    }
-  );
-
+function queueReconcile(trainer, options = {}) {
+  const key = trainer?.parent?.id && trainer?.id ? `${trainer.parent.id}:${trainer.id}` : null;
+  if (!key) return Promise.resolve();
+  const prev = queues.get(key) ?? Promise.resolve();
+  const next = prev.catch(() => {}).then(() => reconcileTrainer(trainer, options)).catch(error => {
+    console.error("Pokemon LITM Tools | Pokémon follower:", error);
+  });
+  queues.set(key, next);
+  void next.finally(() => { if (queues.get(key) === next) queues.delete(key); });
   return next;
 }
 
-
-function reconcileActorTokens(
-  actor,
-  options = {}
-) {
-  if (
-    !isAuthority()
-    ||
-    !canvas?.ready
-    ||
-    !canvas.scene
-  ) {
-    return;
-  }
-
-  const trainers =
-    canvas.scene.tokens.filter(
-      token =>
-        !isFollower(token)
-        &&
-        token.actor?.id
-          ===
-          actor.id
-    );
-
-  for (const trainer of trainers) {
-    void queueReconcile(
-      trainer,
-      options
-    );
+function reconcileActorTokens(actor, options = {}) {
+  if (!isAuthority() || !canvas?.ready || !canvas.scene) return;
+  for (const trainer of canvas.scene.tokens.filter(t => !isManagedToken(t) && t.actor?.id === actor.id)) {
+    void queueReconcile(trainer, options);
   }
 }
 
+export function refreshPokemonFollowersForActor(actor, options = {}) { reconcileActorTokens(actor, options); }
 
-export function refreshPokemonFollowersForActor(
-  actor,
-  options = {}
-) {
-  reconcileActorTokens(
-    actor,
-    options
-  );
+export async function setPokemonFollowerTheme(actor, themeId) {
+  if (!actor || actor.type !== "litm-character") throw new Error("Treinador não encontrado.");
+  const id = themeId ? String(themeId) : "";
+  if (id && !getPokemonThemes(actor).some(t => t.id === id)) throw new Error("Pokémon da equipe não encontrado.");
+  await actor.update({
+    [`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: id,
+    [`flags.${MODULE_ID}.-=${LEGACY_ORDER_FLAG}`]: null
+  }, {pokemonFollowerSync: true});
+  if (isAuthority()) reconcileActorTokens(actor, {place: Boolean(id)});
+  return id || null;
 }
 
+export async function removePokemonThemeTokens(actor, themeId) {
+  if (!isAuthority() || !canvas?.ready || !canvas.scene || !actor || !themeId) return;
+  const ids = canvas.scene.tokens.filter(t => isManagedToken(t)
+    && t.getFlag(MODULE_ID, "trainerActorId") === actor.id && tokenThemeId(t) === themeId).map(t => t.id);
+  await deleteIds(canvas.scene, ids);
+}
 
-async function syncScene() {
-  if (
-    !isAuthority()
-    ||
-    game.system.id
-      !==
-      LITM_SYSTEM_ID
-    ||
-    !canvas?.ready
-    ||
-    !canvas.scene
-  ) {
-    return;
-  }
-
-  const trainers =
-    canvas.scene.tokens.filter(
-      token =>
-        !isFollower(token)
-        &&
-        token.actor?.type
-          ===
-          "litm-character"
-    );
-
-  const trainerIds =
-    new Set(
-      trainers.map(
-        token =>
-          token.id
-      )
-    );
-
-  const orphans =
-    canvas.scene.tokens.filter(
-      token =>
-        isFollower(token)
-        &&
-        !trainerIds.has(
-          token.getFlag(
-            MODULE_ID,
-            "trainerTokenId"
-          )
-        )
-    );
-
-  if (orphans.length) {
-    await canvas.scene
-      .deleteEmbeddedDocuments(
-        "Token",
-        orphans.map(
-          token =>
-            token.id
-        ),
-        {
-          pokemonFollowerSync: true
-        }
-      );
-  }
-
-  for (const trainer of trainers) {
-    await queueReconcile(
-      trainer,
-      {
-        refreshAppearance: true
-      }
-    );
+async function detachToken(token) {
+  if (!token || !isManagedToken(token)) return;
+  const trainer = trainerForToken(token);
+  const actor = trainer?.actor ?? (token.getFlag(MODULE_ID, "trainerActorId") ? game.actors.get(token.getFlag(MODULE_ID, "trainerActorId")) : null);
+  await token.update({
+    [`flags.${MODULE_ID}.${TOKEN_FLAG}`]: true,
+    [`flags.${MODULE_ID}.${ACTIVE_FLAG}`]: false,
+    [`flags.${DYLAN_ID}.${FOLLOWING_FLAG}.who`]: null
+  }, {pokemonFollowerSync: true, follower_updates: []});
+  if (actor && getPokemonFollowerThemeId(actor) === tokenThemeId(token)) {
+    await actor.update({[`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: ""}, {pokemonFollowerSync: true});
   }
 }
 
-
-function changedActorFlag(
-  changes,
-  flagName
-) {
-  if (
-    changes?.flags?.[
-      MODULE_ID
-    ]?.[flagName]
-      !== undefined
-  ) {
-    return true;
-  }
-
-  return Object.prototype
-    .hasOwnProperty.call(
-      changes ?? {},
-      "flags."
-      +
-      MODULE_ID
-      +
-      "."
-      +
-      flagName
-    );
+async function resumeToken(token) {
+  const trainer = trainerForToken(token);
+  const themeId = tokenThemeId(token);
+  if (!trainer?.actor || !themeId) throw new Error("Treinador ou Pokémon não encontrado.");
+  await setPokemonFollowerTheme(trainer.actor, themeId);
+  if (isAuthority()) await queueReconcile(trainer, {place: true});
 }
-
-
-function changedTokenFlag(
-  changes,
-  flagName
-) {
-  if (
-    changes?.flags?.[
-      MODULE_ID
-    ]?.[flagName]
-      !== undefined
-  ) {
-    return true;
-  }
-
-  return Object.prototype
-    .hasOwnProperty.call(
-      changes ?? {},
-      "flags."
-      +
-      MODULE_ID
-      +
-      "."
-      +
-      flagName
-    );
-}
-
-
-function trainerForFollower(
-  follower
-) {
-  const trainerId =
-    follower?.getFlag(
-      MODULE_ID,
-      "trainerTokenId"
-    );
-
-  return trainerId
-    ? follower.parent?.tokens?.get(
-        trainerId
-      )
-      ??
-      null
-    : null;
-}
-
-
-async function markFollowerSuspended(
-  follower,
-  suspended
-) {
-  if (!follower) return;
-
-  await follower.update(
-    {
-      [
-        "flags."
-        +
-        MODULE_ID
-        +
-        "."
-        +
-        SUSPENDED_FLAG
-      ]:
-        suspended,
-
-      [
-        "flags."
-        +
-        DYLAN_ID
-        +
-        "."
-        +
-        FOLLOW_FLAG
-      ]:
-        suspended
-          ? null
-          : follower.getFlag(
-              DYLAN_ID,
-              FOLLOW_FLAG
-            )
-    },
-    {
-      pokemonFollowerSync: true,
-      follower_updates: []
-    }
-  );
-}
-
-
-async function suspendFollower(
-  follower
-) {
-  await markFollowerSuspended(
-    follower,
-    true
-  );
-
-  const trainer =
-    trainerForFollower(
-      follower
-    );
-
-  if (
-    trainer
-    &&
-    isAuthority()
-  ) {
-    await queueReconcile(
-      trainer
-    );
-  }
-}
-
-
-async function resumeFollower(
-  follower
-) {
-  await markFollowerSuspended(
-    follower,
-    false
-  );
-
-  const trainer =
-    trainerForFollower(
-      follower
-    );
-
-  if (
-    trainer
-    &&
-    isAuthority()
-  ) {
-    const themeId =
-      followerThemeId(
-        follower
-      );
-
-    await queueReconcile(
-      trainer,
-      {
-        placeAll: true
-      }
-    );
-  }
-}
-
 
 function onCreateToken(token) {
-  if (
-    !isAuthority()
-    ||
-    isFollower(token)
-    ||
-    token.actor?.type
-      !==
-      "litm-character"
-  ) {
-    return;
-  }
-
-  void queueReconcile(
-    token,
-    {
-      placeAll: true,
-      refreshAppearance: true
-    }
-  );
+  if (isAuthority() && !isManagedToken(token) && token.actor?.type === "litm-character") void queueReconcile(token, {place: true});
 }
 
-
-function onUpdateToken(
-  token,
-  changes,
-  options
-) {
-  if (isFollower(token)) {
+function onUpdateToken(token, changes, options) {
+  if (isManagedToken(token)) {
     if (!isAuthority()) return;
-
-    const moved =
-      changes.x !== undefined
-      ||
-      changes.y !== undefined;
-
-    const internalMove =
-      options?.pokemonFollowerSync
-      ||
-      Array.isArray(
-        options?.follower_updates
-      );
-
-    if (
-      moved
-      &&
-      !internalMove
-      &&
-      !followerIsSuspended(
-        token
-      )
-    ) {
-      void suspendFollower(
-        token
-      ).catch(
-        error => {
-          console.error(
-            "Pokemon LITM Tools | Soltando follower:",
-            error
-          );
-        }
-      );
-
-      return;
+    const moved = changes.x !== undefined || changes.y !== undefined;
+    // Dylan itself clears following.who only when this follower is moved manually.
+    if (moved && !options?.pokemonFollowerSync && isActiveToken(token)
+      && !token.getFlag(DYLAN_ID, FOLLOWING_FLAG)?.who) {
+      void detachToken(token).catch(error => console.error("Pokemon LITM Tools | Soltando follower:", error));
     }
-
-    if (
-      changedTokenFlag(
-        changes,
-        SUSPENDED_FLAG
-      )
-    ) {
-      const trainer =
-        trainerForFollower(
-          token
-        );
-
-      if (!trainer) return;
-
-      void queueReconcile(
-        trainer,
-        followerIsSuspended(
-          token
-        )
-          ? {}
-          : {
-              placeAll: true
-            }
-      );
-    }
-
     return;
   }
-
-  if (
-    !isAuthority()
-    ||
-    token.actor?.type
-      !==
-      "litm-character"
-  ) {
-    return;
-  }
-
-  if (
-    changes.hidden !== undefined
-    ||
-    changes.disposition !== undefined
-  ) {
-    void queueReconcile(token);
-  }
+  if (!isAuthority() || token.actor?.type !== "litm-character") return;
+  if (changes.hidden !== undefined || changes.disposition !== undefined) void queueReconcile(token);
 }
-
 
 function onDeleteToken(token) {
-  if (
-    !isAuthority()
-    ||
-    isFollower(token)
-  ) {
-    return;
-  }
-
-  void deleteFollowers(
-    token.parent,
-    token.id
-  ).catch(
-    error => {
-      console.error(
-        "Pokemon LITM Tools | Removendo followers:",
-        error
-      );
-    }
-  );
+  if (!isAuthority() || isManagedToken(token)) return;
+  void deleteIds(token.parent, getPokemonTokens(token.parent, token.id).map(t => t.id))
+    .catch(error => console.error("Pokemon LITM Tools | Removendo Pokémon do mapa:", error));
 }
 
-
-function onUpdateActor(
-  actor,
-  changes
-) {
-  if (
-    !isAuthority()
-    ||
-    actor?.type !== "litm-character"
-  ) {
-    return;
-  }
-
-  if (
-    changedActorFlag(
-      changes,
-      ORDER_FLAG
-    )
-  ) {
-    reconcileActorTokens(
-      actor,
-      {
-        placeAll: true
-      }
-    );
-  }
+function changedFlag(changes, name) {
+  return changes?.flags?.[MODULE_ID]?.[name] !== undefined
+    || Object.prototype.hasOwnProperty.call(changes ?? {}, `flags.${MODULE_ID}.${name}`);
 }
 
-
-function isPokemonThemeItem(item) {
-  return (
-    item?.type === "themebook"
-    &&
-    item.getFlag(
-      MODULE_ID,
-      "pokemonTheme"
-    ) === true
-    &&
-    item.parent?.documentName
-      ===
-      "Actor"
-  );
+function onUpdateActor(actor, changes, options) {
+  if (!isAuthority() || actor?.type !== "litm-character") return;
+  if (changedFlag(changes, FOLLOWER_FLAG) || changedFlag(changes, LEGACY_ORDER_FLAG)) reconcileActorTokens(actor, {place: true});
 }
 
-
-function onPokemonThemeCreatedOrDeleted(
-  item
-) {
-  if (
-    !isAuthority()
-    ||
-    !isPokemonThemeItem(item)
-  ) {
-    return;
-  }
-
-  reconcileActorTokens(
-    item.parent,
-    {
-      refreshAppearance: true
-    }
-  );
+function isPokemonTheme(item) {
+  return item?.type === "themebook" && item.getFlag(MODULE_ID, "pokemonTheme") === true && item.parent?.documentName === "Actor";
 }
+function onThemeChanged(item) { if (isAuthority() && isPokemonTheme(item)) reconcileActorTokens(item.parent); }
 
-
-function onPokemonThemeUpdated(
-  item,
-  changes
-) {
-  if (
-    !isAuthority()
-    ||
-    !isPokemonThemeItem(item)
-  ) {
-    return;
-  }
-
-  const moduleChanges =
-    changes?.flags?.[
-      MODULE_ID
-    ]
-    ??
-    {};
-
-  const visualChanged =
-    changes?.name !== undefined
-    ||
-    changes?.img !== undefined
-    ||
-    moduleChanges.assets !== undefined
-    ||
-    moduleChanges.animation !== undefined
-    ||
-    moduleChanges.tokenScale !== undefined
-    ||
-    moduleChanges.pokemonActorId !== undefined;
-
-  if (!visualChanged) {
-    return;
-  }
-
-  reconcileActorTokens(
-    item.parent,
-    {
-      refreshAppearance: true
-    }
-  );
+function hudRoot(app, html) {
+  return [html, html?.[0], app?.element, app?.element?.[0]].find(x => x instanceof HTMLElement) ?? null;
 }
-
-function hudRoot(
-  app,
-  html
-) {
-  const candidates = [
-    html,
-    html?.[0],
-    app?.element,
-    app?.element?.[0]
-  ];
-
-  return candidates.find(
-    candidate =>
-      candidate instanceof HTMLElement
-  )
-  ??
-  null;
-}
-
-
-function hudTokenDocument(
-  app
-) {
-  const object =
-    app?.object;
-
-  if (
-    object?.documentName === "Token"
-  ) {
-    return object;
-  }
-
-  if (
-    object?.document?.documentName
-      ===
-      "Token"
-  ) {
-    return object.document;
-  }
-
+function hudToken(app) {
+  const o = app?.object;
+  if (o?.documentName === "Token") return o;
+  if (o?.document?.documentName === "Token") return o.document;
   return null;
 }
 
-
-function addFollowerHudButton(
-  app,
-  html
-) {
-  const token =
-    hudTokenDocument(app);
-
-  if (
-    !token
-    ||
-    !isFollower(token)
-    ||
-    (
-      !game.user.isGM
-      &&
-      !token.isOwner
-    )
-  ) {
-    return;
-  }
-
-  const root =
-    hudRoot(
-      app,
-      html
-    );
-
-  if (!root) return;
-
-  if (
-    root.querySelector(
-      "[data-pokemon-follow-toggle]"
-    )
-  ) {
-    return;
-  }
-
-  const column =
-    root.querySelector(
-      ".col.right"
-    )
-    ??
-    root.querySelector(
-      ".right"
-    )
-    ??
-    root;
-
-  const suspended =
-    followerIsSuspended(
-      token
-    );
-
-  const button =
-    document.createElement(
-      "div"
-    );
-
-  button.className =
-    "control-icon";
-
-  button.dataset
-    .pokemonFollowToggle =
-      "true";
-
-  button.title =
-    suspended
-      ? "Seguir treinador"
-      : "Parar de seguir";
-
-  button.innerHTML =
-    suspended
-      ? '<i class="fa-solid fa-link"></i>'
-      : '<i class="fa-solid fa-link-slash"></i>';
-
-  button.addEventListener(
-    "click",
-    event => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const action =
-        followerIsSuspended(
-          token
-        )
-          ? resumeFollower(token)
-          : suspendFollower(token);
-
-      void action.catch(
-        error => {
-          console.error(
-            "Pokemon LITM Tools | HUD follower:",
-            error
-          );
-
-          ui.notifications.error(
-            "Não foi possível alterar o estado do seguidor."
-          );
-        }
-      );
-    }
-  );
-
+function renderHud(app, html) {
+  const token = hudToken(app);
+  if (!token || !isManagedToken(token) || (!game.user.isGM && !token.isOwner)) return;
+  const root = hudRoot(app, html);
+  if (!root || root.querySelector("[data-pokemon-follow-toggle]")) return;
+  const column = root.querySelector(".col.right") ?? root.querySelector(".right") ?? root;
+  const active = isActiveToken(token) && Boolean(token.getFlag(DYLAN_ID, FOLLOWING_FLAG)?.who);
+  const button = document.createElement("div");
+  button.className = "control-icon";
+  button.dataset.pokemonFollowToggle = "true";
+  button.title = active ? "Parar de seguir" : "Seguir treinador";
+  button.innerHTML = active ? '<i class="fa-solid fa-link-slash"></i>' : '<i class="fa-solid fa-person-walking-arrow-right"></i>';
+  button.addEventListener("click", event => {
+    event.preventDefault(); event.stopPropagation();
+    void (active ? detachToken(token) : resumeToken(token)).catch(error => {
+      console.error("Pokemon LITM Tools | HUD follower:", error);
+      ui.notifications.error("Não foi possível alterar o seguidor.");
+    });
+  });
   column.append(button);
 }
 
+async function syncScene() {
+  if (!isAuthority() || game.system.id !== LITM_SYSTEM_ID || !canvas?.ready || !canvas.scene) return;
+  const trainers = canvas.scene.tokens.filter(t => !isManagedToken(t) && t.actor?.type === "litm-character");
+  const trainerIds = new Set(trainers.map(t => t.id));
+  await deleteIds(canvas.scene, canvas.scene.tokens.filter(t => isManagedToken(t)
+    && !trainerIds.has(t.getFlag(MODULE_ID, "trainerTokenId"))).map(t => t.id));
+  for (const trainer of trainers) await queueReconcile(trainer, {place: true});
+}
 
 export function activatePokemonFollowers() {
-  Hooks.on(
-    "canvasReady",
-    () => {
-      void syncScene()
-        .catch(
-          error => {
-            console.error(
-              "Pokemon LITM Tools | Preparando followers:",
-              error
-            );
-          }
-        );
-    }
-  );
-
-  Hooks.on(
-    "createToken",
-    onCreateToken
-  );
-
-  Hooks.on(
-    "updateToken",
-    onUpdateToken
-  );
-
-  Hooks.on(
-    "deleteToken",
-    onDeleteToken
-  );
-
-  Hooks.on(
-    "updateActor",
-    onUpdateActor
-  );
-
-  Hooks.on(
-    "createItem",
-    onPokemonThemeCreatedOrDeleted
-  );
-
-  Hooks.on(
-    "updateItem",
-    onPokemonThemeUpdated
-  );
-
-  Hooks.on(
-    "deleteItem",
-    onPokemonThemeCreatedOrDeleted
-  );
-
-  Hooks.on(
-    "renderTokenHUD",
-    addFollowerHudButton
-  );
-
-  Hooks.on(
-    "updateUser",
-    () => {
-      if (!isAuthority()) return;
-
-      void syncScene()
-        .catch(
-          error => {
-            console.error(
-              "Pokemon LITM Tools | Autoridade de followers:",
-              error
-            );
-          }
-        );
-    }
-  );
+  Hooks.on("canvasReady", () => void syncScene().catch(e => console.error("Pokemon LITM Tools | Preparando follower:", e)));
+  Hooks.on("createToken", onCreateToken);
+  Hooks.on("updateToken", onUpdateToken);
+  Hooks.on("deleteToken", onDeleteToken);
+  Hooks.on("updateActor", onUpdateActor);
+  Hooks.on("createItem", onThemeChanged);
+  Hooks.on("updateItem", onThemeChanged);
+  Hooks.on("deleteItem", onThemeChanged);
+  Hooks.on("renderTokenHUD", renderHud);
+  Hooks.on("updateUser", () => { if (isAuthority()) void syncScene(); });
 }

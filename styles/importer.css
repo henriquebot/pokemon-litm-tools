@@ -1507,9 +1507,19 @@ input[type="text"] {
   font-size: .78rem;
 }
 
-.pokemon-manager-follow-row select {
-  width: 52px;
-  min-width: 52px;
+.pokemon-manager-follow-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.pokemon-manager-openable {
+  cursor: pointer;
+}
+
+.pokemon-manager-openable:hover {
+  border-color: var(--color-border-highlight);
 }
 
 .pokemon-manager-card-actions {
