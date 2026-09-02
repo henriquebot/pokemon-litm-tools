@@ -206,72 +206,359 @@ function trainerOptions() {
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
+function actorFolderOptions() {
+  const remembered =
+    String(
+      game.settings.get(
+        MODULE_ID,
+        "lastActorFolder"
+      )
+      ?? ""
+    );
+
+  return game.folders
+    .filter(
+      folder =>
+        folder.type === "Actor"
+    )
+    .sort(
+      (a, b) =>
+        a.name.localeCompare(
+          b.name,
+          "pt-BR"
+        )
+    )
+    .map(folder => {
+      const selected =
+        folder.id === remembered
+          ? "selected"
+          : "";
+
+      return (
+        `<option value="${folder.id}" ${selected}>`
+        +
+        `${escapeHTML(folder.name)}</option>`
+      );
+    })
+    .join("");
+}
+
+
+async function resolveChallengeFolder(
+  config
+) {
+  let folderId =
+    String(
+      config.folderId
+      ?? ""
+    ).trim();
+
+  const newFolder =
+    String(
+      config.newFolder
+      ?? ""
+    ).trim();
+
+  if (newFolder) {
+    const folder =
+      await Folder.create({
+        name:
+          newFolder,
+
+        type:
+          "Actor"
+      });
+
+    if (!folder) {
+      throw new Error(
+        "Não foi possível criar a pasta."
+      );
+    }
+
+    folderId =
+      folder.id;
+  }
+
+  if (folderId) {
+    const folder =
+      game.folders.get(
+        folderId
+      );
+
+    if (
+      !folder ||
+      folder.type !== "Actor"
+    ) {
+      throw new Error(
+        "Pasta de Actors inválida."
+      );
+    }
+  }
+
+  await game.settings.set(
+    MODULE_ID,
+    "lastActorFolder",
+    folderId
+  );
+
+  return folderId || null;
+}
+
+
 async function askBuildConfig(entry) {
-  const trainers = trainerOptions();
-  const options = trainers.map(actor =>
-    `<option value="${actor.id}">${escapeHTML(actor.name)}</option>`
-  ).join("");
+  const trainers =
+    trainerOptions();
 
-  const result = await foundry.applications.api.DialogV2.input({
-    window: { title: `${entry.name} · Pokémon Builder` },
-    content: `
-      <div style="display:flex;flex-direction:column;gap:12px;padding:8px">
-        <div class="form-group">
-          <label>Criar como</label>
-          <div class="form-fields">
-            <select name="mode">
-              <option value="challenge">Challenge / NPC</option>
-              <option value="trainer">Adicionar a Treinador</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Might</label>
-          <div class="form-fields">
-            <select name="might">
-              <option value="origin">Origin</option>
-              <option value="adventure" selected>Adventure</option>
-              <option value="greatness">Greatness</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Treinador</label>
-          <div class="form-fields">
-            <select name="trainerId">
-              <option value="">— usado apenas no modo Treinador —</option>
-              ${options}
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Destino</label>
-          <div class="form-fields">
-            <select name="destination">
-              <option value="team">Time</option>
-              <option value="pc">PC</option>
-            </select>
-          </div>
-        </div>
-      </div>
-    `,
-    ok: { label: "Gerar prévia", icon: "fa-solid fa-wand-magic-sparkles" },
-    modal: true
-  });
+  const trainerChoices =
+    trainers
+      .map(
+        actor =>
+          `<option value="${actor.id}">${escapeHTML(actor.name)}</option>`
+      )
+      .join("");
 
-  if (!result) return null;
+  const folderChoices =
+    actorFolderOptions();
+
+  const rememberedFolder =
+    String(
+      game.settings.get(
+        MODULE_ID,
+        "lastActorFolder"
+      )
+      ?? ""
+    );
+
+  const rootSelected =
+    rememberedFolder
+      ? ""
+      : "selected";
+
+  const result =
+    await foundry
+      .applications
+      .api
+      .DialogV2
+      .input({
+        window: {
+          title:
+            `${entry.name} · Pokémon Builder`
+        },
+
+        content: `
+          <div class="pokemon-builder-config">
+
+            <div class="pokemon-builder-field">
+
+              <label>
+                Criar como
+              </label>
+
+              <select name="mode">
+
+                <option value="challenge">
+                  Challenge / NPC
+                </option>
+
+                <option value="trainer">
+                  Adicionar a Treinador
+                </option>
+
+              </select>
+
+            </div>
+
+
+            <div class="pokemon-builder-field">
+
+              <label>
+                Might
+              </label>
+
+              <select name="might">
+
+                <option value="origin">
+                  Origin
+                </option>
+
+                <option
+                  value="adventure"
+                  selected
+                >
+                  Adventure
+                </option>
+
+                <option value="greatness">
+                  Greatness
+                </option>
+
+              </select>
+
+            </div>
+
+
+            <div class="pokemon-builder-challenge-fields">
+
+              <div class="pokemon-builder-section-title">
+                Destino do Challenge
+              </div>
+
+              <div class="pokemon-builder-field">
+
+                <label>
+                  Pasta de Actors
+                </label>
+
+                <select name="folderId">
+
+                  <option
+                    value=""
+                    ${rootSelected}
+                  >
+                    Raiz de Actors
+                  </option>
+
+                  ${folderChoices}
+
+                </select>
+
+              </div>
+
+
+              <div class="pokemon-builder-field">
+
+                <label>
+                  Ou criar nova pasta
+                </label>
+
+                <input
+                  type="text"
+                  name="newFolder"
+                  placeholder="Ex.: Pokémon Selvagens"
+                >
+
+              </div>
+
+            </div>
+
+
+            <div class="pokemon-builder-trainer-fields">
+
+              <div class="pokemon-builder-section-title">
+                Destino do Pokémon
+              </div>
+
+              <div class="pokemon-builder-field">
+
+                <label>
+                  Treinador
+                </label>
+
+                <select name="trainerId">
+
+                  <option value="">
+                    Escolha um treinador
+                  </option>
+
+                  ${trainerChoices}
+
+                </select>
+
+              </div>
+
+
+              <div class="pokemon-builder-field">
+
+                <label>
+                  Destino
+                </label>
+
+                <select name="destination">
+
+                  <option value="team">
+                    Time
+                  </option>
+
+                  <option value="pc">
+                    PC
+                  </option>
+
+                </select>
+
+              </div>
+
+            </div>
+
+          </div>
+        `,
+
+        ok: {
+          label:
+            "Gerar prévia",
+
+          icon:
+            "fa-solid fa-wand-magic-sparkles"
+        },
+
+        modal:
+          true
+      });
+
+  if (!result) {
+    return null;
+  }
+
   const config = {
-    mode: String(result.mode ?? "challenge"),
-    might: String(result.might ?? "adventure"),
-    trainerId: String(result.trainerId ?? ""),
-    destination: String(result.destination ?? "team")
+    mode:
+      String(
+        result.mode
+        ?? "challenge"
+      ),
+
+    might:
+      String(
+        result.might
+        ?? "adventure"
+      ),
+
+    trainerId:
+      String(
+        result.trainerId
+        ?? ""
+      ),
+
+    destination:
+      String(
+        result.destination
+        ?? "team"
+      ),
+
+    folderId:
+      String(
+        result.folderId
+        ?? ""
+      ),
+
+    newFolder:
+      String(
+        result.newFolder
+        ?? ""
+      ).trim()
   };
 
-  if (config.mode === "trainer" && !config.trainerId) {
-    throw new Error("Escolha o treinador que receberá o Pokémon.");
+  if (
+    config.mode === "trainer"
+    &&
+    !config.trainerId
+  ) {
+    throw new Error(
+      "Escolha o treinador que receberá o Pokémon."
+    );
   }
+
   return config;
 }
+
 
 async function reviewBuild(entry, config, data) {
   const typeText = data.types.map(type => TYPE_PT[type] ?? titleCase(type)).join(" / ");
@@ -421,7 +708,10 @@ async function createChallenge(entry, config, data, review, definition) {
     mightIcon: config.might
   }];
   const limitTier = { origin: "3", adventure: "4", greatness: "5" }[config.might] ?? "4";
-  const folderId = String(game.settings.get(MODULE_ID, "lastActorFolder") ?? "") || null;
+  const folderId =
+    await resolveChallengeFolder(
+      config
+    );
 
   const actor = await Actor.implementation.create({
     name: entry.name,

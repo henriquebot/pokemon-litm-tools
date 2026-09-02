@@ -244,31 +244,37 @@
 
             {{#if ../isPokemon}}
 
-              <button
-                type="button"
-                class="pokemon-builder-link"
-                data-pokemon-builder="{{id}}"
-                title="Criar como Challenge ou adicionar a um treinador"
-              >
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                Builder
-              </button>
+              <div class="pokemon-asset-actions">
+
+                <button
+                  type="button"
+                  class="pokemon-builder-link"
+                  data-pokemon-builder="{{id}}"
+                  title="Criar como Challenge ou adicionar a um treinador"
+                >
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                  Builder
+                </button>
+
+
+                {{#if pokedexUrl}}
+
+                  <button
+                    type="button"
+                    class="pokemon-pokedex-link"
+                    data-pokedex-url="{{pokedexUrl}}"
+                    title="Abrir no Pok&eacute;monDB"
+                  >
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    Pok&eacute;dex
+                  </button>
+
+                {{/if}}
+
+              </div>
 
             {{/if}}
 
-            {{#if pokedexUrl}}
-
-              <button
-                type="button"
-                class="pokemon-pokedex-link"
-                data-pokedex-url="{{pokedexUrl}}"
-                title="Abrir no Pok&eacute;monDB"
-              >
-                <i class="fa-solid fa-mobile-screen-button"></i>
-                Pok&eacute;dex
-              </button>
-
-            {{/if}}
 
             {{#if isAnimated}}
 

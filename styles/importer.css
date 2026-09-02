@@ -1600,3 +1600,134 @@ input[type="text"] {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Pokemon Builder 0.8.2 layout */
+
+.pokemon-asset-card {
+  grid-template-columns:
+    28px
+    72px
+    minmax(0, 1fr);
+
+  min-height: 100px;
+  align-items: center;
+}
+
+.pokemon-asset-info {
+  min-width: 0;
+  gap: 4px;
+  justify-content: center;
+}
+
+.pokemon-asset-info strong {
+  display: block;
+  line-height: 1.2;
+}
+
+.pokemon-asset-info small {
+  line-height: 1.15;
+}
+
+.pokemon-asset-actions {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1fr);
+
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.pokemon-asset-actions button {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  margin: 0;
+  padding: 4px 6px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pokemon-importer-shell.preview-zoomed
+.pokemon-asset-card {
+  min-height: 156px;
+}
+
+
+.pokemon-builder-config,
+.pokemon-builder-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  padding: 10px 4px;
+  min-width: 0;
+}
+
+.pokemon-builder-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  min-width: 0;
+}
+
+.pokemon-builder-field label {
+  font-weight: 600;
+}
+
+.pokemon-builder-field select,
+.pokemon-builder-field input {
+  display: block;
+
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pokemon-builder-challenge-fields,
+.pokemon-builder-trainer-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  padding-top: 4px;
+}
+
+.pokemon-builder-section-title {
+  padding-top: 4px;
+
+  font-size: .8rem;
+  font-weight: 700;
+  opacity: .7;
+
+  border-top:
+    1px solid
+    var(--color-border-light-primary);
+}
+
+.pokemon-builder-config:
+has(
+  select[name="mode"]
+  option[value="challenge"]:checked
+)
+.pokemon-builder-trainer-fields {
+  display: none;
+}
+
+.pokemon-builder-config:
+has(
+  select[name="mode"]
+  option[value="trainer"]:checked
+)
+.pokemon-builder-challenge-fields {
+  display: none;
+}
+
