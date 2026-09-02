@@ -875,7 +875,8 @@ class PokemonCharacterCreatorApp
 
   customPreviewUrl = null;
 
-  previewZoomed = false;
+  previewZoomed =
+    true;
 
   teamSize = null;
 
@@ -895,11 +896,7 @@ class PokemonCharacterCreatorApp
 
 
   get totalSteps() {
-    return (
-      this.mode === "trainer"
-        ? 7
-        : 3
-    );
+    return this.mode === "pokemon" ? 4 : 7;
   }
 
 
@@ -1514,10 +1511,8 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.step === 3
-        &&
-        this.mode === "trainer"
-        &&
-        visualReady
+        && !!this.mode
+        && visualReady
       )
       ||
       (
@@ -1546,10 +1541,8 @@ class PokemonCharacterCreatorApp
     const canFinish =
       (
         this.mode === "pokemon"
-        &&
-        this.step === 3
-        &&
-        visualReady
+        && this.step === 4
+        && visualReady
       )
       ||
       (
@@ -1582,22 +1575,35 @@ class PokemonCharacterCreatorApp
         this.step === 3,
 
       stepIsTeam:
-        this.step === 4,
+        this.mode === "trainer"
+        && this.step === 4,
 
       stepIsDream:
-        this.step === 5,
+        this.mode === "trainer"
+        && this.step === 5,
 
       stepIsArchetype:
-        this.step === 6,
+        this.mode === "trainer"
+        && this.step === 6,
 
       stepIsThemes:
-        this.step === 7,
+        (
+          this.mode === "trainer"
+          && this.step === 7
+        )
+        || (
+          this.mode === "pokemon"
+          && this.step === 4
+        ),
 
       isTrainer:
         this.mode === "trainer",
 
       isPokemon:
         this.mode === "pokemon",
+
+      showTrainerProgress:
+        this.mode !== "pokemon",
 
       characterName:
         this.characterName,
@@ -1734,7 +1740,7 @@ class PokemonCharacterCreatorApp
     ) {
       button.addEventListener(
         "click",
-        () => {
+        async () => {
           const mode =
             button.dataset
               .characterType;
@@ -1784,15 +1790,9 @@ class PokemonCharacterCreatorApp
             );
           }
 
-          const next =
-            this.element.querySelector(
-              "[data-action='wizardNext']"
-            );
-
-          if (next) {
-            next.disabled =
-              false;
-          }
+          await this.render({
+            force: true
+          });
         }
       );
     }
@@ -2018,11 +2018,7 @@ class PokemonCharacterCreatorApp
 
           const action =
             this.element.querySelector(
-              this.mode === "trainer"
-                ?
-                "[data-action='wizardNext']"
-                :
-                "[data-action='wizardFinish']"
+              "[data-action='wizardNext']"
             );
 
           if (action) {
@@ -2697,10 +2693,8 @@ class PokemonCharacterCreatorApp
 
           if (
             this.step === 3
-            &&
-            this.mode === "trainer"
-            &&
-            !this._visualReady()
+            && !!this.mode
+            && !this._visualReady()
           ) {
             return;
           }

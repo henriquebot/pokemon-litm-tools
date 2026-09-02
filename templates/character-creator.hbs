@@ -21,7 +21,7 @@
       Visual
     </div>
 
-    {{#if isTrainer}}
+    {{#if showTrainerProgress}}
 
       <div class="pokemon-wizard-line"></div>
 
@@ -48,6 +48,17 @@
 
       <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}">
         <span>7</span>
+        Temas
+      </div>
+
+    {{/if}}
+
+    {{#if isPokemon}}
+
+      <div class="pokemon-wizard-line"></div>
+
+      <div class="pokemon-wizard-step pokemon-theme-progress {{#if stepIsThemes}}active{{/if}}">
+        <span>4</span>
         Temas
       </div>
 
@@ -862,6 +873,49 @@
         Construa seus Temas
       </h2>
 
+      {{#if isPokemon}}
+
+        <div class="pokemon-theme-guidance">
+          Vamos definir os padrões de Temas do personagem Pokémon na próxima etapa do desenvolvimento.
+          A estrutura prevista inclui:
+        </div>
+
+        <div class="pokemon-theme-plan-grid">
+
+          <article>
+            <i class="fa-solid fa-tree"></i>
+            <strong>Habitat</strong>
+            <span>Onde esse Pokémon pertence e prospera.</span>
+          </article>
+
+          <article>
+            <i class="fa-solid fa-star"></i>
+            <strong>Abilities</strong>
+            <span>Características especiais da espécie.</span>
+          </article>
+
+          <article>
+            <i class="fa-solid fa-face-smile"></i>
+            <strong>Nature</strong>
+            <span>Temperamento e maneira de agir.</span>
+          </article>
+
+          <article>
+            <i class="fa-solid fa-dna"></i>
+            <strong>Estágio Evolutivo</strong>
+            <span>Potencial, maturidade e evolução.</span>
+          </article>
+
+          <article>
+            <i class="fa-solid fa-bolt"></i>
+            <strong>Move Set</strong>
+            <span>Golpes e técnicas do Pokémon.</span>
+          </article>
+
+        </div>
+
+      {{/if}}
+
       <div class="pokemon-theme-guidance">
         <strong>Como pensar seus Temas:</strong>
         Tags de Poder representam capacidades, recursos e qualidades que ajudam seu personagem.
@@ -1045,31 +1099,15 @@
 
         {{#if stepIsVisual}}
 
-          {{#if isPokemon}}
-
-            <button
-              type="button"
-              data-action="wizardFinish"
-              class="pokemon-wizard-primary"
-              {{#unless canFinish}}disabled{{/unless}}
-            >
-              <i class="fa-solid fa-check"></i>
-              Finalizar
-            </button>
-
-          {{else}}
-
-            <button
-              type="button"
-              data-action="wizardNext"
-              class="pokemon-wizard-primary"
-              {{#unless canNext}}disabled{{/unless}}
-            >
-              Pr&oacute;ximo
-              <i class="fa-solid fa-arrow-right"></i>
-            </button>
-
-          {{/if}}
+          <button
+            type="button"
+            data-action="wizardNext"
+            class="pokemon-wizard-primary"
+            {{#unless canNext}}disabled{{/unless}}
+          >
+            Pr&oacute;ximo
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
 
         {{else}}
 

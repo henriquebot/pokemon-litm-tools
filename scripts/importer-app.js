@@ -1724,7 +1724,7 @@ class PokemonImporterApp
     new Map();
 
   previewZoomed =
-    false;
+    true;
 
   async _prepareContext(options) {
     const context =
@@ -2183,6 +2183,13 @@ class PokemonImporterApp
     }
 
 
+    /* POKEMON CARD DRAG FIX */
+    for (const card of this.element.querySelectorAll("[data-asset-card]")) {
+      card.draggable = true;
+      for (const image of card.querySelectorAll("img")) image.draggable = false;
+      for (const button of card.querySelectorAll("button")) button.draggable = false;
+    }
+
     /* ARRASTAR PARA A SCENE */
 
     for (
@@ -2217,21 +2224,16 @@ class PokemonImporterApp
           transfer.effectAllowed =
             "copy";
 
-          transfer.setData(
-            "text/plain",
-
+          const dragPayload =
             JSON.stringify({
-              type:
-                POKEMON_IMPORTER_DRAG_TYPE,
-
-              moduleId:
-                MODULE_ID,
-
+              type: POKEMON_IMPORTER_DRAG_TYPE,
+              moduleId: MODULE_ID,
               category,
-
               id
-            })
-          );
+            });
+
+          transfer.setData("text/plain", dragPayload);
+          transfer.setData("application/json", dragPayload);
 
           card.classList.add(
             "dragging"

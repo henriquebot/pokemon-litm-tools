@@ -26,6 +26,82 @@ const MIGHT = {
   greatness: { label: "Greatness", maxLevel: 100 }
 };
 
+const POKEMON_NATURES = [
+  ["hardy","Resistente","Cansado","Determinado"],
+  ["lonely","Solitário","Isolado","Apegado"],
+  ["adamant","Adamante","Frustrado","Obstinado"],
+  ["naughty","Travesso","Repreendido","Desafiador"],
+  ["brave","Corajoso","Assustado","Destemido"],
+  ["bold","Audacioso","Intimidado","Confiante"],
+  ["docile","Dócil","Pressionado","Convencido"],
+  ["impish","Travesso (Impish)","Repreendido","Brincalhão"],
+  ["lax","Relaxado (Lax)","Distraído","Despreocupado"],
+  ["relaxed","Relaxado","Apressado","Tranquilo"],
+  ["modest","Modesto","Exposto","Confiante"],
+  ["mild","Leve","Abalado","Gentil"],
+  ["bashful","Tímido (Bashful)","Envergonhado","À vontade"],
+  ["rash","Erupção cutânea","Cauteloso","Impetuoso"],
+  ["quiet","Silencioso","Perturbado","Concentrado"],
+  ["calm","Calma","Agitado","Sereno"],
+  ["gentle","Gentil","Hostilizado","Amigável"],
+  ["careful","Cuidado","Surpreendido","Cauteloso"],
+  ["quirky","Peculiar","Confuso","Imprevisível"],
+  ["sassy","Atrevido","Contrariado","Desafiador"],
+  ["timid","Tímido","Assustado","Convencido"],
+  ["hasty","Apressado","Preso","Impaciente"],
+  ["jolly","Alegre","Desanimado","Animado"],
+  ["naive","Ingênuo","Enganado","Confiante"],
+  ["serious","Sério","Desconcertado","Determinado"]
+].map(([id,label,low,high]) => ({id,label,low,high}));
+
+const NATURE_BY_STATS = {
+  attack: {
+    attack:"hardy", defense:"lonely", "special-attack":"adamant", "special-defense":"naughty", speed:"brave"
+  },
+  defense: {
+    attack:"bold", defense:"docile", "special-attack":"impish", "special-defense":"lax", speed:"relaxed"
+  },
+  "special-attack": {
+    attack:"modest", defense:"mild", "special-attack":"bashful", "special-defense":"rash", speed:"quiet"
+  },
+  "special-defense": {
+    attack:"calm", defense:"gentle", "special-attack":"careful", "special-defense":"quirky", speed:"sassy"
+  },
+  speed: {
+    attack:"timid", defense:"hasty", "special-attack":"jolly", "special-defense":"naive", speed:"serious"
+  }
+};
+
+function pokemonNature(id) {
+  return POKEMON_NATURES.find(n => n.id === id) ?? POKEMON_NATURES[0];
+}
+
+function defaultNatureForStats(stats) {
+  const names = ["attack","defense","special-attack","special-defense","speed"];
+  const rows = names.map(name => ({name, value:Number(stats?.[name] ?? 0)}));
+  const best = rows.reduce((a,b) => b.value > a.value ? b : a, rows[0]);
+  const worst = rows.reduce((a,b) => b.value < a.value ? b : a, rows[0]);
+  return pokemonNature(NATURE_BY_STATS[best.name]?.[worst.name] ?? "hardy");
+}
+
+function flavorText(entries) {
+  for (const code of ["pt-BR","pt","en"]) {
+    const found = entries?.find(row => row.language?.name === code);
+    if (found?.flavor_text) {
+      return String(found.flavor_text).replace(/[\n\f]+/g," ").replace(/\s+/g," ").trim();
+    }
+  }
+  return "";
+}
+
+function englishEffect(entries) {
+  const found = entries?.find(row => row.language?.name === "en");
+  return String(found?.short_effect ?? found?.effect ?? "")
+    .replace(/\$effect_chance/g,"chance")
+    .replace(/\s+/g," ")
+    .trim();
+}
+
 const apiCache = new Map();
 
 function randomId() {
@@ -77,7 +153,18 @@ async function loadPokemonBuildData(entry, might) {
     throw new Error("Pokémon sem número de Pokédex válido.");
   }
 
-  const pokemon = await fetchJson(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
+  const pokemon =
+    await fetchJson(
+      `https://pokeapi.co/api/v2/pokemon/${pokemonId}`
+    );
+
+  const species =
+    await fetchJson(
+      `https://pokeapi.co/api/v2/pokemon-species/${pokemonId}`
+    );
+
+  const dexText =
+    flavorText(species.flavor_text_entries);
   const types = (pokemon.types ?? [])
     .slice()
     .sort((a, b) => Number(a.slot) - Number(b.slot))
@@ -153,7 +240,9 @@ async function loadPokemonBuildData(entry, might) {
           damageClass: detail.damage_class?.name ?? "status",
           power: Number(detail.power ?? 0),
           accuracy: Number(detail.accuracy ?? 0),
-          level: move.level
+          level: move.level,
+          effectText: englishEffect(detail.effect_entries),
+          flavorText: flavorText(detail.flavor_text_entries)
         };
       } catch (error) {
         console.warn("Pokemon LITM Tools | Move:", move.id, error);
@@ -187,12 +276,39 @@ async function loadPokemonBuildData(entry, might) {
   const best = statRows.reduce((a, b) => b.value > a.value ? b : a, statRows[0]);
   const worst = statRows.reduce((a, b) => b.value < a.value ? b : a, statRows[0]);
 
+  const completeMoves =
+    (pokemon.moves ?? [])
+      .map(row => {
+        const methods = new Set(
+          (row.version_group_details ?? [])
+            .map(detail => detail.move_learn_method?.name)
+            .filter(Boolean)
+        );
+
+        return {
+          id: row.move?.name ?? "",
+          name: titleCase(row.move?.name ?? ""),
+          level: methods.has("level-up"),
+          machine: methods.has("machine")
+        };
+      })
+      .filter(move => !!move.id);
+
+  const levelMoveNames =
+    completeMoves.filter(move => move.level).map(move => move.name);
+
+  const machineMoveNames =
+    completeMoves.filter(move => move.machine).map(move => move.name);
+
   return {
     pokemonId,
     types,
     stats,
     typeEffectiveness,
     moves,
+    dexText,
+    levelMoveNames,
+    machineMoveNames,
     best,
     worst,
     powerStatTag: STAT_TEXT[best.name]?.power ?? "Talento marcante",
@@ -306,308 +422,198 @@ async function resolveChallengeFolder(
 
 
 async function askBuildConfig(entry) {
-  const trainers =
-    trainerOptions();
+  const modeResult = await foundry.applications.api.DialogV2.input({
+    window: { title: `${entry.name} · Pokémon Builder` },
+    content: `
+      <div class="pokemon-builder-config">
+        <div class="pokemon-builder-field">
+          <label>Criar como</label>
+          <select name="mode">
+            <option value="challenge">Challenge / NPC</option>
+            <option value="trainer">Adicionar a Treinador</option>
+          </select>
+        </div>
+        <div class="pokemon-builder-field">
+          <label>Might</label>
+          <select name="might">
+            <option value="origin">Origin</option>
+            <option value="adventure" selected>Adventure</option>
+            <option value="greatness">Greatness</option>
+          </select>
+        </div>
+      </div>
+    `,
+    ok: { label:"Continuar", icon:"fa-solid fa-arrow-right" },
+    modal:true
+  });
 
-  const trainerChoices =
-    trainers
-      .map(
-        actor =>
-          `<option value="${actor.id}">${escapeHTML(actor.name)}</option>`
-      )
-      .join("");
+  if (!modeResult) return null;
 
-  const folderChoices =
-    actorFolderOptions();
+  const mode = String(modeResult.mode ?? "challenge");
+  const might = String(modeResult.might ?? "adventure");
 
-  const rememberedFolder =
-    String(
-      game.settings.get(
-        MODULE_ID,
-        "lastActorFolder"
-      )
-      ?? ""
-    );
+  if (mode === "challenge") {
+    const folderChoices = actorFolderOptions();
+    const remembered = String(game.settings.get(MODULE_ID,"lastActorFolder") ?? "");
+    const rootSelected = remembered ? "" : "selected";
 
-  const rootSelected =
-    rememberedFolder
-      ? ""
-      : "selected";
-
-  const result =
-    await foundry
-      .applications
-      .api
-      .DialogV2
-      .input({
-        window: {
-          title:
-            `${entry.name} · Pokémon Builder`
-        },
-
-        content: `
-          <div class="pokemon-builder-config">
-
-            <div class="pokemon-builder-field">
-
-              <label>
-                Criar como
-              </label>
-
-              <select name="mode">
-
-                <option value="challenge">
-                  Challenge / NPC
-                </option>
-
-                <option value="trainer">
-                  Adicionar a Treinador
-                </option>
-
-              </select>
-
-            </div>
-
-
-            <div class="pokemon-builder-field">
-
-              <label>
-                Might
-              </label>
-
-              <select name="might">
-
-                <option value="origin">
-                  Origin
-                </option>
-
-                <option
-                  value="adventure"
-                  selected
-                >
-                  Adventure
-                </option>
-
-                <option value="greatness">
-                  Greatness
-                </option>
-
-              </select>
-
-            </div>
-
-
-            <div class="pokemon-builder-challenge-fields">
-
-              <div class="pokemon-builder-section-title">
-                Destino do Challenge
-              </div>
-
-              <div class="pokemon-builder-field">
-
-                <label>
-                  Pasta de Actors
-                </label>
-
-                <select name="folderId">
-
-                  <option
-                    value=""
-                    ${rootSelected}
-                  >
-                    Raiz de Actors
-                  </option>
-
-                  ${folderChoices}
-
-                </select>
-
-              </div>
-
-
-              <div class="pokemon-builder-field">
-
-                <label>
-                  Ou criar nova pasta
-                </label>
-
-                <input
-                  type="text"
-                  name="newFolder"
-                  placeholder="Ex.: Pokémon Selvagens"
-                >
-
-              </div>
-
-            </div>
-
-
-            <div class="pokemon-builder-trainer-fields">
-
-              <div class="pokemon-builder-section-title">
-                Destino do Pokémon
-              </div>
-
-              <div class="pokemon-builder-field">
-
-                <label>
-                  Treinador
-                </label>
-
-                <select name="trainerId">
-
-                  <option value="">
-                    Escolha um treinador
-                  </option>
-
-                  ${trainerChoices}
-
-                </select>
-
-              </div>
-
-
-              <div class="pokemon-builder-field">
-
-                <label>
-                  Destino
-                </label>
-
-                <select name="destination">
-
-                  <option value="team">
-                    Time
-                  </option>
-
-                  <option value="pc">
-                    PC
-                  </option>
-
-                </select>
-
-              </div>
-
-            </div>
-
+    const result = await foundry.applications.api.DialogV2.input({
+      window: { title:`${entry.name} · Challenge` },
+      content: `
+        <div class="pokemon-builder-config">
+          <div class="pokemon-builder-field">
+            <label>Pasta de Actors</label>
+            <select name="folderId">
+              <option value="" ${rootSelected}>Raiz de Actors</option>
+              ${folderChoices}
+            </select>
           </div>
-        `,
+          <div class="pokemon-builder-field">
+            <label>Ou criar nova pasta</label>
+            <input type="text" name="newFolder" placeholder="Ex.: Pokémon Selvagens">
+          </div>
+        </div>
+      `,
+      ok: { label:"Gerar prévia", icon:"fa-solid fa-wand-magic-sparkles" },
+      modal:true
+    });
 
-        ok: {
-          label:
-            "Gerar prévia",
+    if (!result) return null;
 
-          icon:
-            "fa-solid fa-wand-magic-sparkles"
-        },
-
-        modal:
-          true
-      });
-
-  if (!result) {
-    return null;
+    return {
+      mode,
+      might,
+      trainerId:"",
+      destination:"",
+      folderId:String(result.folderId ?? ""),
+      newFolder:String(result.newFolder ?? "").trim()
+    };
   }
 
-  const config = {
-    mode:
-      String(
-        result.mode
-        ?? "challenge"
-      ),
+  const options = trainerOptions()
+    .map(actor => `<option value="${actor.id}">${escapeHTML(actor.name)}</option>`)
+    .join("");
 
-    might:
-      String(
-        result.might
-        ?? "adventure"
-      ),
+  const result = await foundry.applications.api.DialogV2.input({
+    window: { title:`${entry.name} · Treinador` },
+    content: `
+      <div class="pokemon-builder-config">
+        <div class="pokemon-builder-field">
+          <label>Treinador</label>
+          <select name="trainerId">
+            <option value="">Escolha um treinador</option>
+            ${options}
+          </select>
+        </div>
+        <div class="pokemon-builder-field">
+          <label>Destino</label>
+          <select name="destination">
+            <option value="team">Time</option>
+            <option value="pc">PC</option>
+          </select>
+        </div>
+      </div>
+    `,
+    ok: { label:"Gerar prévia", icon:"fa-solid fa-wand-magic-sparkles" },
+    modal:true
+  });
 
-    trainerId:
-      String(
-        result.trainerId
-        ?? ""
-      ),
+  if (!result) return null;
+  const trainerId = String(result.trainerId ?? "");
+  if (!trainerId) throw new Error("Escolha o treinador.");
 
-    destination:
-      String(
-        result.destination
-        ?? "team"
-      ),
-
-    folderId:
-      String(
-        result.folderId
-        ?? ""
-      ),
-
-    newFolder:
-      String(
-        result.newFolder
-        ?? ""
-      ).trim()
+  return {
+    mode,
+    might,
+    trainerId,
+    destination:String(result.destination ?? "team"),
+    folderId:"",
+    newFolder:""
   };
-
-  if (
-    config.mode === "trainer"
-    &&
-    !config.trainerId
-  ) {
-    throw new Error(
-      "Escolha o treinador que receberá o Pokémon."
-    );
-  }
-
-  return config;
 }
 
 
 async function reviewBuild(entry, config, data) {
   const typeText = data.types.map(type => TYPE_PT[type] ?? titleCase(type)).join(" / ");
   const statText = Object.entries(data.stats)
-    .map(([name, value]) => `${titleCase(name)} ${value}`)
+    .map(([name,value]) => `${titleCase(name)} ${value}`)
     .join(" · ");
 
-  const moveInputs = data.moves.map((move, index) => `
-    <div class="form-group">
+  const moveInputs = data.moves.map((move,index) => `
+    <div class="pokemon-builder-review-move">
       <label>${escapeHTML(TYPE_PT[move.type] ?? titleCase(move.type))}</label>
-      <div class="form-fields">
-        <input type="text" name="move${index}" value="${escapeHTML(move.name)}">
-      </div>
+      <input type="text" name="move${index}" value="${escapeHTML(move.name)}">
     </div>
   `).join("");
 
+  const defaultNature = defaultNatureForStats(data.stats);
+  const natureOptions = POKEMON_NATURES.map(nature => `
+    <option value="${nature.id}" ${nature.id === defaultNature.id ? "selected" : ""}>
+      ${escapeHTML(nature.label)}
+    </option>
+  `).join("");
+
+  const pokedexUrl = getPokemonDbUrl(entry);
+
   const result = await foundry.applications.api.DialogV2.input({
-    window: { title: `Revisar · ${entry.name}` },
+    window: { title:`Revisar · ${entry.name}` },
     content: `
-      <div style="display:flex;flex-direction:column;gap:10px;padding:8px">
-        <p><strong>${escapeHTML(MIGHT[config.might]?.label ?? config.might)}</strong> · ${escapeHTML(typeText)}</p>
-        <small>${escapeHTML(statText)}</small>
-        <hr>
-        ${moveInputs}
-        <div class="form-group">
-          <label>Tag de Poder (stat)</label>
-          <div class="form-fields">
-            <input type="text" name="powerStatTag" value="${escapeHTML(data.powerStatTag)}">
+      <div class="pokemon-builder-review">
+        <div class="pokemon-builder-review-heading">
+          <div>
+            <strong>${escapeHTML(MIGHT[config.might]?.label ?? config.might)}</strong>
+            · ${escapeHTML(typeText)}
           </div>
+          <a class="pokemon-builder-pokedex-button"
+             href="${escapeHTML(pokedexUrl)}"
+             target="_blank"
+             rel="noopener noreferrer">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            Pokédex
+          </a>
         </div>
-        <div class="form-group">
+
+        <small>${escapeHTML(statText)}</small>
+        <div class="pokemon-builder-divider"></div>
+        ${moveInputs}
+
+        <div class="pokemon-builder-review-move">
+          <label>Natureza</label>
+          <select name="natureId">${natureOptions}</select>
+        </div>
+
+        <div class="pokemon-builder-review-move">
+          <label>Tag de Poder</label>
+          <input type="text" name="powerStatTag" value="${escapeHTML(data.powerStatTag)}">
+        </div>
+
+        <div class="pokemon-builder-review-move">
           <label>Tag de Fraqueza</label>
-          <div class="form-fields">
-            <input type="text" name="weaknessTag" value="${escapeHTML(data.weaknessTag)}">
-          </div>
+          <input type="text" name="weaknessTag" value="${escapeHTML(data.weaknessTag)}">
         </div>
       </div>
     `,
-    ok: { label: "Criar Pokémon", icon: "fa-solid fa-check" },
-    modal: true
+    ok: { label:"Criar Pokémon", icon:"fa-solid fa-check" },
+    modal:true
   });
 
   if (!result) return null;
+
+  const nature = pokemonNature(String(result.natureId ?? defaultNature.id));
+
   return {
-    moveNames: data.moves.map((move, index) => String(result[`move${index}`] ?? move.name).trim() || move.name),
-    powerStatTag: String(result.powerStatTag ?? data.powerStatTag).trim() || data.powerStatTag,
-    weaknessTag: String(result.weaknessTag ?? data.weaknessTag).trim() || data.weaknessTag
+    moveNames: data.moves.map((move,index) =>
+      String(result[`move${index}`] ?? move.name).trim() || move.name
+    ),
+    powerStatTag:String(result.powerStatTag ?? data.powerStatTag).trim() || data.powerStatTag,
+    weaknessTag:String(result.weaknessTag ?? data.weaknessTag).trim() || data.weaknessTag,
+    natureId:nature.id,
+    natureLabel:nature.label,
+    natureLowLimit:nature.low,
+    natureHighLimit:nature.high
   };
 }
+
 
 function powerTag(name) {
   return {
@@ -644,7 +650,11 @@ function themeSystem(review) {
     quest: "",
     story: "",
     tabCategory: "main",
-    powertags: [...review.moveNames.map(powerTag), powerTag(review.powerStatTag)],
+    powertags: [
+      ...review.moveNames.map(powerTag),
+      powerTag(review.powerStatTag),
+      powerTag(review.natureLabel)
+    ],
     weaknesstags: [powerTag(review.weaknessTag)],
     options: { isStoryTheme: false }
   };
@@ -655,6 +665,10 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
     ...foundry.utils.deepClone(definition.moduleFlags),
     pokemonBuilder: true,
     pokemonInstanceId: instanceId,
+    nature: {
+      id: review.natureId,
+      label: review.natureLabel
+    },
     might: config.might,
     types: foundry.utils.deepClone(data.types),
     baseStats: foundry.utils.deepClone(data.stats),
@@ -698,52 +712,120 @@ function prototypeToken(definition, flags) {
   };
 }
 
+function matchupText(effectiveness, predicate) {
+  const values = Object.entries(effectiveness ?? {})
+    .filter(([,value]) => predicate(Number(value)))
+    .sort((a,b) => a[0].localeCompare(b[0]))
+    .map(([type,value]) => `${TYPE_PT[type] ?? titleCase(type)} ×${Number(value)}`);
+  return values.join(", ") || "Nenhuma";
+}
+
+function pokemonBiography(data) {
+  const dex = escapeHTML(data.dexText || "Sem descrição disponível.");
+  const levelMoves = (data.levelMoveNames ?? []).map(escapeHTML).join(", ") || "Nenhum listado.";
+  const machines = (data.machineMoveNames ?? []).map(escapeHTML).join(", ") || "Nenhum listado.";
+
+  return `
+    <h2>Pokédex</h2>
+    <p>${dex}</p>
+    <h2>Golpes por nível</h2>
+    <p>${levelMoves}</p>
+    <h2>TM / HM / Máquinas</h2>
+    <p>${machines}</p>
+  `;
+}
+
+function pokemonThreats(data, review) {
+  return data.moves.map((move,index) => {
+    const type = TYPE_PT[move.type] ?? titleCase(move.type);
+    const description =
+      move.effectText ||
+      move.flavorText ||
+      `Golpe ${type} (${titleCase(move.damageClass)}).`;
+
+    const consequence =
+      move.damageClass === "status"
+        ? `Pode criar uma condição ou vantagem ligada a ${type}.`
+        : `Pode impor uma consequência física ligada a ${type}.`;
+
+    return {
+      name:review.moveNames[index],
+      description,
+      list:[consequence]
+    };
+  });
+}
+
 async function createChallenge(entry, config, data, review, definition) {
   const instanceId = randomId();
   const flags = moduleMetadata(entry, definition, config, data, review, instanceId);
   const types = data.types.map(type => TYPE_PT[type] ?? titleCase(type));
+
   const mightyAspects = config.might === "origin" ? [] : [{
-    level: config.might,
-    aspect: "Poder Pokémon",
-    mightIcon: config.might
+    level:config.might,
+    aspect:"Poder Pokémon",
+    mightIcon:config.might
   }];
-  const limitTier = { origin: "3", adventure: "4", greatness: "5" }[config.might] ?? "4";
-  const folderId =
-    await resolveChallengeFolder(
-      config
-    );
+
+  const defeated = Number({origin:3, adventure:4, greatness:5}[config.might] ?? 4);
+
+  const limits = [
+    {name:"Derrotado", value:String(defeated), consequence:"Fora de combate"},
+    {
+      name:review.natureLowLimit,
+      value:String(Math.max(1, defeated - 1)),
+      consequence:`A Natureza ${review.natureLabel} começa a trabalhar contra ele.`
+    },
+    {
+      name:review.natureHighLimit,
+      value:String(Math.min(6, defeated + 1)),
+      consequence:`A Natureza ${review.natureLabel} domina completamente sua reação.`
+    }
+  ];
+
+  const resistances = matchupText(data.typeEffectiveness, value => value > 0 && value < 1);
+  const weaknesses = matchupText(data.typeEffectiveness, value => value > 1);
+  const immunities = matchupText(data.typeEffectiveness, value => value === 0);
+  const folderId = await resolveChallengeFolder(config);
 
   const actor = await Actor.implementation.create({
-    name: entry.name,
-    type: "litm-npc",
-    ...(folderId ? { folder: folderId } : {}),
-    img: definition.portraitPath,
-    system: {
-      editMode: false,
-      shortDescription: `Pokémon · ${types.join(" / ")}`,
-      biography: "",
-      difficulty: 1,
-      roles: ["Pokémon", ...types],
+    name:entry.name,
+    type:"litm-npc",
+    ...(folderId ? {folder:folderId} : {}),
+    img:definition.portraitPath,
+    system:{
+      editMode:false,
+      shortDescription:data.dexText || `Pokémon · ${types.join(" / ")}`,
+      biography:pokemonBiography(data),
+      difficulty:1,
+      roles:["Pokémon", ...types, review.natureLabel],
       mightyAspects,
-      limits: [{ name: "Derrotado", value: limitTier, consequence: "Fora de combate" }],
-      secrets: [],
-      specialFeatures: [{ name: "Tipos", description: types.join(" / ") }],
-      threatsAndConsequences: [],
-      floatingTagsAndStatusesEditable: false,
-      floatingTagsAndStatuses: [
-        ...review.moveNames.map(name => floatingTag(name, true)),
-        floatingTag(review.powerStatTag, true),
-        floatingTag(review.weaknessTag, false)
+      limits,
+      secrets:[],
+      specialFeatures:[
+        {name:"TIPOS", description:types.join(" / ")},
+        {name:"RESISTÊNCIAS", description:resistances},
+        {name:"FRAQUEZAS", description:weaknesses},
+        {name:"IMUNIDADES", description:immunities}
+      ],
+      threatsAndConsequences:pokemonThreats(data, review),
+      floatingTagsAndStatusesEditable:false,
+      floatingTagsAndStatuses:[
+        ...review.moveNames.map(name => floatingTag(name,true)),
+        floatingTag(review.powerStatTag,true),
+        floatingTag(review.natureLabel,true),
+        floatingTag(review.weaknessTag,false)
       ]
     },
-    prototypeToken: prototypeToken(definition, flags),
-    flags: { [MODULE_ID]: flags }
+    prototypeToken:prototypeToken(definition, flags),
+    flags:{[MODULE_ID]:flags}
   });
 
   if (!actor) throw new Error("Não foi possível criar o Challenge.");
-  void actor.sheet?.render?.({ force: true });
+  void actor.sheet?.render?.({force:true});
   return actor;
 }
+
 
 async function createTrainerPokemon(entry, config, data, review, definition) {
   const trainer = game.actors.get(config.trainerId);
