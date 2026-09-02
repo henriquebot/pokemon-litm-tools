@@ -76,14 +76,69 @@ function safeFilename(
   return `${prefix}-${clean}${ext}`;
 }
 
+
+async function shortBlobHash(
+  blob
+) {
+  const digest =
+    await crypto.subtle.digest(
+      "SHA-256",
+      await blob.arrayBuffer()
+    );
+
+  return Array
+    .from(
+      new Uint8Array(digest)
+    )
+    .map(
+      value =>
+        value
+          .toString(16)
+          .padStart(2, "0")
+    )
+    .join("")
+    .slice(0, 12);
+}
+
+function immutableFilename(
+  filename,
+  hash
+) {
+  const dot =
+    filename.lastIndexOf(".");
+
+  if (dot <= 0) {
+    return `${filename}-${hash}`;
+  }
+
+  return (
+    filename.slice(0, dot)
+    +
+    "-"
+    +
+    hash
+    +
+    filename.slice(dot)
+  );
+}
+
 async function uploadBlob(
   blob,
   filename
 ) {
+  const hash =
+    await shortBlobHash(blob);
+
+  const immutableName =
+    immutableFilename(
+      filename,
+      hash
+    );
+
   const file =
     new File(
       [blob],
-      filename,
+      immutableName,
       {
         type:
           blob.type
@@ -121,6 +176,7 @@ async function uploadBlob(
     null
   );
 }
+
 
 async function persistRemoteAsset(
   url,
@@ -868,8 +924,7 @@ async function prepareActorDefinition(
       : 1;
 
   const moduleFlags = {
-    schemaVersion:
-      8,
+    schemaVersion:\n      9,
 
     kind:
       isPokemon
@@ -1045,8 +1100,7 @@ async function ensureActorCurrent(
     Number(
       current.schemaVersion
       ?? 0
-    ) >= 8
-    &&
+    ) >= 9\n    &&
     current.assets?.overworld
   ) {
     return actor;
