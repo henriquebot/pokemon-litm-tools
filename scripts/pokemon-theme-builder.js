@@ -1,10 +1,14 @@
-﻿import {
+import {
   preparePokemonActorDefinition
 } from "./importer-app.js";
 
 import {
   getPokemonDbUrl
 } from "./pokemon-links.js";
+
+import {
+  loadPokemonThemeProfile
+} from "./pokemon-content.js";
 
 const MODULE_ID = "pokemon-litm-tools";
 const REFERENCE_FOLDER = "Pokemon - Referencias";
@@ -16,8 +20,9 @@ const DREAM_END =
   "<!-- pokemon-litm-dream-team:end -->";
 
 
-function buildThemeSystem() {
+function buildThemeSystem(description = "") {
   return {
+    description,
     type: "litm-variable",
     color: "litm-variable",
     quest: "",
@@ -62,12 +67,16 @@ export async function createPokemonTeamThemes(
   const prepared = [];
 
   for (const entry of entries) {
-    const definition =
-      await preparePokemonActorDefinition(entry);
+    const [definition, profile] =
+      await Promise.all([
+        preparePokemonActorDefinition(entry),
+        loadPokemonThemeProfile(entry)
+      ]);
 
     prepared.push({
       entry,
-      definition
+      definition,
+      profile
     });
   }
 
@@ -77,13 +86,16 @@ export async function createPokemonTeamThemes(
 
   const data =
     prepared.map(
-      ({ entry, definition }, index) => ({
+      ({ entry, definition, profile }, index) => ({
         name: entry.name,
         type: "themebook",
         img: definition.portraitPath,
 
         system:
-          buildThemeSystem(),
+          buildThemeSystem(
+            profile?.description
+            ?? ""
+          ),
 
         flags: {
           [MODULE_ID]: {
@@ -94,6 +106,28 @@ export async function createPokemonTeamThemes(
             themeRole: "pokemon",
             pokemonInstanceId:
               foundry.utils.randomID(16),
+
+            contentLanguage:
+              profile?.contentLanguage
+              ?? "pt-BR",
+
+            types:
+              foundry.utils.deepClone(
+                profile?.types
+                ?? []
+              ),
+
+            baseStats:
+              foundry.utils.deepClone(
+                profile?.stats
+                ?? {}
+              ),
+
+            ability:
+              foundry.utils.deepClone(
+                profile?.ability
+                ?? null
+              ),
 
             pokedexUrl:
               getPokemonDbUrl(entry)
@@ -174,7 +208,13 @@ export async function ensurePokemonReferenceTheme(
       },
 
       system:
-        buildThemeSystem(),
+        sourceTheme
+          ? foundry.utils.deepClone(
+              sourceTheme.system
+                ?.toObject?.()
+              ?? sourceTheme.system
+            )
+          : buildThemeSystem(),
 
       flags: {
         [MODULE_ID]: {

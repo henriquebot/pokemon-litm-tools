@@ -1,5 +1,22 @@
 import { getPokemonDbUrl } from "./pokemon-links.js";
 
+import {
+  getPokemonContentLanguage,
+  typeLabel,
+  statLabel,
+  natureProfile,
+  moveLabel,
+  abilityLabel,
+  fetchPokeJson,
+  choosePrimaryAbility,
+  buildDexText,
+  statPowerText,
+  statWeaknessText,
+  typeDefenseGroups,
+  buildMoveThreat,
+  formatThemeDescription
+} from "./pokemon-content.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const PC_FLAG = "pokemonPC";
 
@@ -147,173 +164,269 @@ function levelForMove(move) {
   return positive.length ? Math.min(...positive) : 1;
 }
 
-async function loadPokemonBuildData(entry, might) {
+function loadPokemonBuildData(entry, might) {
+  const language = getPokemonContentLanguage();
   const pokemonId = Number(entry.pokemonId ?? entry.dex);
+
   if (!Number.isInteger(pokemonId) || pokemonId < 1) {
     throw new Error("Pokémon sem número de Pokédex válido.");
   }
 
-  const pokemon =
-    await fetchJson(
-      `https://pokeapi.co/api/v2/pokemon/${pokemonId}`
-    );
+  return Promise.all([
+    fetchPokeJson(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`),
+    fetchPokeJson(`https://pokeapi.co/api/v2/pokemon-species/${pokemonId}`)
+  ]).then(async ([pokemon, species]) => {
+    const types = (pokemon.types ?? [])
+      .slice()
+      .sort((a, b) => Number(a.slot) - Number(b.slot))
+      .map(row => row.type?.name)
+      .filter(Boolean);
 
-  const species =
-    await fetchJson(
-      `https://pokeapi.co/api/v2/pokemon-species/${pokemonId}`
-    );
-
-  const dexText =
-    flavorText(species.flavor_text_entries);
-  const types = (pokemon.types ?? [])
-    .slice()
-    .sort((a, b) => Number(a.slot) - Number(b.slot))
-    .map(row => row.type?.name)
-    .filter(Boolean);
-
-  const stats = {};
-  for (const row of pokemon.stats ?? []) {
-    if (row.stat?.name) stats[row.stat.name] = Number(row.base_stat ?? 0);
-  }
-
-  const typeEffectiveness = {};
-  for (const defendedType of types) {
-    try {
-      const detail = await fetchJson(`https://pokeapi.co/api/v2/type/${defendedType}`);
-      const relations = detail.damage_relations ?? {};
-      for (const row of relations.double_damage_from ?? []) {
-        typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 2;
-      }
-      for (const row of relations.half_damage_from ?? []) {
-        typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 0.5;
-      }
-      for (const row of relations.no_damage_from ?? []) {
-        typeEffectiveness[row.name] = 0;
-      }
-    } catch (error) {
-      console.warn("Pokemon LITM Tools | Type effectiveness:", defendedType, error);
+    const stats = {};
+    for (const row of pokemon.stats ?? []) {
+      if (row.stat?.name) stats[row.stat.name] = Number(row.base_stat ?? 0);
     }
-  }
 
-  const candidates = [];
-  for (const move of pokemon.moves ?? []) {
-    const level = levelForMove(move);
-    if (level === null) continue;
-    candidates.push({
-      id: move.move.name,
-      url: move.move.url,
-      level
-    });
-  }
+    const abilityEntry = choosePrimaryAbility(pokemon);
+    let ability = null;
 
-  const maxLevel = MIGHT[might]?.maxLevel ?? 45;
-  let pool = candidates
-    .filter(move => move.level <= maxLevel)
-    .sort((a, b) => b.level - a.level || a.id.localeCompare(b.id));
-
-  if (pool.length < 8) {
-    const seen = new Set(pool.map(move => move.id));
-    for (const move of candidates.sort((a, b) => a.level - b.level)) {
-      if (seen.has(move.id)) continue;
-      pool.push(move);
-      seen.add(move.id);
-      if (pool.length >= 12) break;
-    }
-  }
-
-  if (!pool.length) {
-    pool = (pokemon.moves ?? []).slice(0, 12).map(row => ({
-      id: row.move.name,
-      url: row.move.url,
-      level: 1
-    }));
-  }
-
-  const details = await Promise.all(
-    pool.slice(0, 14).map(async move => {
+    if (abilityEntry?.ability?.url) {
       try {
-        const detail = await fetchJson(move.url);
-        return {
+        const detail = await fetchPokeJson(abilityEntry.ability.url);
+        ability = {
           id: detail.name,
-          name: localizedName(detail.names, detail.name),
-          type: detail.type?.name ?? "normal",
-          damageClass: detail.damage_class?.name ?? "status",
-          power: Number(detail.power ?? 0),
-          accuracy: Number(detail.accuracy ?? 0),
-          level: move.level,
-          effectText: englishEffect(detail.effect_entries),
-          flavorText: flavorText(detail.flavor_text_entries)
+          name: abilityLabel(detail.name, detail.names, language),
+          hidden: !!abilityEntry.is_hidden
         };
       } catch (error) {
-        console.warn("Pokemon LITM Tools | Move:", move.id, error);
-        return null;
+        console.warn("Pokemon LITM Tools | Ability:", abilityEntry.ability?.name, error);
+        ability = {
+          id: abilityEntry.ability?.name ?? "unknown",
+          name: abilityLabel(abilityEntry.ability?.name ?? "unknown", [], language),
+          hidden: !!abilityEntry.is_hidden
+        };
       }
-    })
-  );
+    }
 
-  const ranked = details.filter(Boolean).sort((a, b) => {
-    const score = move =>
-      (types.includes(move.type) ? 60 : 0)
-      + (move.power || 30)
-      + Math.min(move.accuracy || 80, 100) / 10
-      + move.level * 0.5;
-    return score(b) - score(a) || a.name.localeCompare(b.name);
-  });
+    const dexText = buildDexText({ pokemon, species, types, ability }, language);
 
-  const moves = [];
-  for (const move of ranked) {
-    if (moves.some(existing => existing.id === move.id)) continue;
-    moves.push(move);
-    if (moves.length >= 4) break;
-  }
+    const typeEffectiveness = {};
+    for (const defendedType of types) {
+      try {
+        const detail = await fetchPokeJson(`https://pokeapi.co/api/v2/type/${defendedType}`);
+        const relations = detail.damage_relations ?? {};
 
-  if (!moves.length) {
-    throw new Error("Não encontrei golpes utilizáveis para este Pokémon.");
-  }
+        for (const row of relations.double_damage_from ?? []) {
+          typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 2;
+        }
 
-  const statOrder = ["hp", "attack", "defense", "special-attack", "special-defense", "speed"];
-  const statRows = statOrder.map(name => ({ name, value: Number(stats[name] ?? 0) }));
-  const best = statRows.reduce((a, b) => b.value > a.value ? b : a, statRows[0]);
-  const worst = statRows.reduce((a, b) => b.value < a.value ? b : a, statRows[0]);
+        for (const row of relations.half_damage_from ?? []) {
+          typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 0.5;
+        }
 
-  const completeMoves =
-    (pokemon.moves ?? [])
+        for (const row of relations.no_damage_from ?? []) {
+          typeEffectiveness[row.name] = 0;
+        }
+      } catch (error) {
+        console.warn("Pokemon LITM Tools | Type effectiveness:", defendedType, error);
+      }
+    }
+
+    function preferredLearnLevel(move) {
+      const details = (move.version_group_details ?? [])
+        .filter(row => row.move_learn_method?.name === "level-up");
+
+      if (!details.length) return null;
+
+      const preferredGroups = [
+        "heartgold-soulsilver",
+        "crystal",
+        "gold-silver"
+      ];
+
+      for (const group of preferredGroups) {
+        const rows = details.filter(row => row.version_group?.name === group);
+        if (!rows.length) continue;
+        const levels = rows.map(row => Number(row.level_learned_at ?? 0)).filter(Number.isFinite);
+        const positive = levels.filter(level => level > 0);
+        return positive.length ? Math.min(...positive) : 1;
+      }
+
+      const levels = details.map(row => Number(row.level_learned_at ?? 0)).filter(Number.isFinite);
+      const positive = levels.filter(level => level > 0);
+      return positive.length ? Math.min(...positive) : 1;
+    }
+
+    const candidates = [];
+    for (const row of pokemon.moves ?? []) {
+      const level = preferredLearnLevel(row);
+      if (level === null) continue;
+      candidates.push({
+        id: row.move?.name,
+        url: row.move?.url,
+        level
+      });
+    }
+
+    const maxLevel = MIGHT[might]?.maxLevel ?? 45;
+    let pool = candidates
+      .filter(move => move.level <= maxLevel)
+      .sort((a, b) => b.level - a.level || String(a.id).localeCompare(String(b.id)));
+
+    if (pool.length < 10) {
+      const seen = new Set(pool.map(move => move.id));
+      for (const move of candidates.slice().sort((a, b) => a.level - b.level)) {
+        if (seen.has(move.id)) continue;
+        pool.push(move);
+        seen.add(move.id);
+        if (pool.length >= 16) break;
+      }
+    }
+
+    if (!pool.length) {
+      pool = (pokemon.moves ?? []).slice(0, 16).map(row => ({
+        id: row.move?.name,
+        url: row.move?.url,
+        level: 1
+      }));
+    }
+
+    const details = await Promise.all(
+      pool.slice(0, 18).map(async move => {
+        if (!move.url) return null;
+
+        try {
+          const detail = await fetchPokeJson(move.url);
+          const meta = detail.meta ?? {};
+
+          return {
+            id: detail.name,
+            name: moveLabel(detail.name, detail.names, language),
+            type: detail.type?.name ?? "normal",
+            damageClass: detail.damage_class?.name ?? "status",
+            power: Number(detail.power ?? 0),
+            accuracy: Number(detail.accuracy ?? 0),
+            level: move.level,
+            target: detail.target?.name ?? "selected-pokemon",
+            effectChance: Number(detail.effect_chance ?? 0),
+            statChanges: (detail.stat_changes ?? []).map(change => ({
+              change: Number(change.change ?? 0),
+              stat: change.stat?.name ?? ""
+            })).filter(change => !!change.stat),
+            meta: {
+              ailment: meta.ailment?.name ?? "none",
+              ailmentChance: Number(meta.ailment_chance ?? 0),
+              category: meta.category?.name ?? "",
+              criticalRate: Number(meta.crit_rate ?? 0),
+              drain: Number(meta.drain ?? 0),
+              flinchChance: Number(meta.flinch_chance ?? 0),
+              healing: Number(meta.healing ?? 0),
+              minHits: Number(meta.min_hits ?? 0),
+              maxHits: Number(meta.max_hits ?? 0),
+              minTurns: Number(meta.min_turns ?? 0),
+              maxTurns: Number(meta.max_turns ?? 0),
+              statChance: Number(meta.stat_chance ?? 0)
+            }
+          };
+        } catch (error) {
+          console.warn("Pokemon LITM Tools | Move:", move.id, error);
+          return null;
+        }
+      })
+    );
+
+    const ranked = details.filter(Boolean).sort((a, b) => {
+      const score = move => {
+        const stab = types.includes(move.type) ? 75 : 0;
+        const usefulStatus = move.damageClass === "status" ? 45 : 0;
+        const powerScore = Math.min(Number(move.power ?? 0), 150);
+        const accuracyScore = Math.min(Number(move.accuracy || 80), 100) / 10;
+        const levelScore = Number(move.level ?? 1) * (might === "origin" ? 0.15 : might === "greatness" ? 0.8 : 0.45);
+        return stab + usefulStatus + powerScore + accuracyScore + levelScore;
+      };
+
+      return score(b) - score(a) || a.name.localeCompare(b.name, language);
+    });
+
+    const moves = [];
+    const usedTypes = new Set();
+    const usedClasses = new Set();
+
+    for (const move of ranked) {
+      if (moves.some(existing => existing.id === move.id)) continue;
+
+      const diversity =
+        !usedTypes.has(move.type)
+        || !usedClasses.has(move.damageClass)
+        || moves.length < 2;
+
+      if (!diversity && moves.length < 3) continue;
+
+      moves.push(move);
+      usedTypes.add(move.type);
+      usedClasses.add(move.damageClass);
+      if (moves.length >= 4) break;
+    }
+
+    if (moves.length < 4) {
+      for (const move of ranked) {
+        if (moves.some(existing => existing.id === move.id)) continue;
+        moves.push(move);
+        if (moves.length >= 4) break;
+      }
+    }
+
+    if (!moves.length) {
+      throw new Error("Não encontrei golpes utilizáveis para este Pokémon.");
+    }
+
+    const statOrder = ["hp", "attack", "defense", "special-attack", "special-defense", "speed"];
+    const statRows = statOrder.map(name => ({ name, value: Number(stats[name] ?? 0) }));
+    const rankedStats = statRows.slice().sort((a, b) => b.value - a.value || statOrder.indexOf(a.name) - statOrder.indexOf(b.name));
+    const best = rankedStats[0];
+
+    /* HP pode ser força, mas nunca define a fraqueza de stat. */
+    const weaknessRows = statRows.filter(row => row.name !== "hp");
+    const weaknessOrder = statOrder.filter(name => name !== "hp");
+    const worst = weaknessRows.reduce((a, b) => {
+      if (b.value < a.value) return b;
+      if (b.value === a.value && weaknessOrder.indexOf(b.name) > weaknessOrder.indexOf(a.name)) return b;
+      return a;
+    }, weaknessRows[0]);
+
+    const completeMoves = (pokemon.moves ?? [])
       .map(row => {
-        const methods = new Set(
-          (row.version_group_details ?? [])
-            .map(detail => detail.move_learn_method?.name)
-            .filter(Boolean)
-        );
+        const methods = new Set((row.version_group_details ?? [])
+          .map(detail => detail.move_learn_method?.name)
+          .filter(Boolean));
 
         return {
           id: row.move?.name ?? "",
-          name: titleCase(row.move?.name ?? ""),
+          name: moveLabel(row.move?.name ?? "", [], language),
           level: methods.has("level-up"),
           machine: methods.has("machine")
         };
       })
       .filter(move => !!move.id);
 
-  const levelMoveNames =
-    completeMoves.filter(move => move.level).map(move => move.name);
-
-  const machineMoveNames =
-    completeMoves.filter(move => move.machine).map(move => move.name);
-
-  return {
-    pokemonId,
-    types,
-    stats,
-    typeEffectiveness,
-    moves,
-    dexText,
-    levelMoveNames,
-    machineMoveNames,
-    best,
-    worst,
-    powerStatTag: STAT_TEXT[best.name]?.power ?? "Talento marcante",
-    weaknessTag: STAT_TEXT[worst.name]?.weakness ?? "Ponto fraco evidente"
-  };
+    return {
+      pokemonId,
+      contentLanguage: language,
+      types,
+      stats,
+      typeEffectiveness,
+      ability,
+      moves,
+      dexText,
+      levelMoveNames: completeMoves.filter(move => move.level).map(move => move.name),
+      machineMoveNames: completeMoves.filter(move => move.machine).map(move => move.name),
+      best,
+      worst,
+      topStats: rankedStats.slice(0, 2),
+      powerStatTag: statPowerText(best.name, language),
+      weaknessTag: statWeaknessText(worst.name, language)
+    };
+  });
 }
 
 function trainerOptions() {
@@ -534,29 +647,41 @@ async function askBuildConfig(entry) {
 
 
 async function reviewBuild(entry, config, data) {
-  const typeText = data.types.map(type => TYPE_PT[type] ?? titleCase(type)).join(" / ");
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
+  const typeText = data.types.map(type => typeLabel(type, language)).join(" / ");
   const statText = Object.entries(data.stats)
-    .map(([name,value]) => `${titleCase(name)} ${value}`)
+    .map(([name, value]) => `${statLabel(name, language)} ${value}`)
     .join(" · ");
 
-  const moveInputs = data.moves.map((move,index) => `
+  const moveInputs = data.moves.map((move, index) => `
     <div class="pokemon-builder-review-move">
-      <label>${escapeHTML(TYPE_PT[move.type] ?? titleCase(move.type))}</label>
+      <label>${escapeHTML(typeLabel(move.type, language))}</label>
       <input type="text" name="move${index}" value="${escapeHTML(move.name)}">
     </div>
   `).join("");
 
-  const defaultNature = defaultNatureForStats(data.stats);
-  const natureOptions = POKEMON_NATURES.map(nature => `
-    <option value="${nature.id}" ${nature.id === defaultNature.id ? "selected" : ""}>
-      ${escapeHTML(nature.label)}
-    </option>
-  `).join("");
+  const defaultNatureId = defaultNatureForStats(data.stats).id;
+  const natureIds = [
+    "hardy","lonely","adamant","naughty","brave",
+    "bold","docile","impish","lax","relaxed",
+    "modest","mild","bashful","rash","quiet",
+    "calm","gentle","careful","quirky","sassy",
+    "timid","hasty","jolly","naive","serious"
+  ];
+
+  const natureOptions = natureIds.map(id => {
+    const nature = natureProfile(id, language);
+    return `
+      <option value="${id}" ${id === defaultNatureId ? "selected" : ""}>
+        ${escapeHTML(nature.label)}
+      </option>
+    `;
+  }).join("");
 
   const pokedexUrl = getPokemonDbUrl(entry);
 
   const result = await foundry.applications.api.DialogV2.input({
-    window: { title:`Revisar · ${entry.name}` },
+    window: { title: language === "en" ? `Review · ${entry.name}` : `Revisar · ${entry.name}` },
     content: `
       <div class="pokemon-builder-review">
         <div class="pokemon-builder-review-heading">
@@ -578,42 +703,43 @@ async function reviewBuild(entry, config, data) {
         ${moveInputs}
 
         <div class="pokemon-builder-review-move">
-          <label>Natureza</label>
+          <label>${language === "en" ? "Nature" : "Natureza"}</label>
           <select name="natureId">${natureOptions}</select>
         </div>
 
         <div class="pokemon-builder-review-move">
-          <label>Tag de Poder</label>
+          <label>${language === "en" ? "Power Tag" : "Tag de Poder"}</label>
           <input type="text" name="powerStatTag" value="${escapeHTML(data.powerStatTag)}">
         </div>
 
         <div class="pokemon-builder-review-move">
-          <label>Tag de Fraqueza</label>
+          <label>${language === "en" ? "Weakness Tag" : "Tag de Fraqueza"}</label>
           <input type="text" name="weaknessTag" value="${escapeHTML(data.weaknessTag)}">
         </div>
       </div>
     `,
-    ok: { label:"Criar Pokémon", icon:"fa-solid fa-check" },
-    modal:true
+    ok: {
+      label: language === "en" ? "Create Pokémon" : "Criar Pokémon",
+      icon: "fa-solid fa-check"
+    },
+    modal: true
   });
 
   if (!result) return null;
 
-  const nature = pokemonNature(String(result.natureId ?? defaultNature.id));
+  const nature = natureProfile(String(result.natureId ?? defaultNatureId), language);
 
   return {
-    moveNames: data.moves.map((move,index) =>
+    moveNames: data.moves.map((move, index) =>
       String(result[`move${index}`] ?? move.name).trim() || move.name
     ),
-    powerStatTag:String(result.powerStatTag ?? data.powerStatTag).trim() || data.powerStatTag,
-    weaknessTag:String(result.weaknessTag ?? data.weaknessTag).trim() || data.weaknessTag,
-    natureId:nature.id,
-    natureLabel:nature.label,
-    natureLowLimit:nature.low,
-    natureHighLimit:nature.high
+    powerStatTag: String(result.powerStatTag ?? data.powerStatTag).trim() || data.powerStatTag,
+    weaknessTag: String(result.weaknessTag ?? data.weaknessTag).trim() || data.weaknessTag,
+    natureId: nature.id,
+    natureLabel: nature.label,
+    natureLimits: nature.limits
   };
 }
-
 
 function powerTag(name) {
   return {
@@ -643,8 +769,11 @@ function floatingTag(name, positive = true) {
   };
 }
 
-function themeSystem(review) {
+function themeSystem(review, data) {
+  const abilityTag = data.ability?.name ? [powerTag(data.ability.name)] : [];
+
   return {
+    description: formatThemeDescription({ data, review }, data.contentLanguage),
     type: "litm-variable",
     color: "litm-variable",
     quest: "",
@@ -653,7 +782,8 @@ function themeSystem(review) {
     powertags: [
       ...review.moveNames.map(powerTag),
       powerTag(review.powerStatTag),
-      powerTag(review.natureLabel)
+      powerTag(review.natureLabel),
+      ...abilityTag
     ],
     weaknesstags: [powerTag(review.weaknessTag)],
     options: { isStoryTheme: false }
@@ -661,14 +791,18 @@ function themeSystem(review) {
 }
 
 function moduleMetadata(entry, definition, config, data, review, instanceId) {
+  const defenses = typeDefenseGroups(data.typeEffectiveness, data.contentLanguage);
+
   return {
     ...foundry.utils.deepClone(definition.moduleFlags),
     pokemonBuilder: true,
     pokemonInstanceId: instanceId,
+    contentLanguage: data.contentLanguage,
     nature: {
       id: review.natureId,
       label: review.natureLabel
     },
+    ability: data.ability ? foundry.utils.deepClone(data.ability) : null,
     might: config.might,
     types: foundry.utils.deepClone(data.types),
     baseStats: foundry.utils.deepClone(data.stats),
@@ -680,7 +814,10 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
       damageClass: move.damageClass,
       power: move.power,
       accuracy: move.accuracy,
-      learnedAt: move.level
+      learnedAt: move.level,
+      target: move.target,
+      meta: foundry.utils.deepClone(move.meta ?? {}),
+      statChanges: foundry.utils.deepClone(move.statChanges ?? [])
     })),
     tagBindings: data.moves.map((move, index) => ({
       tagIndex: index,
@@ -689,6 +826,13 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
       moveId: move.id,
       type: move.type,
       vfx: `${move.type}-move`
+    })),
+    defenseBindings: defenses.map(defense => ({
+      tagName: defense.name,
+      kind: `pokemonTypeDefense:${defense.kind}`,
+      positive: defense.positive,
+      types: foundry.utils.deepClone(defense.types),
+      multipliers: foundry.utils.deepClone(defense.multipliers)
     })),
     pokedexUrl: getPokemonDbUrl(entry)
   };
@@ -712,120 +856,125 @@ function prototypeToken(definition, flags) {
   };
 }
 
-function matchupText(effectiveness, predicate) {
+function matchupText(effectiveness, predicate, language) {
   const values = Object.entries(effectiveness ?? {})
-    .filter(([,value]) => predicate(Number(value)))
-    .sort((a,b) => a[0].localeCompare(b[0]))
-    .map(([type,value]) => `${TYPE_PT[type] ?? titleCase(type)} ×${Number(value)}`);
-  return values.join(", ") || "Nenhuma";
+    .filter(([, value]) => predicate(Number(value)))
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([type, value]) => `${typeLabel(type, language)} ×${Number(value)}`);
+
+  return values.join(", ") || (language === "en" ? "None" : "Nenhuma");
 }
 
-function pokemonBiography(data) {
-  const dex = escapeHTML(data.dexText || "Sem descrição disponível.");
-  const levelMoves = (data.levelMoveNames ?? []).map(escapeHTML).join(", ") || "Nenhum listado.";
-  const machines = (data.machineMoveNames ?? []).map(escapeHTML).join(", ") || "Nenhum listado.";
+function pokemonBiography(data, review) {
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
+  const profile = formatThemeDescription({ data, review }, language);
+  const levelMoves = (data.levelMoveNames ?? []).map(escapeHTML).join(", ") || (language === "en" ? "None listed." : "Nenhum listado.");
+  const machines = (data.machineMoveNames ?? []).map(escapeHTML).join(", ") || (language === "en" ? "None listed." : "Nenhum listado.");
 
   return `
-    <h2>Pokédex</h2>
-    <p>${dex}</p>
-    <h2>Golpes por nível</h2>
+    ${profile}
+    <h2>${language === "en" ? "Level-up moves" : "Golpes por nível"}</h2>
     <p>${levelMoves}</p>
-    <h2>TM / HM / Máquinas</h2>
+    <h2>${language === "en" ? "TM / HM / Machines" : "TM / HM / Máquinas"}</h2>
     <p>${machines}</p>
   `;
 }
 
-function pokemonThreats(data, review) {
-  return data.moves.map((move,index) => {
-    const type = TYPE_PT[move.type] ?? titleCase(move.type);
-    const description =
-      move.effectText ||
-      move.flavorText ||
-      `Golpe ${type} (${titleCase(move.damageClass)}).`;
-
-    const consequence =
-      move.damageClass === "status"
-        ? `Pode criar uma condição ou vantagem ligada a ${type}.`
-        : `Pode impor uma consequência física ligada a ${type}.`;
+function pokemonThreats(data, review, config) {
+  return data.moves.map((move, index) => {
+    const threat = buildMoveThreat(
+      move,
+      review.moveNames[index],
+      config.might,
+      data.contentLanguage
+    );
 
     return {
-      name:review.moveNames[index],
-      description,
-      list:[consequence]
+      name: review.moveNames[index],
+      description: threat.description,
+      list: threat.list
     };
   });
 }
 
 async function createChallenge(entry, config, data, review, definition) {
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
   const instanceId = randomId();
   const flags = moduleMetadata(entry, definition, config, data, review, instanceId);
-  const types = data.types.map(type => TYPE_PT[type] ?? titleCase(type));
+  const types = data.types.map(type => typeLabel(type, language));
+  const defenses = typeDefenseGroups(data.typeEffectiveness, language);
 
   const mightyAspects = config.might === "origin" ? [] : [{
-    level:config.might,
-    aspect:"Poder Pokémon",
-    mightIcon:config.might
+    level: config.might,
+    aspect: language === "en" ? "Pokémon Power" : "Poder Pokémon",
+    mightIcon: config.might
   }];
 
-  const defeated = Number({origin:3, adventure:4, greatness:5}[config.might] ?? 4);
+  const defeated = Number({ origin: 3, adventure: 4, greatness: 5 }[config.might] ?? 4);
+  const natureLimits = Array.isArray(review.natureLimits) ? review.natureLimits : [];
 
   const limits = [
-    {name:"Derrotado", value:String(defeated), consequence:"Fora de combate"},
     {
-      name:review.natureLowLimit,
-      value:String(Math.max(1, defeated - 1)),
-      consequence:`A Natureza ${review.natureLabel} começa a trabalhar contra ele.`
+      name: language === "en" ? "Defeated" : "Derrotado",
+      value: String(defeated),
+      consequence: language === "en" ? "Out of action" : "Fora de combate"
     },
-    {
-      name:review.natureHighLimit,
-      value:String(Math.min(6, defeated + 1)),
-      consequence:`A Natureza ${review.natureLabel} domina completamente sua reação.`
-    }
+    ...natureLimits.slice(0, 2).map((limit, index) => ({
+      name: limit.name,
+      value: String(index === 0 ? Math.max(2, defeated - 1) : Math.min(6, defeated + 1)),
+      consequence: limit.consequence
+    }))
   ];
 
-  const resistances = matchupText(data.typeEffectiveness, value => value > 0 && value < 1);
-  const weaknesses = matchupText(data.typeEffectiveness, value => value > 1);
-  const immunities = matchupText(data.typeEffectiveness, value => value === 0);
+  const resistances = matchupText(data.typeEffectiveness, value => value > 0 && value < 1, language);
+  const weaknesses = matchupText(data.typeEffectiveness, value => value > 1, language);
+  const immunities = matchupText(data.typeEffectiveness, value => value === 0, language);
   const folderId = await resolveChallengeFolder(config);
 
+  const statTags = (data.topStats ?? [])
+    .map(row => statPowerText(row.name, language))
+    .filter(Boolean);
+
+  const intrinsicTags = [
+    ...statTags.map(name => floatingTag(name, true)),
+    ...(data.ability?.name ? [floatingTag(data.ability.name, true)] : []),
+    floatingTag(review.natureLabel, true),
+    floatingTag(review.weaknessTag, false),
+    ...defenses.map(defense => floatingTag(defense.name, defense.positive))
+  ];
+
   const actor = await Actor.implementation.create({
-    name:entry.name,
-    type:"litm-npc",
-    ...(folderId ? {folder:folderId} : {}),
-    img:definition.portraitPath,
-    system:{
-      editMode:false,
-      shortDescription:data.dexText || `Pokémon · ${types.join(" / ")}`,
-      biography:pokemonBiography(data),
-      difficulty:1,
-      roles:["Pokémon", ...types, review.natureLabel],
+    name: entry.name,
+    type: "litm-npc",
+    ...(folderId ? { folder: folderId } : {}),
+    img: definition.portraitPath,
+    system: {
+      editMode: false,
+      shortDescription: data.dexText || `Pokémon · ${types.join(" / ")}`,
+      biography: pokemonBiography(data, review),
+      difficulty: 1,
+      roles: ["Pokémon", ...types, review.natureLabel],
       mightyAspects,
       limits,
-      secrets:[],
-      specialFeatures:[
-        {name:"TIPOS", description:types.join(" / ")},
-        {name:"RESISTÊNCIAS", description:resistances},
-        {name:"FRAQUEZAS", description:weaknesses},
-        {name:"IMUNIDADES", description:immunities}
+      secrets: [],
+      specialFeatures: [
+        { name: language === "en" ? "TYPES" : "TIPOS", description: types.join(" / ") },
+        { name: language === "en" ? "RESISTANCES" : "RESISTÊNCIAS", description: resistances },
+        { name: language === "en" ? "WEAKNESSES" : "FRAQUEZAS", description: weaknesses },
+        { name: language === "en" ? "IMMUNITIES" : "IMUNIDADES", description: immunities }
       ],
-      threatsAndConsequences:pokemonThreats(data, review),
-      floatingTagsAndStatusesEditable:false,
-      floatingTagsAndStatuses:[
-        ...review.moveNames.map(name => floatingTag(name,true)),
-        floatingTag(review.powerStatTag,true),
-        floatingTag(review.natureLabel,true),
-        floatingTag(review.weaknessTag,false)
-      ]
+      threatsAndConsequences: pokemonThreats(data, review, config),
+      floatingTagsAndStatusesEditable: false,
+      floatingTagsAndStatuses: intrinsicTags
     },
-    prototypeToken:prototypeToken(definition, flags),
-    flags:{[MODULE_ID]:flags}
+    prototypeToken: prototypeToken(definition, flags),
+    flags: { [MODULE_ID]: flags }
   });
 
   if (!actor) throw new Error("Não foi possível criar o Challenge.");
-  void actor.sheet?.render?.({force:true});
+  void actor.sheet?.render?.({ force: true });
   return actor;
 }
-
 
 async function createTrainerPokemon(entry, config, data, review, definition) {
   const trainer = game.actors.get(config.trainerId);
@@ -855,7 +1004,7 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
     name: entry.name,
     type: "themebook",
     img: definition.portraitPath,
-    system: themeSystem(review),
+    system: themeSystem(review, data),
     flags: { [MODULE_ID]: flags }
   };
 

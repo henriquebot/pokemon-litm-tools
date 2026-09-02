@@ -29,10 +29,16 @@ import {
   activatePokemonVisualStability
 } from "./pokemon-visual-stability.js";
 
+import {
+  registerPokemonContentSettings
+} from "./pokemon-content.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
 Hooks.once("init", () => {
+
+  registerPokemonContentSettings();
 
   registerTokenOutlineSettings();
 
