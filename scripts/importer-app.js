@@ -2132,7 +2132,7 @@ class PokemonImporterApp
             true;
 
           button.innerHTML =
-            '<i class="fa-solid fa-spinner fa-spin"></i> Builder';
+            '<i class="fa-solid fa-spinner fa-spin"></i> Challenge';
 
           try {
             const catalog =

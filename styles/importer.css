@@ -1838,3 +1838,102 @@ has(
 .pokemon-importer [data-asset-card] button {
   pointer-events:auto;
 }
+
+
+/* Pokemon Importer - Guided Challenge Wizard 0.9 */
+.pokemon-builder-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px;
+}
+.pokemon-builder-wizard-head {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-light-primary);
+}
+.pokemon-builder-wizard-head h2 {
+  margin: 3px 0;
+}
+.pokemon-builder-wizard-head p {
+  margin: 4px 0 0;
+  opacity: .8;
+  line-height: 1.35;
+}
+.pokemon-builder-wizard-steps {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  opacity: .65;
+}
+.pokemon-builder-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.pokemon-builder-profile-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.pokemon-builder-profile-grid .wide {
+  grid-column: 1 / -1;
+}
+.pokemon-builder-move-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.pokemon-builder-move-card {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 6px;
+  background: rgb(255 255 255 / .025);
+}
+.pokemon-builder-move-card:has(input:checked) {
+  border-color: var(--color-border-highlight);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08);
+}
+.pokemon-builder-move-main {
+  min-width: 0;
+}
+.pokemon-builder-move-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pokemon-builder-move-title strong span {
+  opacity: .65;
+  font-weight: 500;
+}
+.pokemon-builder-move-card small {
+  opacity: .72;
+}
+.pokemon-builder-move-card p {
+  margin: 6px 0;
+  line-height: 1.35;
+}
+.pokemon-builder-move-card ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: .82rem;
+}
+.pokemon-builder-final-review {
+  line-height: 1.4;
+}
+@media (max-width: 700px) {
+  .pokemon-builder-profile-grid {
+    grid-template-columns: 1fr;
+  }
+  .pokemon-builder-profile-grid .wide {
+    grid-column: auto;
+  }
+}

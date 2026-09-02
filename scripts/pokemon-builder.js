@@ -14,6 +14,9 @@ import {
   statWeaknessText,
   typeDefenseGroups,
   buildMoveThreat,
+  buildAbilityThreat,
+  moveShortDescription,
+  moveEnglishLabel,
   formatThemeDescription
 } from "./pokemon-content.js";
 
@@ -42,6 +45,74 @@ const MIGHT = {
   adventure: { label: "Adventure", maxLevel: 45 },
   greatness: { label: "Greatness", maxLevel: 100 }
 };
+
+const HM_MOVES = new Set([
+  "cut", "fly", "surf", "strength", "flash", "whirlpool", "waterfall"
+]);
+
+function wizardHeader(step, title, subtitle = "") {
+  return `
+    <div class="pokemon-builder-wizard-head">
+      <div class="pokemon-builder-wizard-steps">Etapa ${step} de 5</div>
+      <h2>${escapeHTML(title)}</h2>
+      ${subtitle ? `<p>${escapeHTML(subtitle)}</p>` : ""}
+    </div>
+  `;
+}
+
+function rankForLevel(level) {
+  const value = Number(level ?? 0);
+  if (value <= 20) return "origin";
+  if (value <= 45) return "adventure";
+  return "greatness";
+}
+
+function learnMethodInfo(methods, level, language = "pt-BR") {
+  if (Number(level) > 0) {
+    return {
+      id: "level-up",
+      label: language === "en" ? `Level ${level}` : `Por nível · Nv. ${level}`
+    };
+  }
+  if (methods.includes("machine")) {
+    const hm = methods.includes("hm");
+    return {
+      id: hm ? "hm" : "tm",
+      label: language === "en"
+        ? (hm ? "Hidden Machine (HM)" : "Technical Machine (TM)")
+        : (hm ? "Máquina Oculta (MO)" : "Máquina Técnica (MT)")
+    };
+  }
+  if (methods.includes("tutor")) {
+    return { id: "tutor", label: language === "en" ? "Tutor" : "Tutor" };
+  }
+  if (methods.includes("egg")) {
+    return { id: "breeding", label: language === "en" ? "Breeding" : "Cruzamento (Breeding)" };
+  }
+  return { id: "other", label: language === "en" ? "Other method" : "Outra forma de aprendizado" };
+}
+
+function defeatedLimitFor(stats, might) {
+  const base = Number({ origin: 3, adventure: 4, greatness: 5 }[might] ?? 4);
+  const hp = Number(stats?.hp ?? 0);
+  const modifier = hp <= 45 ? -1 : hp >= 90 ? 1 : 0;
+  return Math.max(3, Math.min(6, base + modifier));
+}
+
+function captureLimitFor(catchRate) {
+  const rate = Number(catchRate ?? 0);
+  if (rate >= 200) return 3;
+  if (rate >= 120) return 4;
+  if (rate >= 45) return 5;
+  return 6;
+}
+
+function escapeStatusLevel(speed, might) {
+  const base = Number({ origin: 1, adventure: 2, greatness: 3 }[might] ?? 2);
+  const value = Number(speed ?? 0);
+  const speedMod = value >= 90 ? 2 : value >= 50 ? 1 : 0;
+  return Math.max(1, Math.min(5, base + speedMod));
+}
 
 const POKEMON_NATURES = [
   ["hardy","Resistente","Cansado","Determinado"],
@@ -164,7 +235,7 @@ function levelForMove(move) {
   return positive.length ? Math.min(...positive) : 1;
 }
 
-function loadPokemonBuildData(entry, might) {
+async function loadPokemonBuildData(entry, might) {
   const language = getPokemonContentLanguage();
   const pokemonId = Number(entry.pokemonId ?? entry.dex);
 
@@ -172,262 +243,247 @@ function loadPokemonBuildData(entry, might) {
     throw new Error("Pokémon sem número de Pokédex válido.");
   }
 
-  return Promise.all([
+  const [pokemon, species] = await Promise.all([
     fetchPokeJson(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`),
     fetchPokeJson(`https://pokeapi.co/api/v2/pokemon-species/${pokemonId}`)
-  ]).then(async ([pokemon, species]) => {
-    const types = (pokemon.types ?? [])
-      .slice()
-      .sort((a, b) => Number(a.slot) - Number(b.slot))
-      .map(row => row.type?.name)
-      .filter(Boolean);
+  ]);
 
-    const stats = {};
-    for (const row of pokemon.stats ?? []) {
-      if (row.stat?.name) stats[row.stat.name] = Number(row.base_stat ?? 0);
-    }
+  const types = (pokemon.types ?? [])
+    .slice()
+    .sort((a, b) => Number(a.slot) - Number(b.slot))
+    .map(row => row.type?.name)
+    .filter(Boolean);
 
-    const abilityEntry = choosePrimaryAbility(pokemon);
-    let ability = null;
+  const stats = {};
+  for (const row of pokemon.stats ?? []) {
+    if (row.stat?.name) stats[row.stat.name] = Number(row.base_stat ?? 0);
+  }
 
-    if (abilityEntry?.ability?.url) {
+  const abilities = (await Promise.all(
+    (pokemon.abilities ?? []).map(async row => {
+      const id = row.ability?.name ?? "unknown";
       try {
-        const detail = await fetchPokeJson(abilityEntry.ability.url);
-        ability = {
-          id: detail.name,
-          name: abilityLabel(detail.name, detail.names, language),
-          hidden: !!abilityEntry.is_hidden
-        };
-      } catch (error) {
-        console.warn("Pokemon LITM Tools | Ability:", abilityEntry.ability?.name, error);
-        ability = {
-          id: abilityEntry.ability?.name ?? "unknown",
-          name: abilityLabel(abilityEntry.ability?.name ?? "unknown", [], language),
-          hidden: !!abilityEntry.is_hidden
-        };
-      }
-    }
-
-    const dexText = buildDexText({ pokemon, species, types, ability }, language);
-
-    const typeEffectiveness = {};
-    for (const defendedType of types) {
-      try {
-        const detail = await fetchPokeJson(`https://pokeapi.co/api/v2/type/${defendedType}`);
-        const relations = detail.damage_relations ?? {};
-
-        for (const row of relations.double_damage_from ?? []) {
-          typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 2;
-        }
-
-        for (const row of relations.half_damage_from ?? []) {
-          typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 0.5;
-        }
-
-        for (const row of relations.no_damage_from ?? []) {
-          typeEffectiveness[row.name] = 0;
-        }
-      } catch (error) {
-        console.warn("Pokemon LITM Tools | Type effectiveness:", defendedType, error);
-      }
-    }
-
-    function preferredLearnLevel(move) {
-      const details = (move.version_group_details ?? [])
-        .filter(row => row.move_learn_method?.name === "level-up");
-
-      if (!details.length) return null;
-
-      const preferredGroups = [
-        "heartgold-soulsilver",
-        "crystal",
-        "gold-silver"
-      ];
-
-      for (const group of preferredGroups) {
-        const rows = details.filter(row => row.version_group?.name === group);
-        if (!rows.length) continue;
-        const levels = rows.map(row => Number(row.level_learned_at ?? 0)).filter(Number.isFinite);
-        const positive = levels.filter(level => level > 0);
-        return positive.length ? Math.min(...positive) : 1;
-      }
-
-      const levels = details.map(row => Number(row.level_learned_at ?? 0)).filter(Number.isFinite);
-      const positive = levels.filter(level => level > 0);
-      return positive.length ? Math.min(...positive) : 1;
-    }
-
-    const candidates = [];
-    for (const row of pokemon.moves ?? []) {
-      const level = preferredLearnLevel(row);
-      if (level === null) continue;
-      candidates.push({
-        id: row.move?.name,
-        url: row.move?.url,
-        level
-      });
-    }
-
-    const maxLevel = MIGHT[might]?.maxLevel ?? 45;
-    let pool = candidates
-      .filter(move => move.level <= maxLevel)
-      .sort((a, b) => b.level - a.level || String(a.id).localeCompare(String(b.id)));
-
-    if (pool.length < 10) {
-      const seen = new Set(pool.map(move => move.id));
-      for (const move of candidates.slice().sort((a, b) => a.level - b.level)) {
-        if (seen.has(move.id)) continue;
-        pool.push(move);
-        seen.add(move.id);
-        if (pool.length >= 16) break;
-      }
-    }
-
-    if (!pool.length) {
-      pool = (pokemon.moves ?? []).slice(0, 16).map(row => ({
-        id: row.move?.name,
-        url: row.move?.url,
-        level: 1
-      }));
-    }
-
-    const details = await Promise.all(
-      pool.slice(0, 18).map(async move => {
-        if (!move.url) return null;
-
-        try {
-          const detail = await fetchPokeJson(move.url);
-          const meta = detail.meta ?? {};
-
-          return {
-            id: detail.name,
-            name: moveLabel(detail.name, detail.names, language),
-            type: detail.type?.name ?? "normal",
-            damageClass: detail.damage_class?.name ?? "status",
-            power: Number(detail.power ?? 0),
-            accuracy: Number(detail.accuracy ?? 0),
-            level: move.level,
-            target: detail.target?.name ?? "selected-pokemon",
-            effectChance: Number(detail.effect_chance ?? 0),
-            statChanges: (detail.stat_changes ?? []).map(change => ({
-              change: Number(change.change ?? 0),
-              stat: change.stat?.name ?? ""
-            })).filter(change => !!change.stat),
-            meta: {
-              ailment: meta.ailment?.name ?? "none",
-              ailmentChance: Number(meta.ailment_chance ?? 0),
-              category: meta.category?.name ?? "",
-              criticalRate: Number(meta.crit_rate ?? 0),
-              drain: Number(meta.drain ?? 0),
-              flinchChance: Number(meta.flinch_chance ?? 0),
-              healing: Number(meta.healing ?? 0),
-              minHits: Number(meta.min_hits ?? 0),
-              maxHits: Number(meta.max_hits ?? 0),
-              minTurns: Number(meta.min_turns ?? 0),
-              maxTurns: Number(meta.max_turns ?? 0),
-              statChance: Number(meta.stat_chance ?? 0)
-            }
-          };
-        } catch (error) {
-          console.warn("Pokemon LITM Tools | Move:", move.id, error);
-          return null;
-        }
-      })
-    );
-
-    const ranked = details.filter(Boolean).sort((a, b) => {
-      const score = move => {
-        const stab = types.includes(move.type) ? 75 : 0;
-        const usefulStatus = move.damageClass === "status" ? 45 : 0;
-        const powerScore = Math.min(Number(move.power ?? 0), 150);
-        const accuracyScore = Math.min(Number(move.accuracy || 80), 100) / 10;
-        const levelScore = Number(move.level ?? 1) * (might === "origin" ? 0.15 : might === "greatness" ? 0.8 : 0.45);
-        return stab + usefulStatus + powerScore + accuracyScore + levelScore;
-      };
-
-      return score(b) - score(a) || a.name.localeCompare(b.name, language);
-    });
-
-    const moves = [];
-    const usedTypes = new Set();
-    const usedClasses = new Set();
-
-    for (const move of ranked) {
-      if (moves.some(existing => existing.id === move.id)) continue;
-
-      const diversity =
-        !usedTypes.has(move.type)
-        || !usedClasses.has(move.damageClass)
-        || moves.length < 2;
-
-      if (!diversity && moves.length < 3) continue;
-
-      moves.push(move);
-      usedTypes.add(move.type);
-      usedClasses.add(move.damageClass);
-      if (moves.length >= 4) break;
-    }
-
-    if (moves.length < 4) {
-      for (const move of ranked) {
-        if (moves.some(existing => existing.id === move.id)) continue;
-        moves.push(move);
-        if (moves.length >= 4) break;
-      }
-    }
-
-    if (!moves.length) {
-      throw new Error("Não encontrei golpes utilizáveis para este Pokémon.");
-    }
-
-    const statOrder = ["hp", "attack", "defense", "special-attack", "special-defense", "speed"];
-    const statRows = statOrder.map(name => ({ name, value: Number(stats[name] ?? 0) }));
-    const rankedStats = statRows.slice().sort((a, b) => b.value - a.value || statOrder.indexOf(a.name) - statOrder.indexOf(b.name));
-    const best = rankedStats[0];
-
-    /* HP pode ser força, mas nunca define a fraqueza de stat. */
-    const weaknessRows = statRows.filter(row => row.name !== "hp");
-    const weaknessOrder = statOrder.filter(name => name !== "hp");
-    const worst = weaknessRows.reduce((a, b) => {
-      if (b.value < a.value) return b;
-      if (b.value === a.value && weaknessOrder.indexOf(b.name) > weaknessOrder.indexOf(a.name)) return b;
-      return a;
-    }, weaknessRows[0]);
-
-    const completeMoves = (pokemon.moves ?? [])
-      .map(row => {
-        const methods = new Set((row.version_group_details ?? [])
-          .map(detail => detail.move_learn_method?.name)
-          .filter(Boolean));
-
+        const detail = await fetchPokeJson(row.ability?.url);
+        const effectEn = detail.effect_entries?.find(entry => entry.language?.name === "en");
         return {
-          id: row.move?.name ?? "",
-          name: moveLabel(row.move?.name ?? "", [], language),
-          level: methods.has("level-up"),
-          machine: methods.has("machine")
+          id,
+          name: abilityLabel(id, detail.names, language),
+          englishName: abilityLabel(id, detail.names, "en"),
+          hidden: !!row.is_hidden,
+          effectTextEn: String(effectEn?.short_effect ?? effectEn?.effect ?? "").replace(/\s+/g, " ").trim()
         };
-      })
-      .filter(move => !!move.id);
+      } catch (error) {
+        console.warn("Pokemon LITM Tools | Ability:", id, error);
+        return {
+          id,
+          name: abilityLabel(id, [], language),
+          englishName: titleCase(id),
+          hidden: !!row.is_hidden,
+          effectTextEn: ""
+        };
+      }
+    })
+  )).filter(Boolean);
+
+  const ability = abilities.find(row => !row.hidden) ?? abilities[0] ?? null;
+  const dexText = buildDexText({ pokemon, species, types, ability }, language);
+
+  const typeEffectiveness = {};
+  for (const defendedType of types) {
+    try {
+      const detail = await fetchPokeJson(`https://pokeapi.co/api/v2/type/${defendedType}`);
+      const relations = detail.damage_relations ?? {};
+      for (const row of relations.double_damage_from ?? []) {
+        typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 2;
+      }
+      for (const row of relations.half_damage_from ?? []) {
+        typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 0.5;
+      }
+      for (const row of relations.no_damage_from ?? []) {
+        typeEffectiveness[row.name] = 0;
+      }
+    } catch (error) {
+      console.warn("Pokemon LITM Tools | Type effectiveness:", defendedType, error);
+    }
+  }
+
+  const preferredGroups = ["heartgold-soulsilver", "crystal", "gold-silver"];
+
+  function preferredDetails(row) {
+    const all = row.version_group_details ?? [];
+    for (const group of preferredGroups) {
+      const rows = all.filter(detail => detail.version_group?.name === group);
+      if (rows.length) return rows;
+    }
+    return all;
+  }
+
+  const moveSources = (pokemon.moves ?? []).map(row => {
+    const id = row.move?.name ?? "";
+    const details = preferredDetails(row);
+    const methods = [...new Set(details.map(detail => detail.move_learn_method?.name).filter(Boolean))];
+    const levels = details
+      .filter(detail => detail.move_learn_method?.name === "level-up")
+      .map(detail => Number(detail.level_learned_at ?? 0))
+      .filter(value => Number.isFinite(value) && value > 0);
+    const level = levels.length ? Math.min(...levels) : null;
+    if (methods.includes("machine") && HM_MOVES.has(id)) methods.push("hm");
 
     return {
-      pokemonId,
-      contentLanguage: language,
-      types,
-      stats,
-      typeEffectiveness,
-      ability,
-      moves,
-      dexText,
-      levelMoveNames: completeMoves.filter(move => move.level).map(move => move.name),
-      machineMoveNames: completeMoves.filter(move => move.machine).map(move => move.name),
-      best,
-      worst,
-      topStats: rankedStats.slice(0, 2),
-      powerStatTag: statPowerText(best.name, language),
-      weaknessTag: statWeaknessText(worst.name, language)
+      id,
+      url: row.move?.url,
+      methods,
+      level,
+      rank: level ? rankForLevel(level) : null
     };
-  });
+  }).filter(row => row.id && row.url);
+
+  const maxLevel = MIGHT[might]?.maxLevel ?? 45;
+  const levelPool = moveSources
+    .filter(row => Number(row.level ?? Infinity) <= maxLevel)
+    .sort((a, b) => Number(a.level ?? 0) - Number(b.level ?? 0));
+
+  const otherPool = moveSources
+    .filter(row => !row.level && row.methods.some(method => ["machine", "tutor", "egg"].includes(method)))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const chosenSources = [];
+  const seen = new Set();
+  for (const row of [...levelPool, ...otherPool]) {
+    if (seen.has(row.id)) continue;
+    chosenSources.push(row);
+    seen.add(row.id);
+    if (chosenSources.length >= 36) break;
+  }
+  if (!chosenSources.length) chosenSources.push(...moveSources.slice(0, 24));
+
+  const detailRows = (await Promise.all(chosenSources.map(async source => {
+    try {
+      const detail = await fetchPokeJson(source.url);
+      const meta = detail.meta ?? {};
+      const effectEn = detail.effect_entries?.find(entry => entry.language?.name === "en");
+      const flavorEn = detail.flavor_text_entries?.find(entry => entry.language?.name === "en");
+      const methodInfo = learnMethodInfo(source.methods, source.level, language);
+
+      const move = {
+        id: detail.name,
+        name: moveLabel(detail.name, detail.names, language),
+        englishName: moveEnglishLabel(detail.name, detail.names),
+        type: detail.type?.name ?? "normal",
+        damageClass: detail.damage_class?.name ?? "status",
+        power: Number(detail.power ?? 0),
+        accuracy: Number(detail.accuracy ?? 0),
+        level: source.level,
+        rank: source.rank,
+        methods: source.methods,
+        methodId: methodInfo.id,
+        methodLabel: methodInfo.label,
+        target: detail.target?.name ?? "selected-pokemon",
+        effectChance: Number(detail.effect_chance ?? 0),
+        shortEffectEn: String(effectEn?.short_effect ?? "").replace(/\s+/g, " ").trim(),
+        flavorEn: String(flavorEn?.flavor_text ?? "").replace(/[\n\f]+/g, " ").replace(/\s+/g, " ").trim(),
+        statChanges: (detail.stat_changes ?? []).map(change => ({
+          change: Number(change.change ?? 0),
+          stat: change.stat?.name ?? ""
+        })).filter(change => !!change.stat),
+        meta: {
+          ailment: meta.ailment?.name ?? "none",
+          ailmentChance: Number(meta.ailment_chance ?? 0),
+          category: meta.category?.name ?? "",
+          criticalRate: Number(meta.crit_rate ?? 0),
+          drain: Number(meta.drain ?? 0),
+          flinchChance: Number(meta.flinch_chance ?? 0),
+          healing: Number(meta.healing ?? 0),
+          minHits: Number(meta.min_hits ?? 0),
+          maxHits: Number(meta.max_hits ?? 0),
+          minTurns: Number(meta.min_turns ?? 0),
+          maxTurns: Number(meta.max_turns ?? 0),
+          statChance: Number(meta.stat_chance ?? 0)
+        }
+      };
+      move.shortDescription = moveShortDescription(move, move.name, language);
+      return move;
+    } catch (error) {
+      console.warn("Pokemon LITM Tools | Move:", source.id, error);
+      return null;
+    }
+  }))).filter(Boolean);
+
+  function score(move) {
+    const stab = types.includes(move.type) ? 75 : 0;
+    const usefulStatus = move.damageClass === "status" ? 45 : 0;
+    const powerScore = Math.min(Number(move.power ?? 0), 150);
+    const accuracyScore = Math.min(Number(move.accuracy || 80), 100) / 10;
+    const levelScore = Number(move.level ?? 1) * (might === "origin" ? 0.15 : might === "greatness" ? 0.8 : 0.45);
+    return stab + usefulStatus + powerScore + accuracyScore + levelScore;
+  }
+
+  const moveChoices = detailRows.slice().sort((a, b) =>
+    score(b) - score(a) || a.name.localeCompare(b.name, language)
+  );
+
+  const moves = [];
+  const usedTypes = new Set();
+  const usedClasses = new Set();
+  for (const move of moveChoices) {
+    const diversity = !usedTypes.has(move.type) || !usedClasses.has(move.damageClass) || moves.length < 2;
+    if (!diversity && moves.length < 3) continue;
+    moves.push(move);
+    usedTypes.add(move.type);
+    usedClasses.add(move.damageClass);
+    if (moves.length >= 4) break;
+  }
+  for (const move of moveChoices) {
+    if (moves.length >= 4) break;
+    if (!moves.some(existing => existing.id === move.id)) moves.push(move);
+  }
+
+  const statOrder = ["hp", "attack", "defense", "special-attack", "special-defense", "speed"];
+  const statRows = statOrder.map(name => ({ name, value: Number(stats[name] ?? 0) }));
+  const rankedStats = statRows.slice().sort((a, b) =>
+    b.value - a.value || statOrder.indexOf(a.name) - statOrder.indexOf(b.name)
+  );
+  const best = rankedStats[0];
+
+  const weaknessRows = statRows.filter(row => row.name !== "hp");
+  const weaknessOrder = statOrder.filter(name => name !== "hp");
+  const worst = weaknessRows.reduce((a, b) => {
+    if (b.value < a.value) return b;
+    if (b.value === a.value && weaknessOrder.indexOf(b.name) > weaknessOrder.indexOf(a.name)) return b;
+    return a;
+  }, weaknessRows[0]);
+
+  const biographyMoves = moveSources.map(source => ({
+    id: source.id,
+    name: moveLabel(source.id, [], language),
+    englishName: titleCase(source.id),
+    level: source.level,
+    rank: source.rank,
+    methods: source.methods,
+    method: learnMethodInfo(source.methods, source.level, language)
+  }));
+
+  return {
+    pokemonId,
+    contentLanguage: language,
+    types,
+    stats,
+    typeEffectiveness,
+    abilities,
+    ability,
+    moves,
+    moveChoices,
+    dexText,
+    catchRate: Number(species.capture_rate ?? 0),
+    biographyMoves,
+    best,
+    worst,
+    topStats: rankedStats.slice(0, 2),
+    powerStatTag: statPowerText(best.name, language),
+    weaknessTag: statWeaknessText(worst.name, language)
+  };
 }
+
 
 function trainerOptions() {
   return game.actors
@@ -536,70 +592,74 @@ async function resolveChallengeFolder(
 
 async function askBuildConfig(entry) {
   const modeResult = await foundry.applications.api.DialogV2.input({
-    window: { title: `${entry.name} · Pokémon Builder` },
+    window: { title: `${entry.name} · Challenge · Etapa 2` },
+    position: { width: 620 },
     content: `
-      <div class="pokemon-builder-config">
-        <div class="pokemon-builder-field">
-          <label>Criar como</label>
-          <select name="mode">
-            <option value="challenge">Challenge / NPC</option>
-            <option value="trainer">Adicionar a Treinador</option>
-          </select>
-        </div>
-        <div class="pokemon-builder-field">
-          <label>Might</label>
-          <select name="might">
-            <option value="origin">Origin</option>
-            <option value="adventure" selected>Adventure</option>
-            <option value="greatness">Greatness</option>
-          </select>
+      <div class="pokemon-builder-wizard">
+        ${wizardHeader(2, "Configurar Challenge", "O arraste rápido continua disponível; este fluxo cria uma ficha elaborada.")}
+        <div class="pokemon-builder-config">
+          <div class="pokemon-builder-field">
+            <label>Criar como</label>
+            <select name="mode">
+              <option value="challenge">Pokémon selvagem / Challenge</option>
+              <option value="trainer">Adicionar a um treinador jogador</option>
+            </select>
+          </div>
+          <div class="pokemon-builder-field">
+            <label>Rank / Might</label>
+            <select name="might">
+              <option value="origin">Origin</option>
+              <option value="adventure" selected>Adventure</option>
+              <option value="greatness">Greatness</option>
+            </select>
+          </div>
         </div>
       </div>
     `,
-    ok: { label:"Continuar", icon:"fa-solid fa-arrow-right" },
-    modal:true
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
+    modal: true
   });
 
   if (!modeResult) return null;
-
   const mode = String(modeResult.mode ?? "challenge");
   const might = String(modeResult.might ?? "adventure");
 
   if (mode === "challenge") {
     const folderChoices = actorFolderOptions();
-    const remembered = String(game.settings.get(MODULE_ID,"lastActorFolder") ?? "");
+    const remembered = String(game.settings.get(MODULE_ID, "lastActorFolder") ?? "");
     const rootSelected = remembered ? "" : "selected";
 
     const result = await foundry.applications.api.DialogV2.input({
-      window: { title:`${entry.name} · Challenge` },
+      window: { title: `${entry.name} · Destino` },
+      position: { width: 620 },
       content: `
-        <div class="pokemon-builder-config">
-          <div class="pokemon-builder-field">
-            <label>Pasta de Actors</label>
-            <select name="folderId">
-              <option value="" ${rootSelected}>Raiz de Actors</option>
-              ${folderChoices}
-            </select>
-          </div>
-          <div class="pokemon-builder-field">
-            <label>Ou criar nova pasta</label>
-            <input type="text" name="newFolder" placeholder="Ex.: Pokémon Selvagens">
+        <div class="pokemon-builder-wizard">
+          ${wizardHeader(2, "Destino do Challenge")}
+          <div class="pokemon-builder-config">
+            <div class="pokemon-builder-field">
+              <label>Pasta de Actors</label>
+              <select name="folderId">
+                <option value="" ${rootSelected}>Raiz de Actors</option>
+                ${folderChoices}
+              </select>
+            </div>
+            <div class="pokemon-builder-field">
+              <label>Ou criar nova pasta</label>
+              <input type="text" name="newFolder" placeholder="Ex.: Pokémon Selvagens">
+            </div>
           </div>
         </div>
       `,
-      ok: { label:"Gerar prévia", icon:"fa-solid fa-wand-magic-sparkles" },
-      modal:true
+      ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
+      modal: true
     });
 
     if (!result) return null;
-
     return {
-      mode,
-      might,
-      trainerId:"",
-      destination:"",
-      folderId:String(result.folderId ?? ""),
-      newFolder:String(result.newFolder ?? "").trim()
+      mode, might,
+      trainerId: "", destination: "",
+      folderId: String(result.folderId ?? ""),
+      newFolder: String(result.newFolder ?? "").trim()
     };
   }
 
@@ -608,27 +668,31 @@ async function askBuildConfig(entry) {
     .join("");
 
   const result = await foundry.applications.api.DialogV2.input({
-    window: { title:`${entry.name} · Treinador` },
+    window: { title: `${entry.name} · Treinador` },
+    position: { width: 620 },
     content: `
-      <div class="pokemon-builder-config">
-        <div class="pokemon-builder-field">
-          <label>Treinador</label>
-          <select name="trainerId">
-            <option value="">Escolha um treinador</option>
-            ${options}
-          </select>
-        </div>
-        <div class="pokemon-builder-field">
-          <label>Destino</label>
-          <select name="destination">
-            <option value="team">Time</option>
-            <option value="pc">PC</option>
-          </select>
+      <div class="pokemon-builder-wizard">
+        ${wizardHeader(2, "Destino do Pokémon")}
+        <div class="pokemon-builder-config">
+          <div class="pokemon-builder-field">
+            <label>Treinador</label>
+            <select name="trainerId">
+              <option value="">Escolha um treinador</option>
+              ${options}
+            </select>
+          </div>
+          <div class="pokemon-builder-field">
+            <label>Destino</label>
+            <select name="destination">
+              <option value="team">Time</option>
+              <option value="pc">PC</option>
+            </select>
+          </div>
         </div>
       </div>
     `,
-    ok: { label:"Gerar prévia", icon:"fa-solid fa-wand-magic-sparkles" },
-    modal:true
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
+    modal: true
   });
 
   if (!result) return null;
@@ -636,30 +700,15 @@ async function askBuildConfig(entry) {
   if (!trainerId) throw new Error("Escolha o treinador.");
 
   return {
-    mode,
-    might,
-    trainerId,
-    destination:String(result.destination ?? "team"),
-    folderId:"",
-    newFolder:""
+    mode, might, trainerId,
+    destination: String(result.destination ?? "team"),
+    folderId: "", newFolder: ""
   };
 }
 
 
 async function reviewBuild(entry, config, data) {
   const language = data.contentLanguage ?? getPokemonContentLanguage();
-  const typeText = data.types.map(type => typeLabel(type, language)).join(" / ");
-  const statText = Object.entries(data.stats)
-    .map(([name, value]) => `${statLabel(name, language)} ${value}`)
-    .join(" · ");
-
-  const moveInputs = data.moves.map((move, index) => `
-    <div class="pokemon-builder-review-move">
-      <label>${escapeHTML(typeLabel(move.type, language))}</label>
-      <input type="text" name="move${index}" value="${escapeHTML(move.name)}">
-    </div>
-  `).join("");
-
   const defaultNatureId = defaultNatureForStats(data.stats).id;
   const natureIds = [
     "hardy","lonely","adamant","naughty","brave",
@@ -671,75 +720,155 @@ async function reviewBuild(entry, config, data) {
 
   const natureOptions = natureIds.map(id => {
     const nature = natureProfile(id, language);
-    return `
-      <option value="${id}" ${id === defaultNatureId ? "selected" : ""}>
-        ${escapeHTML(nature.label)}
-      </option>
-    `;
+    return `<option value="${id}" ${id === defaultNatureId ? "selected" : ""}>${escapeHTML(nature.label)}</option>`;
   }).join("");
 
-  const pokedexUrl = getPokemonDbUrl(entry);
+  const abilityOptions = (data.abilities ?? []).map(ability => `
+    <option value="${escapeHTML(ability.id)}" ${ability.id === data.ability?.id ? "selected" : ""}>
+      ${escapeHTML(ability.name)}${ability.hidden ? " · Hidden Ability" : ""}
+    </option>
+  `).join("");
 
-  const result = await foundry.applications.api.DialogV2.input({
-    window: { title: language === "en" ? `Review · ${entry.name}` : `Revisar · ${entry.name}` },
+  const weaknessStats = ["attack","defense","special-attack","special-defense","speed"];
+  const weaknessOptions = weaknessStats.map(stat => {
+    const text = statWeaknessText(stat, language);
+    return `<option value="${stat}" ${stat === data.worst?.name ? "selected" : ""}>${escapeHTML(text)} · ${escapeHTML(statLabel(stat, language))} ${Number(data.stats?.[stat] ?? 0)}</option>`;
+  }).join("");
+
+  const profile = await foundry.applications.api.DialogV2.input({
+    window: { title: `${entry.name} · Perfil · Etapa 3` },
+    position: { width: 720 },
     content: `
-      <div class="pokemon-builder-review">
-        <div class="pokemon-builder-review-heading">
-          <div>
-            <strong>${escapeHTML(MIGHT[config.might]?.label ?? config.might)}</strong>
-            · ${escapeHTML(typeText)}
-          </div>
-          <a class="pokemon-builder-pokedex-button"
-             href="${escapeHTML(pokedexUrl)}"
-             target="_blank"
-             rel="noopener noreferrer">
-            <i class="fa-solid fa-mobile-screen-button"></i>
-            Pokédex
-          </a>
-        </div>
-
-        <small>${escapeHTML(statText)}</small>
-        <div class="pokemon-builder-divider"></div>
-        ${moveInputs}
-
-        <div class="pokemon-builder-review-move">
-          <label>${language === "en" ? "Nature" : "Natureza"}</label>
-          <select name="natureId">${natureOptions}</select>
-        </div>
-
-        <div class="pokemon-builder-review-move">
-          <label>${language === "en" ? "Power Tag" : "Tag de Poder"}</label>
-          <input type="text" name="powerStatTag" value="${escapeHTML(data.powerStatTag)}">
-        </div>
-
-        <div class="pokemon-builder-review-move">
-          <label>${language === "en" ? "Weakness Tag" : "Tag de Fraqueza"}</label>
-          <input type="text" name="weaknessTag" value="${escapeHTML(data.weaknessTag)}">
+      <div class="pokemon-builder-wizard">
+        ${wizardHeader(3, "Perfil do Pokémon", "Natureza e Habilidade são propriedades do indivíduo. HP nunca é usado para sugerir a fraqueza.")}
+        <div class="pokemon-builder-profile-grid">
+          <label>
+            <span>Natureza</span>
+            <select name="natureId">${natureOptions}</select>
+          </label>
+          <label>
+            <span>Habilidade</span>
+            <select name="abilityId">${abilityOptions}</select>
+          </label>
+          <label class="wide">
+            <span>Fraqueza sugerida</span>
+            <select name="weaknessStat">${weaknessOptions}<option value="custom">Personalizada</option></select>
+          </label>
+          <label class="wide">
+            <span>Fraqueza personalizada (opcional)</span>
+            <input name="customWeakness" type="text" placeholder="Se preencher, substitui a sugestão acima">
+          </label>
         </div>
       </div>
     `,
-    ok: {
-      label: language === "en" ? "Create Pokémon" : "Criar Pokémon",
-      icon: "fa-solid fa-check"
-    },
+    ok: { label: "Escolher golpes", icon: "fa-solid fa-arrow-right" },
     modal: true
   });
 
-  if (!result) return null;
+  if (!profile) return null;
 
-  const nature = natureProfile(String(result.natureId ?? defaultNatureId), language);
+  const nature = natureProfile(String(profile.natureId ?? defaultNatureId), language);
+  const selectedAbility = (data.abilities ?? []).find(row => row.id === String(profile.abilityId ?? "")) ?? data.ability ?? null;
+  data.ability = selectedAbility;
 
-  return {
-    moveNames: data.moves.map((move, index) =>
-      String(result[`move${index}`] ?? move.name).trim() || move.name
-    ),
-    powerStatTag: String(result.powerStatTag ?? data.powerStatTag).trim() || data.powerStatTag,
-    weaknessTag: String(result.weaknessTag ?? data.weaknessTag).trim() || data.weaknessTag,
+  const customWeakness = String(profile.customWeakness ?? "").trim();
+  const weaknessStat = String(profile.weaknessStat ?? data.worst?.name ?? "speed");
+  const weaknessTag = customWeakness || (
+    weaknessStat === "custom"
+      ? data.weaknessTag
+      : statWeaknessText(weaknessStat, language)
+  );
+
+  let selectedMoves = null;
+
+  while (!selectedMoves) {
+    const defaults = new Set((data.moves ?? []).map(move => move.id));
+    const cards = (data.moveChoices ?? []).map((move, index) => {
+      const threat = buildMoveThreat(move, move.name, config.might, language);
+      const consequenceText = threat.list.map(item => `<li>${item}</li>`).join("");
+      return `
+        <label class="pokemon-builder-move-card">
+          <input type="checkbox" name="move_${index}" ${defaults.has(move.id) ? "checked" : ""}>
+          <div class="pokemon-builder-move-main">
+            <div class="pokemon-builder-move-title">
+              <strong>${escapeHTML(move.name)} <span>(${escapeHTML(move.englishName)})</span></strong>
+              <a href="https://pokemondb.net/move/${encodeURIComponent(move.id)}" target="_blank" rel="noopener noreferrer" title="PokémonDB">
+                <i class="fa-solid fa-up-right-from-square"></i>
+              </a>
+            </div>
+            <small>${escapeHTML(typeLabel(move.type, language))} · ${escapeHTML(move.methodLabel)} · ${move.power ? `Power ${move.power}` : "Sem dano direto"}</small>
+            <p>${escapeHTML(move.shortDescription)}</p>
+            <ul>${consequenceText}</ul>
+          </div>
+        </label>
+      `;
+    }).join("");
+
+    const result = await foundry.applications.api.DialogV2.input({
+      window: { title: `${entry.name} · Golpes · Etapa 4` },
+      position: { width: 860, height: 760 },
+      content: `
+        <div class="pokemon-builder-wizard pokemon-builder-moves-step">
+          ${wizardHeader(4, "Escolher golpes", "Marque até 4. As sugestões respeitam o Rank, mas você pode trocar livremente.")}
+          <div class="pokemon-builder-move-list">${cards}</div>
+        </div>
+      `,
+      ok: { label: "Revisar", icon: "fa-solid fa-arrow-right" },
+      modal: true
+    });
+
+    if (!result) return null;
+
+    const picked = (data.moveChoices ?? []).filter((move, index) => result[`move_${index}`] === true || result[`move_${index}`] === "true" || result[`move_${index}`] === "on");
+    if (picked.length < 1 || picked.length > 4) {
+      ui.notifications.warn("Escolha entre 1 e 4 golpes.");
+      continue;
+    }
+    selectedMoves = picked;
+  }
+
+  data.moves = selectedMoves;
+
+  const review = {
+    moveNames: selectedMoves.map(move => move.name),
+    powerStatTag: data.powerStatTag,
+    weaknessTag,
     natureId: nature.id,
     natureLabel: nature.label,
-    natureLimits: nature.limits
+    natureLimits: [],
+    abilityId: selectedAbility?.id ?? null
   };
+
+  const threatPreview = selectedMoves.map(move => {
+    const threat = buildMoveThreat(move, move.name, config.might, language);
+    return `<li><strong>${escapeHTML(move.name)} (${escapeHTML(move.englishName)})</strong> — ${escapeHTML(threat.description)}</li>`;
+  }).join("");
+
+  const confirm = await foundry.applications.api.DialogV2.input({
+    window: { title: `${entry.name} · Revisão · Etapa 5` },
+    position: { width: 720 },
+    content: `
+      <div class="pokemon-builder-wizard">
+        ${wizardHeader(5, "Revisar Pokémon")}
+        <div class="pokemon-builder-final-review">
+          <p><strong>Rank:</strong> ${escapeHTML(MIGHT[config.might]?.label ?? config.might)}</p>
+          <p><strong>Natureza:</strong> ${escapeHTML(review.natureLabel)}</p>
+          <p><strong>Habilidade:</strong> ${escapeHTML(selectedAbility?.name ?? "—")}${selectedAbility?.hidden ? " · Hidden Ability" : ""}</p>
+          <p><strong>Tag de Poder sugerida:</strong> ${escapeHTML(review.powerStatTag)}</p>
+          <p><strong>Tag de Fraqueza:</strong> ${escapeHTML(review.weaknessTag)}</p>
+          <p><strong>Golpes:</strong></p>
+          <ul>${threatPreview}</ul>
+        </div>
+        <input type="hidden" name="confirmed" value="yes">
+      </div>
+    `,
+    ok: { label: "Criar Pokémon", icon: "fa-solid fa-check" },
+    modal: true
+  });
+
+  return confirm ? review : null;
 }
+
 
 function powerTag(name) {
   return {
@@ -868,39 +997,96 @@ function matchupText(effectiveness, predicate, language) {
 function pokemonBiography(data, review) {
   const language = data.contentLanguage ?? getPokemonContentLanguage();
   const profile = formatThemeDescription({ data, review }, language);
-  const levelMoves = (data.levelMoveNames ?? []).map(escapeHTML).join(", ") || (language === "en" ? "None listed." : "Nenhum listado.");
-  const machines = (data.machineMoveNames ?? []).map(escapeHTML).join(", ") || (language === "en" ? "None listed." : "Nenhum listado.");
+  const rows = data.biographyMoves ?? [];
+
+  const nameText = move => `${escapeHTML(move.name)} (${escapeHTML(move.englishName)})`;
+  const rankSections = [
+    ["origin", language === "en" ? "Origin · up to Lv. 20" : "Origin · até Nv. 20"],
+    ["adventure", language === "en" ? "Adventure · Lv. 21–45" : "Adventure · Nv. 21–45"],
+    ["greatness", language === "en" ? "Greatness · Lv. 46+" : "Greatness · Nv. 46+"]
+  ].map(([rank, title]) => {
+    const moves = rows.filter(move => move.rank === rank).sort((a, b) => Number(a.level ?? 0) - Number(b.level ?? 0));
+    const text = moves.length
+      ? moves.map(move => `${nameText(move)} · Nv. ${move.level}`).join("<br>")
+      : "Nenhum listado.";
+    return `<h3>${title}</h3><p>${text}</p>`;
+  }).join("");
+
+  function otherGroup(method, title) {
+    const moves = rows.filter(move => move.method?.id === method);
+    if (!moves.length) return "";
+    return `<h3>${title}</h3><p>${moves.map(nameText).join(", ")}</p>`;
+  }
 
   return `
     ${profile}
-    <h2>${language === "en" ? "Level-up moves" : "Golpes por nível"}</h2>
-    <p>${levelMoves}</p>
-    <h2>${language === "en" ? "TM / HM / Machines" : "TM / HM / Máquinas"}</h2>
-    <p>${machines}</p>
+    <h2>${language === "en" ? "Moves by Rank" : "Golpes por Rank"}</h2>
+    ${rankSections}
+    <h2>${language === "en" ? "Other learning methods" : "Outras formas de aprendizado"}</h2>
+    ${otherGroup("tm", language === "en" ? "Technical Machine (TM)" : "Máquina Técnica (MT)")}
+    ${otherGroup("hm", language === "en" ? "Hidden Machine (HM)" : "Máquina Oculta (MO)")}
+    ${otherGroup("tutor", "Tutor")}
+    ${otherGroup("breeding", language === "en" ? "Breeding" : "Cruzamento (Breeding)")}
   `;
 }
 
+
 function pokemonThreats(data, review, config) {
-  return data.moves.map((move, index) => {
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
+  const threats = data.moves.map((move, index) => {
     const threat = buildMoveThreat(
       move,
-      review.moveNames[index],
+      review.moveNames[index] ?? move.name,
       config.might,
-      data.contentLanguage
+      language
     );
-
     return {
-      name: review.moveNames[index],
+      name: `${review.moveNames[index] ?? move.name} (${move.englishName ?? titleCase(move.id)})`,
       description: threat.description,
       list: threat.list
     };
   });
+
+  const abilityThreat = buildAbilityThreat(data.ability, language);
+  if (abilityThreat) {
+    threats.push({
+      name: `${abilityThreat.name}${data.ability?.englishName && data.ability.englishName !== abilityThreat.name ? ` (${data.ability.englishName})` : ""}`,
+      description: abilityThreat.description,
+      list: abilityThreat.list
+    });
+  }
+
+  if (config.mode === "challenge") {
+    const fuga = escapeStatusLevel(data.stats?.speed, config.might);
+    threats.unshift({
+      name: language === "en" ? "ESCAPE" : "FUGIR",
+      description: language === "en"
+        ? "The wild Pokémon looks for an opening to leave the confrontation."
+        : "O Pokémon selvagem procura uma abertura para abandonar o confronto.",
+      list: [
+        language === "en"
+          ? `When it threatens to flee, apply [/s escape-${fuga}] against attempts to stop it.`
+          : `Quando ameaçar fugir, aplique [/s fuga-${fuga}] contra tentativas de impedir a fuga.`
+      ]
+    });
+  }
+
+  return threats;
 }
+
 
 async function createChallenge(entry, config, data, review, definition) {
   const language = data.contentLanguage ?? getPokemonContentLanguage();
   const instanceId = randomId();
   const flags = moduleMetadata(entry, definition, config, data, review, instanceId);
+  flags.encounter = {
+    wild: config.mode === "challenge",
+    defeatedLimit: defeatedLimitFor(data.stats, config.might),
+    catchRate: Number(data.catchRate ?? 0),
+    captureBase: captureLimitFor(data.catchRate),
+    dynamicCaptureReady: true,
+    escapeStatusLevel: escapeStatusLevel(data.stats?.speed, config.might)
+  };
   const types = data.types.map(type => typeLabel(type, language));
   const defenses = typeDefenseGroups(data.typeEffectiveness, language);
 
@@ -910,21 +1096,25 @@ async function createChallenge(entry, config, data, review, definition) {
     mightIcon: config.might
   }];
 
-  const defeated = Number({ origin: 3, adventure: 4, greatness: 5 }[config.might] ?? 4);
-  const natureLimits = Array.isArray(review.natureLimits) ? review.natureLimits : [];
+  const defeated = defeatedLimitFor(data.stats, config.might);
+  const captureBase = captureLimitFor(data.catchRate);
 
   const limits = [
     {
       name: language === "en" ? "Defeated" : "Derrotado",
       value: String(defeated),
       consequence: language === "en" ? "Out of action" : "Fora de combate"
-    },
-    ...natureLimits.slice(0, 2).map((limit, index) => ({
-      name: limit.name,
-      value: String(index === 0 ? Math.max(2, defeated - 1) : Math.min(6, defeated + 1)),
-      consequence: limit.consequence
-    }))
+    }
   ];
+
+  if (config.mode === "challenge") {
+    limits.push({
+      name: language === "en" ? "Captured" : "Capturado",
+      value: String(captureBase),
+      consequence: language === "en" ? "Captured by a Trainer" : "Capturado por um Treinador"
+    });
+  }
+
 
   const resistances = matchupText(data.typeEffectiveness, value => value > 0 && value < 1, language);
   const weaknesses = matchupText(data.typeEffectiveness, value => value > 1, language);
@@ -938,7 +1128,7 @@ async function createChallenge(entry, config, data, review, definition) {
   const intrinsicTags = [
     ...statTags.map(name => floatingTag(name, true)),
     ...(data.ability?.name ? [floatingTag(data.ability.name, true)] : []),
-    floatingTag(review.natureLabel, true),
+    floatingTag(`Natureza: ${review.natureLabel}`, true),
     floatingTag(review.weaknessTag, false),
     ...defenses.map(defense => floatingTag(defense.name, defense.positive))
   ];

@@ -183,6 +183,118 @@ const SPECIAL_MOVE_RULES = {
   rest: { selfPt: "adormecido", selfEn: "asleep", selfLevel: 3 }
 };
 
+const ABILITY_THREAT_RULES = {
+  intimidate: {
+    pt: "Sua presença intimidadora reduz a confiança ofensiva do adversário.",
+    en: "Its intimidating presence weakens the opponent's offensive confidence.",
+    statusPt: "intimidado", statusEn: "intimidated", level: 2
+  },
+  static: {
+    pt: "O contato com seu corpo pode transmitir uma descarga paralisante.",
+    en: "Contact with its body can transmit a paralyzing charge.",
+    statusPt: "paralisado", statusEn: "paralyzed", level: 2
+  },
+  "poison-point": {
+    pt: "O contato com seus espinhos pode inocular veneno.",
+    en: "Contact with its spines can poison the attacker.",
+    statusPt: "envenenado", statusEn: "poisoned", level: 2
+  },
+  "effect-spore": {
+    pt: "O contato pode liberar esporos que causam uma condição debilitante.",
+    en: "Contact can release spores that inflict a debilitating condition.",
+    statusPt: "afetado-por-esporos", statusEn: "spore-affected", level: 2
+  },
+  "flame-body": {
+    pt: "O calor do corpo pode queimar quem o toca.",
+    en: "Its heated body can burn attackers that touch it.",
+    statusPt: "queimado", statusEn: "burned", level: 2
+  },
+  "cute-charm": {
+    pt: "O contato próximo pode deixar o adversário encantado e hesitante.",
+    en: "Close contact can leave the opponent infatuated and hesitant.",
+    statusPt: "encantado", statusEn: "infatuated", level: 2
+  },
+  "rough-skin": {
+    pt: "Sua pele áspera machuca quem o atinge por contato.",
+    en: "Its rough skin hurts attackers that make contact.",
+    statusPt: "ferido-pelo-contato", statusEn: "hurt-by-contact", level: 1
+  },
+  pressure: {
+    pt: "Sua presença opressiva força os adversários a gastar mais esforço.",
+    en: "Its oppressive presence forces opponents to spend more effort.",
+    statusPt: "pressionado", statusEn: "pressured", level: 2
+  },
+  "arena-trap": {
+    pt: "Controla o terreno ao redor e dificulta que o adversário escape.",
+    en: "It controls the surrounding ground and makes escape difficult.",
+    statusPt: "preso", statusEn: "trapped", level: 3
+  },
+  "shadow-tag": {
+    pt: "Prende a atenção do adversário à própria sombra e dificulta a fuga.",
+    en: "It pins the foe through its shadow and makes escape difficult.",
+    statusPt: "preso", statusEn: "trapped", level: 3
+  },
+  "run-away": {
+    pt: "Encontra rapidamente uma rota segura para abandonar um confronto.",
+    en: "It quickly finds a safe route out of a confrontation."
+  },
+  "keen-eye": {
+    pt: "Sua visão aguçada impede que sua precisão seja facilmente prejudicada.",
+    en: "Its keen sight prevents its accuracy from being easily impaired."
+  },
+  levitate: {
+    pt: "Flutua acima do solo e evita efeitos baseados em contato com o terreno.",
+    en: "It floats above the ground and avoids ground-based effects."
+  },
+  insomnia: {
+    pt: "Permanece desperto mesmo diante de efeitos que normalmente causariam sono.",
+    en: "It remains awake against effects that would normally cause sleep."
+  },
+  immunity: {
+    pt: "Seu organismo neutraliza toxinas antes que elas possam envenená-lo.",
+    en: "Its body neutralizes toxins before they can poison it."
+  },
+  limber: {
+    pt: "Seu corpo flexível resiste a efeitos que tentam paralisá-lo.",
+    en: "Its flexible body resists effects that would paralyze it."
+  },
+  "water-absorb": {
+    pt: "Absorve ataques de Água e converte a energia recebida em recuperação.",
+    en: "It absorbs Water attacks and converts their energy into recovery.",
+    selfPt: "recuperado-pela-agua", selfEn: "restored-by-water", level: 2
+  },
+  "volt-absorb": {
+    pt: "Absorve ataques Elétricos e converte a energia recebida em recuperação.",
+    en: "It absorbs Electric attacks and converts their energy into recovery.",
+    selfPt: "recuperado-pela-eletricidade", selfEn: "restored-by-electricity", level: 2
+  },
+  "flash-fire": {
+    pt: "Absorve o calor de ataques de Fogo e fortalece suas próprias chamas.",
+    en: "It absorbs Fire attacks and strengthens its own flames.",
+    selfPt: "fogo-fortalecido", selfEn: "fire-empowered", level: 2
+  },
+  overgrow: {
+    pt: "Quando está muito ferido, seus golpes de Planta se tornam mais perigosos.",
+    en: "When badly hurt, its Grass moves become more dangerous.",
+    selfPt: "planta-fortalecida", selfEn: "grass-empowered", level: 2
+  },
+  blaze: {
+    pt: "Quando está muito ferido, seus golpes de Fogo se tornam mais perigosos.",
+    en: "When badly hurt, its Fire moves become more dangerous.",
+    selfPt: "fogo-fortalecido", selfEn: "fire-empowered", level: 2
+  },
+  torrent: {
+    pt: "Quando está muito ferido, seus golpes de Água se tornam mais perigosos.",
+    en: "When badly hurt, its Water moves become more dangerous.",
+    selfPt: "agua-fortalecida", selfEn: "water-empowered", level: 2
+  },
+  swarm: {
+    pt: "Quando está muito ferido, seus golpes de Inseto se tornam mais perigosos.",
+    en: "When badly hurt, its Bug moves become more dangerous.",
+    selfPt: "inseto-fortalecido", selfEn: "bug-empowered", level: 2
+  }
+};
+
 const apiCache = new Map();
 
 function titleCase(value) {
@@ -250,18 +362,17 @@ export function damageClassLabel(id, language = getPokemonContentLanguage()) {
 export function natureProfile(id, language = getPokemonContentLanguage()) {
   const source = NATURES[id] ?? NATURES.hardy;
   const isEn = language === "en";
-  const limits = isEn ? source.limitsEn : source.limitsPt;
   return {
     id: NATURES[id] ? id : "hardy",
     label: isEn ? source.en : source.pt,
-    limits: limits.map((name, index) => ({
-      name,
-      consequence: isEn
-        ? (index === 0 ? "The Pokémon is put under pressure." : "The Pokémon loses control of the situation.")
-        : (index === 0 ? "O Pokémon fica sob pressão." : "O Pokémon perde o controle da situação.")
-    }))
+    limits: []
   };
 }
+
+export function moveEnglishLabel(id, names = []) {
+  return exactLocalizedName(names, "en") || titleCase(id);
+}
+
 
 export function moveLabel(id, names = [], language = getPokemonContentLanguage()) {
   if (language === "en") {
@@ -417,12 +528,51 @@ function statusMarkup(name, level) {
   return `[/s ${String(name).trim().toLocaleLowerCase().replace(/\s+/g, "-")}-${level}]`;
 }
 
-function damageStatusLevel(power, might) {
-  const base = might === "greatness" ? 3 : might === "adventure" ? 2 : 1;
-  if (Number(power) >= 120) return Math.min(5, base + 1);
-  if (Number(power) > 0 && Number(power) < 50) return Math.max(1, base - 1);
-  return base;
+function damageStatusLevel(power) {
+  const value = Number(power ?? 0);
+  if (value >= 150) return 5;
+  if (value >= 110) return 4;
+  if (value >= 80) return 3;
+  if (value >= 40) return 2;
+  return value > 0 ? 1 : 0;
 }
+
+function moveDescriptionPt(move, displayName) {
+  const meta = move.meta ?? {};
+  const rule = SPECIAL_MOVE_RULES[move.id] ?? {};
+  const type = typeLabel(move.type, "pt-BR");
+  const ailment = meta.ailment && meta.ailment !== "none" && meta.ailment !== "unknown"
+    ? (AILMENT_PTBR[meta.ailment] ?? meta.ailment)
+    : null;
+
+  if (ailment) return `Tenta deixar o alvo ${ailment} usando uma técnica do tipo ${type}.`;
+  if (Number(meta.flinchChance) > 0) return `Ataca de modo a fazer o alvo hesitar no próximo movimento.`;
+  if (rule.trap) return `Prende o alvo com uma técnica do tipo ${type}, dificultando sua movimentação e fuga.`;
+  if (rule.charge) return `Concentra energia antes de desferir ${displayName}, um ataque poderoso do tipo ${type}.`;
+  if (Number(meta.drain) < 0) return `Ataca com grande impacto e sofre parte da força do golpe de volta.`;
+  if (Number(meta.drain) > 0) return `Drena energia do alvo enquanto causa dano do tipo ${type}.`;
+  if (Number(meta.healing) > 0) return `Usa ${displayName} para recuperar suas próprias forças.`;
+
+  const changes = move.statChanges ?? [];
+  if (changes.length) {
+    const first = changes[0];
+    const direction = Number(first.change ?? 0) > 0 ? "aumenta" : "reduz";
+    return `${displayName} ${direction} ${statLabel(first.stat, "pt-BR").toLocaleLowerCase()} durante o confronto.`;
+  }
+
+  if (move.damageClass === "physical") return `Atinge o alvo com um ataque físico do tipo ${type}.`;
+  if (move.damageClass === "special") return `Dispara energia do tipo ${type} contra o alvo.`;
+  return `Usa uma técnica do tipo ${type} para alterar as condições do confronto.`;
+}
+
+export function moveShortDescription(move, displayName, language = getPokemonContentLanguage()) {
+  if (language === "en") {
+    const text = String(move.shortEffectEn ?? move.flavorEn ?? "").replace(/\$effect_chance/g, String(move.effectChance || "its")).replace(/\s+/g, " ").trim();
+    if (text) return text;
+  }
+  return moveDescriptionPt(move, displayName);
+}
+
 
 function statStatusName(stat, direction, language) {
   const label = statLabel(stat, language).toLocaleLowerCase().replace(/\s+/g, "-");
@@ -431,45 +581,25 @@ function statStatusName(stat, direction, language) {
 }
 
 export function buildMoveThreat(move, displayName, might, language = getPokemonContentLanguage()) {
-  const type = typeLabel(move.type, language);
-  const damageClass = damageClassLabel(move.damageClass, language);
-  const accuracy = Number(move.accuracy ?? 0);
   const power = Number(move.power ?? 0);
   const meta = move.meta ?? {};
   const rule = SPECIAL_MOVE_RULES[move.id] ?? {};
-
-  const descriptionParts = [];
-  if (move.damageClass === "status" || power <= 0) {
-    descriptionParts.push(language === "en"
-      ? `Uses a ${type} technique (${damageClass}).`
-      : `Usa uma técnica do tipo ${type} (${damageClass}).`);
-  } else {
-    descriptionParts.push(language === "en"
-      ? `Attacks with a ${type} ${damageClass.toLocaleLowerCase()} move (Power ${power}${accuracy ? `, Accuracy ${accuracy}%` : ""}).`
-      : `Ataca com um golpe ${damageClass.toLocaleLowerCase()} do tipo ${type} (Poder ${power}${accuracy ? `, Precisão ${accuracy}%` : ""}).`);
-  }
-
-  if (rule.charge) descriptionParts.push(language === "en" ? "Requires preparation before striking." : "Exige preparação antes de atacar.");
-  if (rule.evasive) descriptionParts.push(language === "en" ? "The Pokémon becomes difficult to reach while preparing it." : "Durante a preparação, o Pokémon fica difícil de alcançar.");
-  if (rule.recharge) descriptionParts.push(language === "en" ? "The Pokémon must recover after using it." : "Depois de usar o golpe, o Pokémon precisa se recuperar.");
-  if (Number(meta.drain) > 0) descriptionParts.push(language === "en" ? "Recovers energy from the damage caused." : "Recupera energia com parte do dano causado.");
-  if (Number(meta.drain) < 0) descriptionParts.push(language === "en" ? "The user suffers recoil." : "O usuário sofre dano de recuo.");
-  if (Number(meta.healing) > 0) descriptionParts.push(language === "en" ? "Restores the user's vitality." : "Restaura a vitalidade do usuário.");
-  if (Number(meta.criticalRate) > 0) descriptionParts.push(language === "en" ? "Has an increased chance of a critical hit." : "Tem chance aumentada de acerto crítico.");
-  if (Number(meta.minHits) > 1 || Number(meta.maxHits) > 1) descriptionParts.push(language === "en" ? "Can hit several times in succession." : "Pode atingir várias vezes em sequência.");
-
+  const description = moveShortDescription(move, displayName, language);
   const consequences = [];
+
   if (power > 0 && move.damageClass !== "status") {
-    const level = damageStatusLevel(power, might);
-    consequences.push(language === "en"
-      ? `A solid hit can leave the target ${statusMarkup("wounded", level)}.`
-      : `Um acerto sólido pode deixar o alvo ${statusMarkup("ferido", level)}.`);
+    const level = damageStatusLevel(power);
+    if (level > 0) {
+      consequences.push(language === "en"
+        ? `A solid hit can leave the target ${statusMarkup("wounded", level)}.`
+        : `Um acerto sólido pode deixar o alvo ${statusMarkup("ferido", level)}.`);
+    }
   }
 
   const ailment = meta.ailment;
   if (ailment && ailment !== "none" && ailment !== "unknown") {
-    const status = language === "en" ? ailment.replace(/-/g, "-") : (AILMENT_PTBR[ailment] ?? ailment);
-    const chance = Number(meta.ailmentChance ?? 0);
+    const status = language === "en" ? ailment : (AILMENT_PTBR[ailment] ?? ailment);
+    const chance = Number(meta.ailmentChance ?? move.effectChance ?? 0);
     const level = chance >= 100 || move.damageClass === "status" ? 3 : 2;
     consequences.push(language === "en"
       ? `Can leave the target ${statusMarkup(status, level)}${chance > 0 && chance < 100 ? ` (${chance}% chance)` : ""}.`
@@ -478,8 +608,21 @@ export function buildMoveThreat(move, displayName, might, language = getPokemonC
 
   if (Number(meta.flinchChance) > 0) {
     consequences.push(language === "en"
-      ? `Can leave the target ${statusMarkup("staggered", 2)} (${meta.flinchChance}% chance).`
-      : `Pode deixar o alvo ${statusMarkup("atordoado", 2)} (${meta.flinchChance}% de chance).`);
+      ? `Can leave the target ${statusMarkup("hesitation-on-next-move", 2)} (${meta.flinchChance}% chance).`
+      : `Pode deixar o alvo ${statusMarkup("hesitacao-no-proximo-movimento", 2)} (${meta.flinchChance}% de chance). O Status expira após a próxima ação relevante.`);
+  }
+
+  if (Number(meta.drain) < 0) {
+    const recoilLevel = Number(meta.drain) <= -50 ? 2 : 1;
+    consequences.push(language === "en"
+      ? `The user suffers ${statusMarkup("hurt-by-recoil", recoilLevel)}.`
+      : `O próprio Pokémon recebe ${statusMarkup("ferido-pelo-recuo", recoilLevel)}.`);
+  }
+
+  if (Number(meta.healing) > 0 || Number(meta.drain) > 0) {
+    consequences.push(language === "en"
+      ? `The user can become ${statusMarkup("recovered", 2)}.`
+      : `O Pokémon pode receber ${statusMarkup("recuperado", 2)}.`);
   }
 
   for (const change of move.statChanges ?? []) {
@@ -488,19 +631,26 @@ export function buildMoveThreat(move, displayName, might, language = getPokemonC
     const selfTarget = String(move.target ?? "").includes("user");
     const level = Math.min(4, Math.max(1, Math.abs(amount) + 1));
     const status = statStatusName(change.stat, amount, language);
-    if (selfTarget) {
-      consequences.push(language === "en"
-        ? `The Pokémon can become ${statusMarkup(status, level)}.`
-        : `O Pokémon pode ficar ${statusMarkup(status, level)}.`);
-    } else {
-      consequences.push(language === "en"
-        ? `Can leave the target ${statusMarkup(status, level)}.`
-        : `Pode deixar o alvo ${statusMarkup(status, level)}.`);
-    }
+    consequences.push(
+      selfTarget
+        ? (language === "en"
+            ? `The Pokémon can become ${statusMarkup(status, level)}.`
+            : `O Pokémon pode ficar ${statusMarkup(status, level)}.`)
+        : (language === "en"
+            ? `Can leave the target ${statusMarkup(status, level)}.`
+            : `Pode deixar o alvo ${statusMarkup(status, level)}.`)
+    );
   }
 
   if (rule.trap) {
-    consequences.push(language === "en" ? `Can leave the target ${statusMarkup("trapped", 2)}.` : `Pode deixar o alvo ${statusMarkup("preso", 2)}.`);
+    consequences.push(language === "en"
+      ? `Can leave the target ${statusMarkup("trapped", 2)}.`
+      : `Pode deixar o alvo ${statusMarkup("preso", 2)}.`);
+  }
+  if (rule.recharge) {
+    consequences.push(language === "en"
+      ? `After using it, the Pokémon becomes ${statusMarkup("recovering", 2)}.`
+      : `Depois de usar o golpe, o Pokémon fica ${statusMarkup("recuperando-se", 2)}.`);
   }
   if (rule.statusPt || rule.statusEn) {
     consequences.push(language === "en"
@@ -520,11 +670,42 @@ export function buildMoveThreat(move, displayName, might, language = getPokemonC
       : `Cria uma abertura ou complicação coerente com ${displayName}.`);
   }
 
+  return { description, list: uniqueConsequences };
+}
+
+export function buildAbilityThreat(ability, language = getPokemonContentLanguage()) {
+  if (!ability?.id) return null;
+  const rule = ABILITY_THREAT_RULES[ability.id] ?? null;
+  const description = rule
+    ? (language === "en" ? rule.en : rule.pt)
+    : (language === "en"
+        ? (ability.effectTextEn || `The Ability ${ability.name} changes how this Pokémon behaves in the confrontation.`)
+        : `A Habilidade ${ability.name} altera como este Pokémon reage durante o confronto.`);
+
+  const list = [];
+  if (rule?.statusPt || rule?.statusEn) {
+    list.push(language === "en"
+      ? `Can cause ${statusMarkup(rule.statusEn ?? rule.statusPt, rule.level ?? 2)}.`
+      : `Pode causar ${statusMarkup(rule.statusPt ?? rule.statusEn, rule.level ?? 2)}.`);
+  }
+  if (rule?.selfPt || rule?.selfEn) {
+    list.push(language === "en"
+      ? `Can grant the Pokémon ${statusMarkup(rule.selfEn ?? rule.selfPt, rule.level ?? 2)}.`
+      : `Pode conceder ao Pokémon ${statusMarkup(rule.selfPt ?? rule.selfEn, rule.level ?? 2)}.`);
+  }
+  if (!list.length) {
+    list.push(language === "en"
+      ? "Apply this passive effect whenever the fiction makes it relevant."
+      : "Aplique este efeito passivo sempre que ele for relevante na ficção.");
+  }
+
   return {
-    description: descriptionParts.join(" "),
-    list: uniqueConsequences
+    name: ability.name,
+    description,
+    list
   };
 }
+
 
 export function formatThemeDescription({ data, review }, language = getPokemonContentLanguage()) {
   const types = (data.types ?? []).map(type => typeLabel(type, language)).join(" / ");
