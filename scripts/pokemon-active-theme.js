@@ -88,6 +88,15 @@ function getActiveId(
       "activePokemonThemeId"
     );
 
+  /*
+   * null significa:
+   * jogador escolheu explicitamente
+   * "Nenhum".
+   */
+  if (stored === null) {
+    return null;
+  }
+
   if (
     themes.some(
       theme =>
@@ -97,6 +106,10 @@ function getActiveId(
     return stored;
   }
 
+  /*
+   * Actor antigo sem flag:
+   * mantém o primeiro Pokémon ativo.
+   */
   return themes[0].id;
 }
 
@@ -171,6 +184,29 @@ export async function setActivePokemonTheme(
 ) {
   const themes =
     getPokemonThemes(actor);
+
+  /*
+   * Nenhum Pokémon ativo.
+   */
+  if (
+    themeId === ""
+    ||
+    themeId === null
+  ) {
+    for (const theme of themes) {
+      await clearThemeSelection(
+        theme
+      );
+    }
+
+    await actor.setFlag(
+      MODULE_ID,
+      "activePokemonThemeId",
+      null
+    );
+
+    return null;
+  }
 
   const selected =
     themes.find(
@@ -309,6 +345,24 @@ function createSelector(
     .pokemonActiveThemeSelect =
       "true";
 
+  const noneOption =
+    document.createElement(
+      "option"
+    );
+
+  noneOption.value =
+    "";
+
+  noneOption.textContent =
+    "Nenhum";
+
+  noneOption.selected =
+    activeId === null;
+
+  select.append(
+    noneOption
+  );
+
   for (const theme of themes) {
     const option =
       document.createElement(
@@ -328,9 +382,7 @@ function createSelector(
   }
 
   select.disabled =
-    !actor.isOwner
-    ||
-    themes.length <= 1;
+    !actor.isOwner;
 
   select.addEventListener(
     "change",
@@ -353,17 +405,13 @@ function createSelector(
         );
 
         select.value =
-          previous;
+          previous ?? "";
 
         ui.notifications.error(
           "Nao foi possivel trocar o Pokemon ativo."
         );
       } finally {
-        if (
-          actor.isOwner
-          &&
-          themes.length > 1
-        ) {
+        if (actor.isOwner) {
           select.disabled =
             false;
         }

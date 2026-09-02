@@ -92,6 +92,13 @@ function getActivePokemonTheme(actor) {
       "activePokemonThemeId"
     );
 
+  /*
+   * null = nenhum Pokémon ativo.
+   */
+  if (activeId === null) {
+    return null;
+  }
+
   return (
     themes.find(
       theme =>
@@ -662,9 +669,144 @@ function queueMove(
 }
 
 
+
+function followerDestination(
+  trainer,
+  previous,
+  options
+) {
+  const size =
+    gridSize();
+
+  let from = {
+    x:
+      Number(previous.x),
+    y:
+      Number(previous.y)
+  };
+
+  let to = {
+    x:
+      Number(trainer.x ?? 0),
+    y:
+      Number(trainer.y ?? 0)
+  };
+
+  const waypoints =
+    options?.movement?.[
+      trainer.id
+    ]?.waypoints;
+
+  if (
+    Array.isArray(waypoints)
+    &&
+    waypoints.length >= 2
+  ) {
+    const before =
+      waypoints[
+        waypoints.length - 2
+      ];
+
+    const last =
+      waypoints[
+        waypoints.length - 1
+      ];
+
+    if (
+      Number.isFinite(
+        Number(before?.x)
+      )
+      &&
+      Number.isFinite(
+        Number(before?.y)
+      )
+      &&
+      Number.isFinite(
+        Number(last?.x)
+      )
+      &&
+      Number.isFinite(
+        Number(last?.y)
+      )
+    ) {
+      from = {
+        x:
+          Number(before.x),
+        y:
+          Number(before.y)
+      };
+
+      to = {
+        x:
+          Number(last.x),
+        y:
+          Number(last.y)
+      };
+    }
+  }
+
+  const dx =
+    to.x - from.x;
+
+  const dy =
+    to.y - from.y;
+
+  /*
+   * Apenas mudança de elevação.
+   */
+  if (
+    dx === 0
+    &&
+    dy === 0
+  ) {
+    return {
+      x:
+        Number(
+          trainer.x ?? 0
+        ),
+
+      y:
+        Number(
+          trainer.y ?? 0
+        ),
+
+      elevation:
+        Number(
+          trainer.elevation ?? 0
+        )
+    };
+  }
+
+  return {
+    x:
+      Number(
+        trainer.x ?? to.x
+      )
+      -
+      Math.sign(dx)
+      *
+      size,
+
+    y:
+      Number(
+        trainer.y ?? to.y
+      )
+      -
+      Math.sign(dy)
+      *
+      size,
+
+    elevation:
+      Number(
+        trainer.elevation ?? 0
+      )
+  };
+}
+
 async function moveFollower(
   trainer,
-  previous
+  previous,
+  options
 ) {
   const follower =
     await ensureFollower(
@@ -675,19 +817,37 @@ async function moveFollower(
     return;
   }
 
+  const destination =
+    followerDestination(
+      trainer,
+      previous,
+      options
+    );
+
   await follower.update(
     {
       x:
-        previous.x,
+        destination.x,
 
       y:
-        previous.y,
+        destination.y,
 
       elevation:
-        previous.elevation
+        destination.elevation
     },
 
     {
+      /*
+       * O Pokémon é visual.
+       * Parede/obstáculo não pode
+       * impedir que alcance o treinador.
+       */
+      teleport:
+        true,
+
+      forced:
+        true,
+
       animate:
         true,
 
@@ -702,7 +862,6 @@ async function moveFollower(
     }
   );
 }
-
 
 async function syncScene() {
   if (
@@ -811,7 +970,8 @@ function onCreateToken(token) {
 
 function onUpdateToken(
   token,
-  changes
+  changes,
+  options
 ) {
   if (
     !isAuthority()
@@ -866,7 +1026,8 @@ function onUpdateToken(
       () =>
         moveFollower(
           token,
-          previous
+          previous,
+          options
         )
     );
   }
