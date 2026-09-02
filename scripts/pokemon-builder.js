@@ -23,6 +23,21 @@ import {
 const MODULE_ID = "pokemon-litm-tools";
 const PC_FLAG = "pokemonPC";
 
+const {
+  ApplicationV2,
+  HandlebarsApplicationMixin
+} = foundry.applications.api;
+
+let pokemonBuilderWizardApp = null;
+
+const NATURE_IDS = [
+  "hardy","lonely","adamant","naughty","brave",
+  "bold","docile","impish","lax","relaxed",
+  "modest","mild","bashful","rash","quiet",
+  "calm","gentle","careful","quirky","sassy",
+  "timid","hasty","jolly","naive","serious"
+];
+
 const TYPE_PT = {
   normal: "Normal", fire: "Fogo", water: "Água", electric: "Elétrico",
   grass: "Planta", ice: "Gelo", fighting: "Lutador", poison: "Venenoso",
@@ -78,16 +93,14 @@ function learnMethodInfo(methods, level, language = "pt-BR") {
     const hm = methods.includes("hm");
     return {
       id: hm ? "hm" : "tm",
-      label: language === "en"
-        ? (hm ? "Hidden Machine (HM)" : "Technical Machine (TM)")
-        : (hm ? "Máquina Oculta (MO)" : "Máquina Técnica (MT)")
+      label: hm ? "HM" : "TM"
     };
   }
   if (methods.includes("tutor")) {
     return { id: "tutor", label: language === "en" ? "Tutor" : "Tutor" };
   }
   if (methods.includes("egg")) {
-    return { id: "breeding", label: language === "en" ? "Breeding" : "Cruzamento (Breeding)" };
+    return { id: "breeding", label: language === "en" ? "Breeding" : "Cruzamento" };
   }
   return { id: "other", label: language === "en" ? "Other method" : "Outra forma de aprendizado" };
 }
@@ -1008,7 +1021,7 @@ function pokemonBiography(data, review) {
     const moves = rows.filter(move => move.rank === rank).sort((a, b) => Number(a.level ?? 0) - Number(b.level ?? 0));
     const text = moves.length
       ? moves.map(move => `${nameText(move)} · Nv. ${move.level}`).join("<br>")
-      : "Nenhum listado.";
+      : (language === "en" ? "None listed." : "Nenhum listado.");
     return `<h3>${title}</h3><p>${text}</p>`;
   }).join("");
 
@@ -1018,15 +1031,51 @@ function pokemonBiography(data, review) {
     return `<h3>${title}</h3><p>${moves.map(nameText).join(", ")}</p>`;
   }
 
+  const actionRows = (data.moves ?? []).map((move, index) => {
+    const displayName = review.moveNames[index] ?? move.name;
+    const threat = buildMoveThreat(move, displayName, review.might ?? "adventure", language);
+    return `
+      <article class="pokemon-biography-effect"
+        data-pokemon-effect-kind="move"
+        data-pokemon-effect-id="${escapeHTML(move.id)}"
+        data-pokemon-effect-type="${escapeHTML(move.type)}"
+        data-pokemon-effect-target="${escapeHTML(move.target ?? "selected-pokemon")}">
+        <h3><i class="fa-solid fa-bolt"></i> ${escapeHTML(displayName)} (${escapeHTML(move.englishName ?? titleCase(move.id))})</h3>
+        <p>${escapeHTML(threat.description)}</p>
+      </article>
+    `;
+  }).join("");
+
+  const abilityThreat = buildAbilityThreat(data.ability, language);
+  const abilityRow = abilityThreat ? `
+    <article class="pokemon-biography-effect"
+      data-pokemon-effect-kind="ability"
+      data-pokemon-effect-id="${escapeHTML(data.ability?.id ?? "")}"
+      data-pokemon-effect-target="self">
+      <h3><i class="fa-solid fa-star"></i> ${escapeHTML(abilityThreat.name)}${data.ability?.englishName && data.ability.englishName !== abilityThreat.name ? ` (${escapeHTML(data.ability.englishName)})` : ""}</h3>
+      <p>${escapeHTML(abilityThreat.description)}</p>
+    </article>
+  ` : "";
+
   return `
-    ${profile}
+    <h2>${language === "en" ? "Actions / Effects" : "Ações / Efeitos"}</h2>
+    <p><em>${language === "en" ? "Prepared for future visual-effect buttons." : "Área preparada para os futuros botões de efeitos visuais."}</em></p>
+    <div class="pokemon-biography-effects" data-pokemon-effect-actions="true">
+      ${actionRows}
+      ${abilityRow}
+    </div>
+
     <h2>${language === "en" ? "Moves by Rank" : "Golpes por Rank"}</h2>
     ${rankSections}
+
     <h2>${language === "en" ? "Other learning methods" : "Outras formas de aprendizado"}</h2>
-    ${otherGroup("tm", language === "en" ? "Technical Machine (TM)" : "Máquina Técnica (MT)")}
-    ${otherGroup("hm", language === "en" ? "Hidden Machine (HM)" : "Máquina Oculta (MO)")}
+    ${otherGroup("tm", "TM")}
+    ${otherGroup("hm", "HM")}
     ${otherGroup("tutor", "Tutor")}
-    ${otherGroup("breeding", language === "en" ? "Breeding" : "Cruzamento (Breeding)")}
+    ${otherGroup("breeding", language === "en" ? "Breeding" : "Cruzamento")}
+
+    <hr>
+    ${profile}
   `;
 }
 
@@ -1126,10 +1175,10 @@ async function createChallenge(entry, config, data, review, definition) {
     .filter(Boolean);
 
   const intrinsicTags = [
-    ...statTags.map(name => floatingTag(name, true)),
-    ...(data.ability?.name ? [floatingTag(data.ability.name, true)] : []),
-    floatingTag(`Natureza: ${review.natureLabel}`, true),
-    floatingTag(review.weaknessTag, false),
+    ...statTags.map(name => floatingTag(name, false)),
+    ...(data.ability?.name ? [floatingTag(data.ability.name, false)] : []),
+    floatingTag(`Natureza: ${review.natureLabel}`, false),
+    floatingTag(review.weaknessTag, true),
     ...defenses.map(defense => floatingTag(defense.name, defense.positive))
   ];
 
@@ -1213,24 +1262,898 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
   return null;
 }
 
+class PokemonChallengeWizardApp
+  extends HandlebarsApplicationMixin(ApplicationV2) {
+
+  static DEFAULT_OPTIONS = {
+    id: "pokemon-litm-challenge-wizard",
+    classes: [
+      "pokemon-litm-tools",
+      "pokemon-challenge-wizard"
+    ],
+    position: {
+      width: 900,
+      height: 780
+    },
+    window: {
+      title: "Criar Challenge Pokémon",
+      icon: "fa-solid fa-dragon",
+      resizable: true
+    }
+  };
+
+  static PARTS = {
+    main: {
+      template:
+        "modules/" +
+        MODULE_ID +
+        "/templates/pokemon-builder-wizard.hbs",
+      scrollable: [
+        ".pokemon-challenge-wizard-body",
+        ".pokemon-builder-move-list"
+      ]
+    }
+  };
+
+  step = 1;
+  busy = false;
+  data = null;
+  loadedMight = null;
+  natureId = "hardy";
+  abilityId = "";
+  weaknessStat = "speed";
+  customWeakness = "";
+  selectedMoveIds = new Set();
+
+  config = {
+    mode: "challenge",
+    might: "adventure",
+    trainerId: "",
+    destination: "team",
+    folderId: "",
+    newFolder: ""
+  };
+
+  constructor(entry, prepareDefinition, options = {}) {
+    super(options);
+    this.entry = entry;
+    this.prepareDefinition = prepareDefinition;
+  }
+
+  async _ensureData() {
+    if (
+      this.data &&
+      this.loadedMight === this.config.might
+    ) return;
+
+    ui.notifications.info(
+      `Consultando dados de ${this.entry.name}...`
+    );
+
+    this.data = await loadPokemonBuildData(
+      this.entry,
+      this.config.might
+    );
+
+    this.loadedMight = this.config.might;
+
+    const defaultNature =
+      defaultNatureForStats(this.data.stats);
+
+    this.natureId = defaultNature.id;
+    this.abilityId =
+      this.data.ability?.id ??
+      this.data.abilities?.[0]?.id ??
+      "";
+    this.weaknessStat =
+      this.data.worst?.name ??
+      "speed";
+    this.customWeakness = "";
+    this.selectedMoveIds =
+      new Set(
+        (this.data.moves ?? [])
+          .slice(0, 4)
+          .map(move => move.id)
+      );
+  }
+
+  _selectedAbility() {
+    return (
+      (this.data?.abilities ?? [])
+        .find(row => row.id === this.abilityId)
+      ??
+      this.data?.ability
+      ??
+      null
+    );
+  }
+
+  _selectedMoves() {
+    return (this.data?.moveChoices ?? [])
+      .filter(move =>
+        this.selectedMoveIds.has(move.id)
+      )
+      .slice(0, 4);
+  }
+
+  _buildReview() {
+    const language =
+      this.data?.contentLanguage ??
+      getPokemonContentLanguage();
+
+    const nature =
+      natureProfile(
+        this.natureId,
+        language
+      );
+
+    const ability =
+      this._selectedAbility();
+
+    const weaknessTag =
+      this.customWeakness.trim()
+      ||
+      statWeaknessText(
+        this.weaknessStat,
+        language
+      );
+
+    const moves =
+      this._selectedMoves();
+
+    return {
+      nature,
+      ability,
+      moves,
+      review: {
+        moveNames:
+          moves.map(move => move.name),
+        powerStatTag:
+          this.data?.powerStatTag ?? "",
+        weaknessTag,
+        natureId:
+          nature.id,
+        natureLabel:
+          nature.label,
+        natureLimits: [],
+        abilityId:
+          ability?.id ?? null,
+        might:
+          this.config.might
+      }
+    };
+  }
+
+  async _prepareContext(options) {
+    const context =
+      await super._prepareContext(options);
+
+    if (this.step >= 3) {
+      await this._ensureData();
+    }
+
+    const language =
+      this.data?.contentLanguage ??
+      getPokemonContentLanguage();
+
+    const progressNames = [
+      "Configuração",
+      "Destino",
+      "Perfil",
+      "Golpes",
+      "Revisão"
+    ];
+
+    const progress =
+      progressNames.map((name, index) => {
+        const number = index + 1;
+        return {
+          number,
+          name,
+          active: number === this.step,
+          done: number < this.step
+        };
+      });
+
+    const folders =
+      game.folders
+        .filter(folder => folder.type === "Actor")
+        .sort((a, b) =>
+          a.name.localeCompare(b.name, "pt-BR")
+        )
+        .map(folder => ({
+          id: folder.id,
+          name: folder.name,
+          selected:
+            folder.id === this.config.folderId
+        }));
+
+    const trainers =
+      trainerOptions()
+        .map(actor => ({
+          id: actor.id,
+          name: actor.name,
+          selected:
+            actor.id === this.config.trainerId
+        }));
+
+    let natureOptions = [];
+    let abilityOptions = [];
+    let selectedNature = null;
+    let selectedAbility = null;
+    let weaknessOptions = [];
+    let moveChoices = [];
+    let finalReview = null;
+
+    if (this.data) {
+      natureOptions =
+        NATURE_IDS.map(id => {
+          const nature =
+            natureProfile(id, language);
+          return {
+            ...nature,
+            selected:
+              id === this.natureId
+          };
+        });
+
+      selectedNature =
+        natureProfile(
+          this.natureId,
+          language
+        );
+
+      abilityOptions =
+        (this.data.abilities ?? [])
+          .map(ability => {
+            const threat =
+              buildAbilityThreat(
+                ability,
+                language
+              );
+            return {
+              ...ability,
+              selected:
+                ability.id === this.abilityId,
+              description:
+                threat?.description ??
+                ""
+            };
+          });
+
+      selectedAbility =
+        abilityOptions.find(
+          ability => ability.selected
+        )
+        ??
+        abilityOptions[0]
+        ??
+        null;
+
+      weaknessOptions =
+        [
+          "attack",
+          "defense",
+          "special-attack",
+          "special-defense",
+          "speed"
+        ].map(stat => ({
+          id: stat,
+          label:
+            statWeaknessText(
+              stat,
+              language
+            ),
+          statLabel:
+            statLabel(
+              stat,
+              language
+            ),
+          value:
+            Number(
+              this.data.stats?.[stat] ??
+              0
+            ),
+          selected:
+            stat === this.weaknessStat
+        }));
+
+      moveChoices =
+        (this.data.moveChoices ?? [])
+          .map(move => {
+            const threat =
+              buildMoveThreat(
+                move,
+                move.name,
+                this.config.might,
+                language
+              );
+
+            return {
+              ...move,
+              checked:
+                this.selectedMoveIds.has(
+                  move.id
+                ),
+              typeText:
+                typeLabel(
+                  move.type,
+                  language
+                ),
+              damageText:
+                move.power
+                  ? (
+                      language === "en"
+                        ? `Power ${move.power}`
+                        : `Poder ${move.power}`
+                    )
+                  : (
+                      language === "en"
+                        ? "No direct damage"
+                        : "Sem dano direto"
+                    ),
+              consequences:
+                threat.list
+            };
+          });
+
+      if (this.step === 5) {
+        const built =
+          this._buildReview();
+
+        finalReview = {
+          nature:
+            built.nature,
+          ability:
+            built.ability,
+          weaknessTag:
+            built.review.weaknessTag,
+          powerStatTag:
+            built.review.powerStatTag,
+          moves:
+            built.moves.map(move => ({
+              ...move,
+              threat:
+                buildMoveThreat(
+                  move,
+                  move.name,
+                  this.config.might,
+                  language
+                )
+            }))
+        };
+      }
+    }
+
+    const selectedCount =
+      this.selectedMoveIds.size;
+
+    const canNext =
+      (
+        this.step === 1
+      )
+      ||
+      (
+        this.step === 2
+        &&
+        (
+          this.config.mode === "challenge"
+          ||
+          !!this.config.trainerId
+        )
+      )
+      ||
+      (
+        this.step === 3
+      )
+      ||
+      (
+        this.step === 4
+        &&
+        selectedCount >= 1
+        &&
+        selectedCount <= 4
+      );
+
+    return {
+      ...context,
+
+      entry:
+        this.entry,
+
+      pokedexUrl:
+        getPokemonDbUrl(
+          this.entry
+        ),
+
+      step:
+        this.step,
+
+      progress,
+
+      stepIsConfig:
+        this.step === 1,
+
+      stepIsDestination:
+        this.step === 2,
+
+      stepIsProfile:
+        this.step === 3,
+
+      stepIsMoves:
+        this.step === 4,
+
+      stepIsReview:
+        this.step === 5,
+
+      isChallenge:
+        this.config.mode ===
+        "challenge",
+
+      isTrainer:
+        this.config.mode ===
+        "trainer",
+
+      mode:
+        this.config.mode,
+
+      might:
+        this.config.might,
+
+      mightOrigin:
+        this.config.might === "origin",
+
+      mightAdventure:
+        this.config.might === "adventure",
+
+      mightGreatness:
+        this.config.might === "greatness",
+
+      destination:
+        this.config.destination,
+
+      destinationTeam:
+        this.config.destination === "team",
+
+      destinationPc:
+        this.config.destination === "pc",
+
+      folders,
+      trainers,
+
+      rootFolderSelected:
+        !this.config.folderId,
+
+      newFolder:
+        this.config.newFolder,
+
+      natureOptions,
+      selectedNature,
+
+      abilityOptions,
+      selectedAbility,
+
+      weaknessOptions,
+
+      customWeakness:
+        this.customWeakness,
+
+      moveChoices,
+
+      selectedCount,
+
+      finalReview,
+
+      canBack:
+        this.step > 1
+        &&
+        !this.busy,
+
+      canNext:
+        canNext
+        &&
+        this.step < 5
+        &&
+        !this.busy,
+
+      canCreate:
+        this.step === 5
+        &&
+        !this.busy,
+
+      busy:
+        this.busy
+    };
+  }
+
+  async _onRender(context, options) {
+    await super._onRender(
+      context,
+      options
+    );
+
+    const field =
+      name =>
+        this.element.querySelector(
+          `[data-builder-field="${name}"]`
+        );
+
+    field("mode")
+      ?.addEventListener(
+        "change",
+        event => {
+          this.config.mode =
+            event.currentTarget.value;
+        }
+      );
+
+    field("might")
+      ?.addEventListener(
+        "change",
+        event => {
+          const next =
+            event.currentTarget.value;
+          if (
+            next !==
+            this.config.might
+          ) {
+            this.config.might =
+              next;
+            this.data = null;
+            this.loadedMight = null;
+          }
+        }
+      );
+
+    field("folderId")
+      ?.addEventListener(
+        "change",
+        event => {
+          this.config.folderId =
+            event.currentTarget.value;
+        }
+      );
+
+    field("newFolder")
+      ?.addEventListener(
+        "input",
+        event => {
+          this.config.newFolder =
+            event.currentTarget.value;
+        }
+      );
+
+    field("trainerId")
+      ?.addEventListener(
+        "change",
+        event => {
+          this.config.trainerId =
+            event.currentTarget.value;
+        }
+      );
+
+    field("destination")
+      ?.addEventListener(
+        "change",
+        event => {
+          this.config.destination =
+            event.currentTarget.value;
+        }
+      );
+
+    field("natureId")
+      ?.addEventListener(
+        "change",
+        async event => {
+          this.natureId =
+            event.currentTarget.value;
+          await this.render({
+            force: true
+          });
+        }
+      );
+
+    field("abilityId")
+      ?.addEventListener(
+        "change",
+        async event => {
+          this.abilityId =
+            event.currentTarget.value;
+          await this.render({
+            force: true
+          });
+        }
+      );
+
+    field("weaknessStat")
+      ?.addEventListener(
+        "change",
+        event => {
+          this.weaknessStat =
+            event.currentTarget.value;
+        }
+      );
+
+    field("customWeakness")
+      ?.addEventListener(
+        "input",
+        event => {
+          this.customWeakness =
+            event.currentTarget.value;
+        }
+      );
+
+    for (
+      const checkbox
+      of this.element.querySelectorAll(
+        "[data-builder-move]"
+      )
+    ) {
+      checkbox.addEventListener(
+        "change",
+        event => {
+          const id =
+            event.currentTarget
+              .dataset.builderMove;
+
+          if (!id) return;
+
+          if (
+            event.currentTarget.checked
+          ) {
+            if (
+              this.selectedMoveIds.size
+              >=
+              4
+            ) {
+              event.currentTarget.checked =
+                false;
+
+              ui.notifications.warn(
+                "Escolha no máximo 4 golpes."
+              );
+
+              return;
+            }
+
+            this.selectedMoveIds.add(
+              id
+            );
+          } else {
+            this.selectedMoveIds.delete(
+              id
+            );
+          }
+
+          const counter =
+            this.element.querySelector(
+              "[data-builder-move-count]"
+            );
+
+          if (counter) {
+            counter.textContent =
+              String(
+                this.selectedMoveIds.size
+              );
+          }
+        }
+      );
+    }
+
+    this.element
+      .querySelector(
+        "[data-action='builderBack']"
+      )
+      ?.addEventListener(
+        "click",
+        async () => {
+          if (
+            this.busy
+            ||
+            this.step <= 1
+          ) return;
+
+          this.step--;
+
+          await this.render({
+            force: true
+          });
+        }
+      );
+
+    this.element
+      .querySelector(
+        "[data-action='builderNext']"
+      )
+      ?.addEventListener(
+        "click",
+        async () => {
+          if (this.busy) return;
+
+          if (
+            this.step === 2
+            &&
+            this.config.mode ===
+              "trainer"
+            &&
+            !this.config.trainerId
+          ) {
+            ui.notifications.warn(
+              "Escolha o treinador."
+            );
+            return;
+          }
+
+          if (
+            this.step === 2
+          ) {
+            await this._ensureData();
+          }
+
+          if (
+            this.step === 4
+            &&
+            (
+              this.selectedMoveIds.size
+                < 1
+              ||
+              this.selectedMoveIds.size
+                > 4
+            )
+          ) {
+            ui.notifications.warn(
+              "Escolha entre 1 e 4 golpes."
+            );
+            return;
+          }
+
+          if (this.step < 5) {
+            this.step++;
+          }
+
+          await this.render({
+            force: true
+          });
+        }
+      );
+
+    this.element
+      .querySelector(
+        "[data-action='builderCreate']"
+      )
+      ?.addEventListener(
+        "click",
+        async event => {
+          if (this.busy) return;
+
+          this.busy = true;
+
+          const button =
+            event.currentTarget;
+
+          button.disabled = true;
+          button.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i> Criando...';
+
+          try {
+            await this._ensureData();
+
+            const built =
+              this._buildReview();
+
+            this.data.ability =
+              built.ability;
+
+            this.data.moves =
+              built.moves;
+
+            const definition =
+              await this.prepareDefinition(
+                this.entry
+              );
+
+            const result =
+              this.config.mode ===
+                "trainer"
+                ? await createTrainerPokemon(
+                    this.entry,
+                    this.config,
+                    this.data,
+                    built.review,
+                    definition
+                  )
+                : await createChallenge(
+                    this.entry,
+                    this.config,
+                    this.data,
+                    built.review,
+                    definition
+                  );
+
+            ui.notifications.info(
+              `${this.entry.name} criado com sucesso.`
+            );
+
+            await this.close();
+
+            return result;
+
+          } catch (error) {
+            console.error(
+              "Pokemon LITM Tools | Challenge Wizard:",
+              error
+            );
+
+            ui.notifications.error(
+              "Não foi possível criar o Pokémon. Veja F12."
+            );
+
+            this.busy = false;
+            button.disabled = false;
+            button.innerHTML =
+              '<i class="fa-solid fa-check"></i> Criar Pokémon';
+          }
+        }
+      );
+  }
+
+  async close(options = {}) {
+    const result =
+      await super.close(options);
+
+    if (
+      pokemonBuilderWizardApp ===
+      this
+    ) {
+      pokemonBuilderWizardApp =
+        null;
+    }
+
+    return result;
+  }
+}
+
+
 export async function openPokemonBuilder(entry, prepareDefinition) {
   if (!game.user.isGM) return null;
-  if (!entry || entry.category !== "pokemon") throw new Error("O Builder aceita apenas Pokémon.");
-  if (typeof prepareDefinition !== "function") throw new Error("Serviço visual do importador indisponível.");
 
-  const config = await askBuildConfig(entry);
-  if (!config) return null;
+  if (
+    !entry
+    ||
+    entry.category !== "pokemon"
+  ) {
+    throw new Error(
+      "O Builder aceita apenas Pokémon."
+    );
+  }
 
-  ui.notifications.info(`Consultando dados de ${entry.name}...`);
-  const data = await loadPokemonBuildData(entry, config.might);
-  const review = await reviewBuild(entry, config, data);
-  if (!review) return null;
+  if (
+    typeof prepareDefinition
+    !==
+    "function"
+  ) {
+    throw new Error(
+      "Serviço visual do importador indisponível."
+    );
+  }
 
-  const definition = await prepareDefinition(entry);
-  const result = config.mode === "trainer"
-    ? await createTrainerPokemon(entry, config, data, review, definition)
-    : await createChallenge(entry, config, data, review, definition);
+  if (
+    pokemonBuilderWizardApp
+    &&
+    pokemonBuilderWizardApp.rendered
+  ) {
+    await pokemonBuilderWizardApp.close();
+  }
 
-  ui.notifications.info(`${entry.name} criado com sucesso.`);
-  return result;
+  pokemonBuilderWizardApp =
+    new PokemonChallengeWizardApp(
+      entry,
+      prepareDefinition
+    );
+
+  pokemonBuilderWizardApp.render({
+    force: true
+  });
+
+  return pokemonBuilderWizardApp;
 }

@@ -1,0 +1,262 @@
+<div class="pokemon-challenge-wizard-shell">
+  <nav class="pokemon-builder-progress">
+    {{#each progress}}
+      <div class="pokemon-builder-progress-step {{#if active}}active{{/if}} {{#if done}}done{{/if}}">
+        <span>{{number}}</span>
+        <strong>{{name}}</strong>
+      </div>
+    {{/each}}
+  </nav>
+
+  <section class="pokemon-challenge-wizard-body">
+
+    {{#if stepIsConfig}}
+      <div class="pokemon-builder-page">
+        <h2>Configuração</h2>
+        <p>Defina como este Pokémon será criado. O arraste rápido do Importer continua funcionando normalmente.</p>
+
+        <div class="pokemon-builder-config-grid">
+          <label>
+            <span>Criar como</span>
+            <select data-builder-field="mode">
+              <option value="challenge" {{#if isChallenge}}selected{{/if}}>Pokémon selvagem / Challenge</option>
+              <option value="trainer" {{#if isTrainer}}selected{{/if}}>Pokémon de treinador jogador</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Rank / Might</span>
+            <select data-builder-field="might">
+              <option value="origin" {{#if mightOrigin}}selected{{/if}}>Origin</option>
+              <option value="adventure" {{#if mightAdventure}}selected{{/if}}>Adventure</option>
+              <option value="greatness" {{#if mightGreatness}}selected{{/if}}>Greatness</option>
+            </select>
+          </label>
+        </div>
+
+        {{#if pokedexUrl}}
+          <a class="pokemon-builder-db-link" href="{{pokedexUrl}}" target="_blank" rel="noopener noreferrer">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            Abrir {{entry.name}} no PokémonDB
+          </a>
+        {{/if}}
+      </div>
+    {{/if}}
+
+    {{#if stepIsDestination}}
+      <div class="pokemon-builder-page">
+        <h2>Destino</h2>
+
+        {{#if isChallenge}}
+          <p>Escolha onde o Challenge será armazenado.</p>
+
+          <div class="pokemon-builder-config-grid">
+            <label>
+              <span>Pasta de Actors</span>
+              <select data-builder-field="folderId">
+                <option value="" {{#if rootFolderSelected}}selected{{/if}}>Raiz de Actors</option>
+                {{#each folders}}
+                  <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+                {{/each}}
+              </select>
+            </label>
+
+            <label>
+              <span>Ou criar nova pasta</span>
+              <input data-builder-field="newFolder" type="text" value="{{newFolder}}" placeholder="Ex.: Pokémon Selvagens">
+            </label>
+          </div>
+        {{else}}
+          <p>Escolha o treinador e se o Pokémon entra no Time ou no PC.</p>
+
+          <div class="pokemon-builder-config-grid">
+            <label>
+              <span>Treinador</span>
+              <select data-builder-field="trainerId">
+                <option value="">Escolha um treinador</option>
+                {{#each trainers}}
+                  <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+                {{/each}}
+              </select>
+            </label>
+
+            <label>
+              <span>Destino</span>
+              <select data-builder-field="destination">
+                <option value="team" {{#if destinationTeam}}selected{{/if}}>Time</option>
+                <option value="pc" {{#if destinationPc}}selected{{/if}}>PC</option>
+              </select>
+            </label>
+          </div>
+        {{/if}}
+      </div>
+    {{/if}}
+
+    {{#if stepIsProfile}}
+      <div class="pokemon-builder-page">
+        <h2>Perfil do Pokémon</h2>
+        <p>Natureza e Habilidade pertencem ao indivíduo. HP não é usado para sugerir a fraqueza.</p>
+
+        <div class="pokemon-builder-profile-grid">
+          <label>
+            <span>Natureza</span>
+            <select data-builder-field="natureId">
+              {{#each natureOptions}}
+                <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+              {{/each}}
+            </select>
+          </label>
+
+          <div class="pokemon-builder-explanation">
+            <strong>O que esta Natureza altera</strong>
+            <p>{{selectedNature.effect}}</p>
+          </div>
+
+          <label>
+            <span>Habilidade</span>
+            <select data-builder-field="abilityId">
+              {{#each abilityOptions}}
+                <option value="{{id}}" {{#if selected}}selected{{/if}}>
+                  {{name}}{{#if hidden}} · Habilidade Oculta{{/if}}
+                </option>
+              {{/each}}
+            </select>
+          </label>
+
+          <div class="pokemon-builder-explanation">
+            <strong>O que esta Habilidade faz</strong>
+            <p>{{selectedAbility.description}}</p>
+          </div>
+
+          <label class="wide">
+            <span>Fraqueza sugerida</span>
+            <select data-builder-field="weaknessStat">
+              {{#each weaknessOptions}}
+                <option value="{{id}}" {{#if selected}}selected{{/if}}>
+                  {{label}} · {{statLabel}} {{value}}
+                </option>
+              {{/each}}
+            </select>
+          </label>
+
+          <label class="wide">
+            <span>Fraqueza personalizada (opcional)</span>
+            <input data-builder-field="customWeakness" type="text" value="{{customWeakness}}" placeholder="Se preencher, substitui a sugestão">
+          </label>
+        </div>
+      </div>
+    {{/if}}
+
+    {{#if stepIsMoves}}
+      <div class="pokemon-builder-page pokemon-builder-moves-page">
+        <div class="pokemon-builder-moves-heading">
+          <div>
+            <h2>Escolher golpes</h2>
+            <p>Escolha até 4 golpes. O Rank define as sugestões, mas você pode trocar livremente.</p>
+          </div>
+          <strong><span data-builder-move-count>{{selectedCount}}</span>/4</strong>
+        </div>
+
+        <div class="pokemon-builder-move-list">
+          {{#each moveChoices}}
+            <label class="pokemon-builder-move-card">
+              <input type="checkbox" data-builder-move="{{id}}" {{#if checked}}checked{{/if}}>
+
+              <div class="pokemon-builder-move-main">
+                <div class="pokemon-builder-move-title">
+                  <strong>{{name}} <span>({{englishName}})</span></strong>
+                  <a href="https://pokemondb.net/move/{{id}}" target="_blank" rel="noopener noreferrer" title="PokémonDB">
+                    <i class="fa-solid fa-up-right-from-square"></i>
+                  </a>
+                </div>
+
+                <small>{{typeText}} · {{methodLabel}} · {{damageText}}</small>
+                <p>{{shortDescription}}</p>
+
+                <ul>
+                  {{#each consequences}}
+                    <li>{{this}}</li>
+                  {{/each}}
+                </ul>
+              </div>
+            </label>
+          {{/each}}
+        </div>
+      </div>
+    {{/if}}
+
+    {{#if stepIsReview}}
+      <div class="pokemon-builder-page">
+        <h2>Revisão</h2>
+
+        <div class="pokemon-builder-review-grid">
+          <div>
+            <strong>Natureza</strong>
+            <p>{{finalReview.nature.label}}</p>
+            <small>{{finalReview.nature.effect}}</small>
+          </div>
+
+          <div>
+            <strong>Habilidade</strong>
+            <p>{{finalReview.ability.name}}</p>
+          </div>
+
+          <div>
+            <strong>Tag de Poder</strong>
+            <p>{{finalReview.powerStatTag}}</p>
+          </div>
+
+          <div>
+            <strong>Fraqueza</strong>
+            <p>{{finalReview.weaknessTag}}</p>
+          </div>
+        </div>
+
+        <h3>Golpes selecionados</h3>
+
+        <div class="pokemon-builder-review-moves">
+          {{#each finalReview.moves}}
+            <article>
+              <strong>{{name}} ({{englishName}})</strong>
+              <p>{{threat.description}}</p>
+              <ul>
+                {{#each threat.list}}
+                  <li>{{this}}</li>
+                {{/each}}
+              </ul>
+            </article>
+          {{/each}}
+        </div>
+
+        {{#if pokedexUrl}}
+          <a class="pokemon-builder-db-link" href="{{pokedexUrl}}" target="_blank" rel="noopener noreferrer">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            Abrir no PokémonDB
+          </a>
+        {{/if}}
+      </div>
+    {{/if}}
+
+  </section>
+
+  <footer class="pokemon-builder-wizard-footer">
+    <button type="button" data-action="builderBack" {{#unless canBack}}disabled{{/unless}}>
+      <i class="fa-solid fa-arrow-left"></i>
+      Voltar
+    </button>
+
+    <span>Etapa {{step}} de 5</span>
+
+    {{#if stepIsReview}}
+      <button type="button" data-action="builderCreate" {{#unless canCreate}}disabled{{/unless}}>
+        <i class="fa-solid fa-check"></i>
+        Criar Pokémon
+      </button>
+    {{else}}
+      <button type="button" data-action="builderNext" {{#unless canNext}}disabled{{/unless}}>
+        Continuar
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    {{/if}}
+  </footer>
+</div>

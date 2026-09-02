@@ -27,7 +27,9 @@ const STAT_PTBR = {
   defense: "Defesa",
   "special-attack": "Ataque Especial",
   "special-defense": "Defesa Especial",
-  speed: "Velocidade"
+  speed: "Velocidade",
+  accuracy: "Precisão",
+  evasion: "Evasão"
 };
 
 const DAMAGE_CLASS_PTBR = {
@@ -62,6 +64,35 @@ const NATURES = {
   jolly: { pt: "Alegre", en: "Jolly", limitsPt: ["Desanimado", "Abalado"], limitsEn: ["Discouraged", "Shaken"] },
   naive: { pt: "Ingênuo", en: "Naive", limitsPt: ["Enganado", "Confuso"], limitsEn: ["Deceived", "Confused"] },
   serious: { pt: "Sério", en: "Serious", limitsPt: ["Desconcertado", "Frustrado"], limitsEn: ["Unsettled", "Frustrated"] }
+};
+
+
+const NATURE_EFFECTS = {
+  hardy: [null, null],
+  lonely: ["attack", "defense"],
+  adamant: ["attack", "special-attack"],
+  naughty: ["attack", "special-defense"],
+  brave: ["attack", "speed"],
+  bold: ["defense", "attack"],
+  docile: [null, null],
+  impish: ["defense", "special-attack"],
+  lax: ["defense", "special-defense"],
+  relaxed: ["defense", "speed"],
+  modest: ["special-attack", "attack"],
+  mild: ["special-attack", "defense"],
+  bashful: [null, null],
+  rash: ["special-attack", "special-defense"],
+  quiet: ["special-attack", "speed"],
+  calm: ["special-defense", "attack"],
+  gentle: ["special-defense", "defense"],
+  careful: ["special-defense", "special-attack"],
+  quirky: [null, null],
+  sassy: ["special-defense", "speed"],
+  timid: ["speed", "attack"],
+  hasty: ["speed", "defense"],
+  jolly: ["speed", "special-attack"],
+  naive: ["speed", "special-defense"],
+  serious: [null, null]
 };
 
 const MOVE_PTBR = {
@@ -361,10 +392,23 @@ export function damageClassLabel(id, language = getPokemonContentLanguage()) {
 
 export function natureProfile(id, language = getPokemonContentLanguage()) {
   const source = NATURES[id] ?? NATURES.hardy;
+  const resolvedId = NATURES[id] ? id : "hardy";
   const isEn = language === "en";
+  const [raised, lowered] = NATURE_EFFECTS[resolvedId] ?? [null, null];
+  const effect = !raised || !lowered
+    ? (isEn ? "Neutral nature: no stat is raised or lowered." : "Natureza neutra: não aumenta nem reduz nenhum atributo.")
+    : (
+        isEn
+          ? `Raises ${statLabel(raised, "en")} and lowers ${statLabel(lowered, "en")}.`
+          : `Aumenta ${statLabel(raised, "pt-BR")} e reduz ${statLabel(lowered, "pt-BR")}.`
+      );
+
   return {
-    id: NATURES[id] ? id : "hardy",
+    id: resolvedId,
     label: isEn ? source.en : source.pt,
+    raised,
+    lowered,
+    effect,
     limits: []
   };
 }
@@ -496,18 +540,18 @@ export function typeDefenseGroups(effectiveness, language = getPokemonContentLan
 
   const definitions = language === "en"
     ? [
-        ["immune", "Immune to", true, "immunity"],
-        ["strongResist", "Strongly resists", true, "resistance"],
-        ["resist", "Resists", true, "resistance"],
-        ["weak", "Vulnerable to", false, "weakness"],
-        ["strongWeak", "Extremely vulnerable to", false, "weakness"]
+        ["immune", "Immune to", false, "immunity"],
+        ["strongResist", "Strongly resists", false, "resistance"],
+        ["resist", "Resists", false, "resistance"],
+        ["weak", "Vulnerable to", true, "weakness"],
+        ["strongWeak", "Extremely vulnerable to", true, "weakness"]
       ]
     : [
-        ["immune", "Imune a", true, "immunity"],
-        ["strongResist", "Resiste muito a", true, "resistance"],
-        ["resist", "Resiste a", true, "resistance"],
-        ["weak", "Vulnerável a", false, "weakness"],
-        ["strongWeak", "Muito vulnerável a", false, "weakness"]
+        ["immune", "Imune a", false, "immunity"],
+        ["strongResist", "Resiste muito a", false, "resistance"],
+        ["resist", "Resiste a", false, "resistance"],
+        ["weak", "Vulnerável a", true, "weakness"],
+        ["strongWeak", "Muito vulnerável a", true, "weakness"]
       ];
 
   return definitions.flatMap(([key, label, positive, kind]) => {
