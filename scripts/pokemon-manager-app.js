@@ -71,26 +71,65 @@ async function ensurePokemonFoundation(trainer) {
   const updates = [];
   for (const theme of themes) {
     if (!theme.getFlag(MODULE_ID, "pokemonInstanceId")) {
-      updates.push({_id: theme.id, [`flags.${MODULE_ID}.pokemonInstanceId`]: newInstanceId()});
+      updates.push({
+        _id: theme.id,
+        [`flags.${MODULE_ID}.pokemonInstanceId`]: newInstanceId()
+      });
     }
   }
-  if (updates.length) await trainer.updateEmbeddedDocuments("Item", updates);
+  if (updates.length) {
+    await trainer.updateEmbeddedDocuments("Item", updates);
+  }
 
   const records = getPcRecords(trainer);
   let changed = false;
   for (const record of records) {
     record.data ??= {};
-    const before = record.data?.flags?.[MODULE_ID]?.pokemonInstanceId;
+    const before =
+      record.data?.flags?.[MODULE_ID]?.pokemonInstanceId;
     ensureDataInstanceId(record.data);
     if (!before) changed = true;
   }
-  if (changed) await setPcRecords(trainer, records);
 
-  const teamActorIds = new Set(themes.map(t => t.getFlag(MODULE_ID, "pokemonActorId")).filter(Boolean));
+  const knownInstances = new Set(
+    records
+      .map(record =>
+        record.data?.flags?.[MODULE_ID]?.pokemonInstanceId
+      )
+      .filter(Boolean)
+  );
+
+  const teamActorIds = new Set(
+    themes
+      .map(theme =>
+        theme.getFlag(MODULE_ID, "pokemonActorId")
+      )
+      .filter(Boolean)
+  );
+
   for (const pokemon of pokemonActorsForTrainer(trainer, teamActorIds)) {
-    if (!pokemon.getFlag(MODULE_ID, "pokemonInstanceId") && (game.user.isGM || pokemon.isOwner)) {
-      await pokemon.setFlag(MODULE_ID, "pokemonInstanceId", newInstanceId());
-    }
+    const stored =
+      pokemon.getFlag(MODULE_ID, "storedThemeData");
+
+    if (!stored || typeof stored !== "object") continue;
+
+    const data =
+      foundry.utils.deepClone(stored);
+    const instanceId =
+      ensureDataInstanceId(data);
+
+    if (knownInstances.has(instanceId)) continue;
+
+    records.push({
+      id: newInstanceId(),
+      data
+    });
+    knownInstances.add(instanceId);
+    changed = true;
+  }
+
+  if (changed) {
+    await setPcRecords(trainer, records);
   }
 }
 
@@ -115,26 +154,30 @@ function nextTeamSlot(trainer) {
 
 async function sendThemeToPc(trainer, themeId) {
   const theme = trainer.items.get(themeId);
-  if (!theme || theme.getFlag(MODULE_ID, "pokemonTheme") !== true) throw new Error("Pokémon do time não encontrado.");
+  if (!theme || theme.getFlag(MODULE_ID, "pokemonTheme") !== true) {
+    throw new Error("Pokémon do time não encontrado.");
+  }
 
-  if (getPokemonFollowerThemeId(trainer) === theme.id) await setPokemonFollowerTheme(trainer, null);
+  if (getPokemonFollowerThemeId(trainer) === theme.id) {
+    await setPokemonFollowerTheme(trainer, null);
+  }
   await removePokemonThemeTokens(trainer, theme.id);
+
+  const snapshot = themeSnapshot(theme);
+  const records = getPcRecords(trainer);
+  records.push({
+    id: newInstanceId(),
+    data: snapshot
+  });
+  await setPcRecords(trainer, records);
 
   const linkedActorId = theme.getFlag(MODULE_ID, "pokemonActorId");
   const linkedActor = linkedActorId ? game.actors.get(linkedActorId) : null;
-  const snapshot = themeSnapshot(theme);
-  const instanceId = snapshot.flags?.[MODULE_ID]?.pokemonInstanceId;
-
   if (linkedActor && (game.user.isGM || linkedActor.isOwner)) {
     await linkedActor.update({
-      name: theme.name,
       [`flags.${MODULE_ID}.storedThemeData`]: snapshot,
-      [`flags.${MODULE_ID}.pokemonInstanceId`]: instanceId
+      [`flags.${MODULE_ID}.pcThemeBackupOnly`]: true
     });
-  } else {
-    const records = getPcRecords(trainer);
-    records.push({id: newInstanceId(), data: snapshot});
-    await setPcRecords(trainer, records);
   }
 
   await trainer.deleteEmbeddedDocuments("Item", [theme.id]);
@@ -190,30 +233,32 @@ function buildThemeFromPcRecord(record, slot) {
 
 async function addPcPokemonToTeam(trainer, source, id) {
   const slot = nextTeamSlot(trainer);
-  if (slot === null) throw new Error("O time já tem 6 Pokémon.");
-
-  if (source === "actor") {
-    const pokemon = game.actors.get(id);
-    if (!pokemon || pokemon.getFlag(MODULE_ID, "kind") !== "pokemon" || (!game.user.isGM && !pokemon.isOwner)) {
-      throw new Error("Pokémon do PC não encontrado.");
-    }
-    const instanceId = await ensureActorInstanceId(pokemon);
-    await trainer.createEmbeddedDocuments("Item", [buildThemeFromActor(pokemon, slot, instanceId)]);
-    return;
+  if (slot === null) {
+    throw new Error("O time já tem 6 Pokémon.");
   }
 
-  if (source === "stored") {
-    const records = getPcRecords(trainer);
-    const index = records.findIndex(record => record.id === id);
-    if (index < 0) throw new Error("Pokémon armazenado não encontrado.");
-    const [record] = records.splice(index, 1);
-    const created = await trainer.createEmbeddedDocuments("Item", [buildThemeFromPcRecord(record, slot)]);
-    if (!created?.[0]) throw new Error("Não foi possível adicionar o Pokémon ao time.");
-    await setPcRecords(trainer, records);
-    return;
+  if (source !== "stored") {
+    throw new Error("O PC aceita somente Pokémon armazenados como Tema.");
   }
 
-  throw new Error("Origem de Pokémon desconhecida.");
+  const records = getPcRecords(trainer);
+  const index = records.findIndex(record => record.id === id);
+  if (index < 0) {
+    throw new Error("Pokémon armazenado não encontrado.");
+  }
+
+  const [record] = records.splice(index, 1);
+  const created =
+    await trainer.createEmbeddedDocuments(
+      "Item",
+      [buildThemeFromPcRecord(record, slot)]
+    );
+
+  if (!created?.[0]) {
+    throw new Error("Não foi possível adicionar o Pokémon ao time.");
+  }
+
+  await setPcRecords(trainer, records);
 }
 
 function pokemonActorPreview(pokemon) {
@@ -235,32 +280,130 @@ function openTheme(theme) {
   void sheet.render({force: true});
 }
 
-function challengePowerTag(name) {
+function openPcThemeRecord(trainer, recordId) {
+  if (!trainer || !recordId) return;
+
+  const record =
+    getPcRecords(trainer)
+      .find(row => row.id === recordId);
+
+  if (!record?.data) return;
+
+  const data =
+    foundry.utils.deepClone(record.data);
+
+  data._id =
+    data._id ?? newInstanceId();
+  data.type = "themebook";
+  data.system ??= pokemonThemeSystem();
+  data.system.editMode = false;
+
+  const ItemClass =
+    CONFIG.Item?.documentClass
+    ?? globalThis.Item;
+
+  if (!ItemClass) {
+    throw new Error("Classe de Item indisponível.");
+  }
+
+  const theme =
+    new ItemClass(
+      data,
+      { parent: trainer }
+    );
+
+  const sheet = theme.sheet;
+  if (!sheet?.render) {
+    throw new Error("Ficha de Tema indisponível.");
+  }
+
+  void sheet.render({ force: true });
+}
+
+function challengePowerTag(name, planned = false) {
   return {
     name: String(name ?? ""), question: "", burned: false, toBurn: false,
-    planned: false, selected: false, expiring: false, expired: false
+    planned: !!planned, selected: false, expiring: false, expired: false
   };
 }
 
+function pokemonThemeDisplayName(species, natureLabel, gender) {
+  const name = String(species ?? "Pokémon").trim() || "Pokémon";
+  const nature = String(natureLabel ?? "").trim();
+  const suffix = nature ? ` ${nature}` : "";
+
+  if (gender === "male") return `O ${name}${suffix}`;
+  if (gender === "female") return `A ${name}${suffix}`;
+  return `${name}${nature ? " · " + nature : ""}`;
+}
+
 function capturedThemeData(pokemon, slot = null) {
-  const flags = foundry.utils.deepClone(pokemon.flags?.[MODULE_ID] ?? {});
-  const moveNames = (flags.moves ?? []).map(move => move.name).filter(Boolean);
+  const flags =
+    foundry.utils.deepClone(
+      pokemon.flags?.[MODULE_ID] ?? {}
+    );
+
+  const moveNames =
+    (flags.moves ?? [])
+      .map(move => move.name)
+      .filter(Boolean);
+
+  const natureLabel =
+    flags.nature?.label ?? "";
+
+  const gender =
+    flags.gender ?? "genderless";
+
   const powers = [
     ...moveNames,
     flags.powerStatTag,
-    flags.nature?.label ? `Natureza: ${flags.nature.label}` : null,
+    natureLabel
+      ? `Natureza: ${natureLabel}`
+      : null,
     flags.ability?.name
+      ? `Habilidade: ${flags.ability.name}`
+      : null
   ].filter(Boolean);
 
+  const futureTags =
+    (flags.futureMoves ?? [])
+      .slice(0, 3)
+      .map(move =>
+        challengePowerTag(
+          move.name,
+          true
+        )
+      );
+
+  const themeName =
+    pokemonThemeDisplayName(
+      pokemon.name,
+      natureLabel,
+      gender
+    );
+
   return {
-    name: pokemon.name,
+    name: themeName,
     type: "themebook",
     img: pokemon.img,
     system: {
       ...pokemonThemeSystem(),
-      description: String(pokemon.system?.biography ?? pokemon.system?.shortDescription ?? ""),
-      powertags: powers.map(challengePowerTag),
-      weaknesstags: flags.weaknessTag ? [challengePowerTag(flags.weaknessTag)] : []
+      description:
+        String(
+          pokemon.system?.biography
+          ?? pokemon.system?.shortDescription
+          ?? ""
+        ),
+      powertags: [
+        ...powers.map(name =>
+          challengePowerTag(name)
+        ),
+        ...futureTags
+      ],
+      weaknesstags:
+        flags.weaknessTag
+          ? [challengePowerTag(flags.weaknessTag)]
+          : []
     },
     flags: {
       [MODULE_ID]: {
@@ -268,8 +411,12 @@ function capturedThemeData(pokemon, slot = null) {
         pokemonTheme: true,
         themeRole: "pokemon",
         pokemonActorId: pokemon.id,
-        pokemonInstanceId: flags.pokemonInstanceId ?? newInstanceId(),
-        ...(slot === null ? {} : { pokemonTeamSlot: slot }),
+        pokemonInstanceId:
+          flags.pokemonInstanceId
+          ?? newInstanceId(),
+        ...(slot === null
+          ? {}
+          : { pokemonTeamSlot: slot }),
         capturedFromChallenge: true,
         capturedChallengeId: pokemon.id
       }
@@ -311,6 +458,15 @@ export async function capturePokemonChallenge(pokemon) {
   const trainer = game.actors.get(String(choice.trainerId ?? ""));
   if (!trainer || trainer.type !== "litm-character") throw new Error("Treinador jogador inválido.");
   const destination = String(choice.destination ?? "team");
+
+  while (getPokemonThemes(trainer).length > 6) {
+    const overflow =
+      getPokemonThemes(trainer)[
+        getPokemonThemes(trainer).length - 1
+      ];
+    if (!overflow) break;
+    await sendThemeToPc(trainer, overflow.id);
+  }
 
   if (destination === "team" && getPokemonThemes(trainer).length >= 6) {
     const current = getPokemonThemes(trainer);
@@ -383,9 +539,7 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const themes = getPokemonThemes(trainer);
     const followerThemeId = trainer ? getPokemonFollowerThemeId(trainer) : null;
-    const teamActorIds = new Set(themes.map(t => t.getFlag(MODULE_ID, "pokemonActorId")).filter(Boolean));
     const storedRecords = getPcRecords(trainer);
-    const ownedPokemonActors = pokemonActorsForTrainer(trainer, teamActorIds);
 
     const team = themes.map((theme, index) => ({
       id: theme.id, number: index + 1, name: theme.name, img: themePreview(theme),
@@ -395,18 +549,22 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }));
 
     const emptySlots = Array.from({length: Math.max(0, 6 - team.length)}, (_, index) => ({number: team.length + index + 1}));
-    const pcItems = [
-      ...storedRecords.map(record => ({
-        id: record.id, source: "stored", name: record.data?.name ?? "Pokémon", img: storedPreview(record),
-        instanceId: record.data?.flags?.[MODULE_ID]?.pokemonInstanceId ?? "",
-        pokedexUrl: record.data?.flags?.[MODULE_ID]?.pokedexUrl ?? getPokemonDbUrl(record.data?.name)
-      })),
-      ...ownedPokemonActors.map(pokemon => ({
-        id: pokemon.id, source: "actor", name: pokemon.name, img: pokemonActorPreview(pokemon),
-        instanceId: pokemon.getFlag(MODULE_ID, "pokemonInstanceId") ?? "",
-        pokedexUrl: pokemon.getFlag(MODULE_ID, "pokedexUrl") ?? getPokemonDbUrl(pokemon.name)
+    const pcItems = storedRecords
+      .map(record => ({
+        id: record.id,
+        source: "stored",
+        name: record.data?.name ?? "Pokémon",
+        img: storedPreview(record),
+        instanceId:
+          record.data?.flags?.[MODULE_ID]?.pokemonInstanceId
+          ?? "",
+        pokedexUrl:
+          record.data?.flags?.[MODULE_ID]?.pokedexUrl
+          ?? getPokemonDbUrl(record.data?.name)
       }))
-    ].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, "pt-BR")
+      );
 
     return {...context,
       hasActors: actors.length > 0,
@@ -446,6 +604,31 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const theme = this.actor?.items.get(card.dataset.openTheme);
       openTheme(theme);
     });
+
+    for (
+      const card
+      of root.querySelectorAll("[data-open-pc-theme]")
+    ) {
+      card.addEventListener("click", event => {
+        if (event.target.closest("button,input,select,a")) return;
+        const actor = this.actor;
+        const recordId = card.dataset.openPcTheme;
+        if (!actor || !recordId) return;
+
+        try {
+          openPcThemeRecord(actor, recordId);
+        } catch (error) {
+          console.error(
+            "Pokemon LITM Tools | Abrir Theme do PC:",
+            error
+          );
+          ui.notifications.error(
+            error?.message
+            ?? "Não foi possível abrir o Tema."
+          );
+        }
+      });
+    }
 
     for (const input of root.querySelectorAll("[data-follower-theme-id]")) input.addEventListener("change", () => {
       const actor = this.actor;

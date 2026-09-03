@@ -2254,3 +2254,35 @@ has(
     margin-top: 6px;
   }
 }
+
+
+/* Pokemon Challenge Wizard - NPC trainer picker */
+.pokemon-builder-trainer-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(180px, .8fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pokemon-builder-trainer-tools label,
+.pokemon-builder-trainer-select {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pokemon-builder-trainer-select {
+  width: 100%;
+}
+
+.pokemon-builder-trainer-tools input,
+.pokemon-builder-trainer-tools select,
+.pokemon-builder-trainer-select select {
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .pokemon-builder-trainer-tools {
+    grid-template-columns: 1fr;
+  }
+}

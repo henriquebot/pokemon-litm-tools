@@ -72,7 +72,7 @@
           {{#if pcItems.length}}
             <div class="pokemon-manager-pc-grid">
               {{#each pcItems}}
-                <article class="pokemon-manager-card pokemon-manager-pc-card">
+                <article class="pokemon-manager-card pokemon-manager-pc-card pokemon-manager-openable" data-open-pc-theme="{{id}}" title="Clique para visualizar o Theme do Pokémon">
                   <img src="{{img}}" alt="{{name}}" loading="lazy">
                   <strong>{{name}}</strong>
                   <div class="pokemon-manager-card-actions">
@@ -85,7 +85,7 @@
           {{else}}
             <div class="pokemon-manager-empty-state">
               <i class="fa-solid fa-box-open"></i><strong>PC vazio</strong>
-              <span>Envie um Pokémon do time para o PC ou dê ownership de um Pokémon ao jogador.</span>
+              <span>Envie um Theme Pokémon do time para o PC. Actors Pokémon não aparecem aqui.</span>
             </div>
           {{/if}}
         </section>

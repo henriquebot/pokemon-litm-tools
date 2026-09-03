@@ -69,18 +69,43 @@
         {{else}}
           <p>Escolha o Challenge do treinador NPC ao qual este Pokémon pertence.</p>
 
-          <div class="pokemon-builder-config-grid">
+          <div class="pokemon-builder-trainer-tools">
             <label>
-              <span>Treinador</span>
-              <select data-builder-field="trainerId">
-                <option value="">Escolha um treinador</option>
-                {{#each trainers}}
-                  <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+              <span>Buscar treinador</span>
+              <input
+                data-builder-field="trainerSearch"
+                type="search"
+                placeholder="Nome do treinador ou pasta"
+                autocomplete="off">
+            </label>
+
+            <label>
+              <span>Pasta</span>
+              <select data-builder-field="trainerFolder">
+                <option value="">Todas as pastas</option>
+                {{#each trainerFolders}}
+                  <option value="{{id}}">{{name}}</option>
                 {{/each}}
               </select>
             </label>
-
           </div>
+
+          <label class="pokemon-builder-trainer-select">
+            <span>Treinador</span>
+            <select data-builder-field="trainerId">
+              <option value="">Escolha um treinador</option>
+              {{#each trainers}}
+                <option
+                  value="{{id}}"
+                  data-trainer-option
+                  data-folder-id="{{folderId}}"
+                  data-search="{{search}}"
+                  {{#if selected}}selected{{/if}}>
+                  {{name}} · {{folderName}}
+                </option>
+              {{/each}}
+            </select>
+          </label>
         {{/if}}
       </div>
     {{/if}}
@@ -119,6 +144,22 @@
           <div class="pokemon-builder-explanation">
             <strong>O que esta Habilidade faz</strong>
             <p>{{selectedAbility.description}}</p>
+          </div>
+
+          <label>
+            <span>Gênero</span>
+            <select data-builder-field="genderId">
+              {{#each genderOptions}}
+                <option value="{{id}}" {{#if selected}}selected{{/if}}>
+                  {{label}} · {{chanceText}}
+                </option>
+              {{/each}}
+            </select>
+          </label>
+
+          <div class="pokemon-builder-explanation">
+            <strong>Distribuição oficial da espécie</strong>
+            <p>{{selectedGender.label}} é a opção atual. A proporção exibida vem dos dados oficiais da espécie.</p>
           </div>
 
           <label class="wide">
@@ -192,6 +233,11 @@
           <div>
             <strong>Habilidade</strong>
             <p>{{finalReview.ability.name}}</p>
+          </div>
+
+          <div>
+            <strong>Gênero</strong>
+            <p>{{finalReview.gender.label}}</p>
           </div>
 
           <div>

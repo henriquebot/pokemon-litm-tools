@@ -127,6 +127,95 @@ function escapeStatusLevel(speed, might) {
   return Math.max(1, Math.min(5, base + speedMod));
 }
 
+function genderOptionsForRate(rate, language = "pt-BR") {
+  const value = Number(rate ?? -1);
+  const labels = language === "en"
+    ? { male: "Male", female: "Female", genderless: "Genderless" }
+    : { male: "Macho", female: "Fêmea", genderless: "Sem gênero" };
+
+  if (value < 0) {
+    return [{
+      id: "genderless",
+      label: labels.genderless,
+      chance: 100
+    }];
+  }
+
+  const femaleChance = Math.max(0, Math.min(100, (value / 8) * 100));
+  const maleChance = 100 - femaleChance;
+  const rows = [];
+
+  if (maleChance > 0) {
+    rows.push({
+      id: "male",
+      label: labels.male,
+      chance: maleChance
+    });
+  }
+
+  if (femaleChance > 0) {
+    rows.push({
+      id: "female",
+      label: labels.female,
+      chance: femaleChance
+    });
+  }
+
+  return rows;
+}
+
+function defaultGenderForRate(rate) {
+  const options = genderOptionsForRate(rate, "pt-BR");
+  if (options.length <= 1) return options[0]?.id ?? "genderless";
+
+  const roll = Math.random() * 100;
+  let cursor = 0;
+  for (const option of options) {
+    cursor += Number(option.chance ?? 0);
+    if (roll <= cursor) return option.id;
+  }
+
+  return options[0].id;
+}
+
+function genderLabel(id, language = "pt-BR") {
+  const labels = language === "en"
+    ? { male: "Male", female: "Female", genderless: "Genderless" }
+    : { male: "Macho", female: "Fêmea", genderless: "Sem gênero" };
+  return labels[id] ?? labels.genderless;
+}
+
+function futureLevelUpMoves(data) {
+  const selectedLevel = Math.max(
+    0,
+    ...(data.moves ?? [])
+      .map(move => Number(move.level ?? 0))
+      .filter(level => level > 0)
+  );
+
+  const rows = (data.biographyMoves ?? [])
+    .filter(move => Number(move.level ?? 0) > selectedLevel)
+    .sort((a, b) =>
+      Number(a.level ?? 0) - Number(b.level ?? 0)
+      || String(a.name ?? "").localeCompare(String(b.name ?? ""), "pt-BR")
+    );
+
+  const seen = new Set();
+  const result = [];
+  for (const move of rows) {
+    if (!move.id || seen.has(move.id)) continue;
+    seen.add(move.id);
+    result.push({
+      id: move.id,
+      name: move.name,
+      englishName: move.englishName,
+      learnedAt: Number(move.level ?? 0)
+    });
+    if (result.length >= 3) break;
+  }
+  return result;
+}
+
 const POKEMON_NATURES = [
   ["hardy","Resistente","Cansado","Determinado"],
   ["lonely","Solitário","Isolado","Apegado"],
@@ -488,6 +577,7 @@ async function loadPokemonBuildData(entry, might) {
     moveChoices,
     dexText,
     catchRate: Number(species.capture_rate ?? 0),
+    genderRate: Number(species.gender_rate ?? -1),
     biographyMoves,
     best,
     worst,
@@ -500,11 +590,23 @@ async function loadPokemonBuildData(entry, might) {
 
 function trainerOptions() {
   return game.actors
-    .filter(actor =>
-      actor.type === "litm-npc"
-      && actor.getFlag(MODULE_ID, "pokemonBuilder") !== true
-      && (game.user.isGM || actor.isOwner)
-    )
+    .filter(actor => {
+      if (actor.type !== "litm-npc") return false;
+      if (!game.user.isGM && !actor.isOwner) return false;
+
+      const moduleFlags = actor.flags?.[MODULE_ID] ?? {};
+      const roles = Array.isArray(actor.system?.roles) ? actor.system.roles : [];
+      const pokemonChallenge = (
+        moduleFlags.kind === "pokemon"
+        || Number(moduleFlags.pokemonId ?? 0) > 0
+        || (
+          moduleFlags.pokemonBuilder === true
+          && roles.some(role => String(role).toLocaleLowerCase() === "pokémon")
+        )
+      );
+
+      return !pokemonChallenge;
+    })
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
@@ -887,13 +989,13 @@ async function reviewBuild(entry, config, data) {
 }
 
 
-function powerTag(name) {
+function powerTag(name, planned = false) {
   return {
     name,
     question: "",
     burned: false,
     toBurn: false,
-    planned: false,
+    planned: !!planned,
     selected: false,
     expiring: false,
     expired: false
@@ -916,7 +1018,12 @@ function floatingTag(name, positive = true) {
 }
 
 function themeSystem(review, data) {
-  const abilityTag = data.ability?.name ? [powerTag(data.ability.name)] : [];
+  const abilityTag = data.ability?.name
+    ? [powerTag(`Habilidade: ${data.ability.name}`)]
+    : [];
+
+  const futureTags = futureLevelUpMoves(data)
+    .map(move => powerTag(move.name, true));
 
   return {
     description: formatThemeDescription({ data, review }, data.contentLanguage),
@@ -928,8 +1035,9 @@ function themeSystem(review, data) {
     powertags: [
       ...review.moveNames.map(powerTag),
       powerTag(review.powerStatTag),
-      powerTag(review.natureLabel),
-      ...abilityTag
+      powerTag(`Natureza: ${review.natureLabel}`),
+      ...abilityTag,
+      ...futureTags
     ],
     weaknesstags: [powerTag(review.weaknessTag)],
     options: { isStoryTheme: false }
@@ -948,6 +1056,8 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
       id: review.natureId,
       label: review.natureLabel
     },
+    gender: review.genderId ?? "genderless",
+    genderLabel: review.genderLabel ?? genderLabel(review.genderId, data.contentLanguage),
     ability: data.ability ? foundry.utils.deepClone(data.ability) : null,
     might: config.might,
     trainerNpcId: config.mode === "trainer" ? (config.trainerId || null) : null,
@@ -956,6 +1066,7 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
     types: foundry.utils.deepClone(data.types),
     baseStats: foundry.utils.deepClone(data.stats),
     typeEffectiveness: foundry.utils.deepClone(data.typeEffectiveness),
+    futureMoves: futureLevelUpMoves(data),
     moves: data.moves.map((move, index) => ({
       id: move.id,
       name: review.moveNames[index],
@@ -1238,7 +1349,7 @@ async function createChallenge(entry, config, data, review, definition, existing
 
   const intrinsicTags = [
     ...statTags.map(name => floatingTag(name, false)),
-    ...(data.ability?.name ? [floatingTag(data.ability.name, false)] : []),
+    ...(data.ability?.name ? [floatingTag(`Habilidade: ${data.ability.name}`, false)] : []),
     floatingTag(`Natureza: ${review.natureLabel}`, false),
     floatingTag(review.weaknessTag, true),
     ...defenses.map(defense => floatingTag(defense.name, defense.positive))
@@ -1377,6 +1488,7 @@ class PokemonChallengeWizardApp
   loadedMight = null;
   natureId = "hardy";
   abilityId = "";
+  genderId = "";
   weaknessStat = "speed";
   customWeakness = "";
   selectedMoveIds = new Set();
@@ -1431,6 +1543,7 @@ class PokemonChallengeWizardApp
       const flags = this.existingActor.flags?.[MODULE_ID] ?? {};
       this.natureId = flags.nature?.id ?? defaultNature.id;
       this.abilityId = flags.ability?.id ?? this.data.ability?.id ?? this.data.abilities?.[0]?.id ?? "";
+      this.genderId = flags.gender ?? defaultGenderForRate(this.data.genderRate);
       this.weaknessStat = this.data.worst?.name ?? "speed";
       this.customWeakness = flags.weaknessTag ?? "";
       this.selectedMoveIds = new Set((flags.moves ?? []).map(move => move.id).filter(Boolean).slice(0, 4));
@@ -1441,6 +1554,7 @@ class PokemonChallengeWizardApp
     } else if (!this.hydratedFromActor) {
       this.natureId = defaultNature.id;
       this.abilityId = this.data.ability?.id ?? this.data.abilities?.[0]?.id ?? "";
+      this.genderId = this.genderId || defaultGenderForRate(this.data.genderRate);
       this.weaknessStat = this.data.worst?.name ?? "speed";
       this.customWeakness = "";
       this.selectedMoveIds = new Set((this.data.moves ?? []).slice(0, 4).map(move => move.id));
@@ -1506,6 +1620,13 @@ class PokemonChallengeWizardApp
           nature.id,
         natureLabel:
           nature.label,
+        genderId:
+          this.genderId || "genderless",
+        genderLabel:
+          genderLabel(
+            this.genderId || "genderless",
+            language
+          ),
         natureLimits: [],
         abilityId:
           ability?.id ?? null,
@@ -1559,19 +1680,45 @@ class PokemonChallengeWizardApp
             folder.id === this.config.folderId
         }));
 
+    const trainerActors =
+      trainerOptions();
+
     const trainers =
-      trainerOptions()
-        .map(actor => ({
-          id: actor.id,
-          name: actor.name,
-          selected:
-            actor.id === this.config.trainerId
-        }));
+      trainerActors.map(actor => ({
+        id: actor.id,
+        name: actor.name,
+        folderId: actor.folder?.id ?? "",
+        folderName: actor.folder?.name ?? "Raiz de Actors",
+        search: [
+          actor.name,
+          actor.folder?.name ?? ""
+        ].join(" ").toLocaleLowerCase(),
+        selected:
+          actor.id === this.config.trainerId
+      }));
+
+    const trainerFolders =
+      [...new Map(
+        trainerActors
+          .filter(actor => actor.folder)
+          .map(actor => [
+            actor.folder.id,
+            {
+              id: actor.folder.id,
+              name: actor.folder.name
+            }
+          ])
+      ).values()]
+        .sort((a, b) =>
+          a.name.localeCompare(b.name, "pt-BR")
+        );
 
     let natureOptions = [];
     let abilityOptions = [];
     let selectedNature = null;
     let selectedAbility = null;
+    let genderOptions = [];
+    let selectedGender = null;
     let weaknessOptions = [];
     let moveChoices = [];
     let finalReview = null;
@@ -1620,6 +1767,33 @@ class PokemonChallengeWizardApp
         abilityOptions[0]
         ??
         null;
+
+      genderOptions =
+        genderOptionsForRate(
+          this.data.genderRate,
+          language
+        ).map(option => ({
+          ...option,
+          chanceText:
+            Number(option.chance ?? 0) === 100
+              ? "100%"
+              : `${Number(option.chance ?? 0).toLocaleString("pt-BR", {maximumFractionDigits: 1})}%`,
+          selected:
+            option.id === this.genderId
+        }));
+
+      if (
+        !genderOptions.some(option => option.selected)
+        && genderOptions.length
+      ) {
+        this.genderId = genderOptions[0].id;
+        genderOptions[0].selected = true;
+      }
+
+      selectedGender =
+        genderOptions.find(option => option.selected)
+        ?? genderOptions[0]
+        ?? null;
 
       weaknessOptions =
         [
@@ -1697,6 +1871,10 @@ class PokemonChallengeWizardApp
             built.nature,
           ability:
             built.ability,
+          gender: {
+            id: built.review.genderId,
+            label: built.review.genderLabel
+          },
           weaknessTag:
             built.review.weaknessTag,
           powerStatTag:
@@ -1811,6 +1989,7 @@ class PokemonChallengeWizardApp
 
       folders,
       trainers,
+      trainerFolders,
 
       rootFolderSelected:
         !this.config.folderId,
@@ -1824,6 +2003,9 @@ class PokemonChallengeWizardApp
       abilityOptions,
       selectedAbility,
 
+      genderOptions,
+      selectedGender,
+
       weaknessOptions,
 
       customWeakness:
@@ -1836,8 +2018,6 @@ class PokemonChallengeWizardApp
       finalReview,
 
       canBack:
-        this.step > 1
-        &&
         !this.busy,
 
       canNext:
@@ -1915,12 +2095,77 @@ class PokemonChallengeWizardApp
         }
       );
 
-    field("trainerId")
+    const trainerSearch =
+      field("trainerSearch");
+
+    const trainerFolder =
+      field("trainerFolder");
+
+    const trainerSelect =
+      field("trainerId");
+
+    const filterTrainers =
+      () => {
+        if (!trainerSelect) return;
+
+        const query =
+          String(trainerSearch?.value ?? "")
+            .trim()
+            .toLocaleLowerCase();
+
+        const folderId =
+          String(trainerFolder?.value ?? "");
+
+        for (
+          const option
+          of trainerSelect.querySelectorAll(
+            "option[data-trainer-option]"
+          )
+        ) {
+          const search =
+            String(option.dataset.search ?? "");
+          const optionFolder =
+            String(option.dataset.folderId ?? "");
+
+          const visible =
+            (!query || search.includes(query))
+            &&
+            (!folderId || optionFolder === folderId);
+
+          option.hidden = !visible;
+        }
+      };
+
+    trainerSearch
+      ?.addEventListener(
+        "input",
+        filterTrainers
+      );
+
+    trainerFolder
+      ?.addEventListener(
+        "change",
+        filterTrainers
+      );
+
+    trainerSelect
       ?.addEventListener(
         "change",
         async event => {
           this.config.trainerId = event.currentTarget.value;
           await this.render({ force: true });
+        }
+      );
+
+    field("genderId")
+      ?.addEventListener(
+        "change",
+        async event => {
+          this.genderId =
+            event.currentTarget.value;
+          await this.render({
+            force: true
+          });
         }
       );
 
@@ -2039,11 +2284,12 @@ class PokemonChallengeWizardApp
       ?.addEventListener(
         "click",
         async () => {
-          if (
-            this.busy
-            ||
-            this.step <= 1
-          ) return;
+          if (this.busy) return;
+
+          if (this.step <= 1) {
+            await this.close();
+            return;
+          }
 
           this.step--;
 

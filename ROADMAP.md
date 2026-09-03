@@ -7,6 +7,10 @@
 - [x] Pokémon de Treinador NPC como Challenge vinculado
 - [x] Converter Challenge selvagem capturado em Themebook do treinador jogador
 - [x] Destino Time / PC e troca automática quando o Time estiver cheio
+- [x] PC composto apenas por Themebooks serializados; Actors Pokémon ficam fora da listagem
+- [x] Visualização em modo leitura dos Themebooks armazenados no PC
+- [x] Gênero oficial do indivíduo preservado como metadata
+- [x] Próximos 3 golpes por nível como Tags de Poder planejadas
 - [x] Editar Challenge Pokémon novamente pelo Wizard
 - [ ] Challenge Builder de Pessoas / treinadores NPC com equipe inteira em um único fluxo
 - [ ] Challenge Add-ons / templates nativos do LitM no Importer
@@ -24,6 +28,8 @@
 
 ## Marco 3 — Pokémon-jogador
 - [ ] Finalizar etapa 4 do criador de Pokémon-jogador
+- [ ] Botão no header para reabrir Trainer/Pokémon-jogador no Criador em modo edição
+- [ ] Quest dos Themes Pokémon baseada em Nature, relação e evolução
 - [ ] Themes reais: Habitat, Ability, Nature, Estágio Evolutivo e Move Set
 - [ ] Tags de Poder, Fraquezas e Quests
 - [ ] Refinamentos de Mochila e Trocas
