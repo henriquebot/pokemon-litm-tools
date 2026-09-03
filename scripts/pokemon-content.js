@@ -157,7 +157,8 @@ const MOVE_PTBR = {
   "extreme-speed": "Velocidade Extrema", "ancient-power": "Poder Ancestral", "shadow-ball": "Bola Sombria",
   "future-sight": "Visão do Futuro", "rock-smash": "Quebra-Rocha", whirlpool: "Redemoinho", "beat-up": "Espancamento",
   "seed-bomb": "Bomba de Sementes", "energy-ball": "Bola de Energia", "aqua-tail": "Cauda d'Água", "air-slash": "Corte de Ar",
-  roost: "Poleiro", "brave-bird": "Pássaro Bravo", "leaf-storm": "Tempestade de Folhas", "power-whip": "Chicote Poderoso"
+  roost: "Poleiro", "brave-bird": "Pássaro Bravo", "leaf-storm": "Tempestade de Folhas", "power-whip": "Chicote Poderoso",
+  "worry-seed": "Semente da Preocupação"
 };
 
 const MOVE_WORD_PTBR = {
@@ -499,10 +500,9 @@ export function moveLabel(id, names = [], language = getPokemonContentLanguage()
   if (exact) return exact;
   if (MOVE_PTBR[id]) return MOVE_PTBR[id];
 
-  const words = String(id ?? "").split("-").filter(Boolean);
-  if (!words.length) return "Golpe";
-  const translated = words.map(word => MOVE_WORD_PTBR[word] ?? titleCase(word));
-  return translated.join(" ");
+  // Nunca mistura palavras PT-BR e ingles no mesmo nome.
+  // Se ainda nao houver traducao curada, preserva o nome original inteiro.
+  return exactLocalizedName(names, 'en') || titleCase(id) || 'Golpe';
 }
 
 export function abilityLabel(id, names = [], language = getPokemonContentLanguage()) {

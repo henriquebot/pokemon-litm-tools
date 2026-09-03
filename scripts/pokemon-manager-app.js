@@ -320,103 +320,128 @@ function openPcThemeRecord(trainer, recordId) {
   void sheet.render({ force: true });
 }
 
-function challengePowerTag(name, planned = false) {
+function challengePowerTag(name, planned = false, question = '') {
   return {
-    name: String(name ?? ""), question: "", burned: false, toBurn: false,
+    name: String(name ?? ''), question: String(question ?? ''), burned: false, toBurn: false,
     planned: !!planned, selected: false, expiring: false, expired: false
   };
 }
 
-function pokemonThemeDisplayName(species, natureLabel, gender) {
-  const name = String(species ?? "Pokémon").trim() || "Pokémon";
-  const nature = String(natureLabel ?? "").trim();
-  const suffix = nature ? ` ${nature}` : "";
+function pokemonThemeTitleTag(species, natureLabel, gender, language = 'pt-BR') {
+  const name = String(species ?? 'Pokémon').trim() || 'Pokémon';
+  const nature = String(natureLabel ?? '').trim();
+  const suffix = nature ? ' ' + nature : '';
 
-  if (gender === "male") return `O ${name}${suffix}`;
-  if (gender === "female") return `A ${name}${suffix}`;
-  return `${name}${nature ? " · " + nature : ""}`;
+  if (language === 'en') return name + suffix;
+  if (gender === 'male') return 'O ' + name + suffix;
+  if (gender === 'female') return 'A ' + name + suffix;
+  return nature ? name + ' · ' + nature : name;
+}
+
+function futureMovesFromFlags(flags) {
+  const direct = Array.isArray(flags.futureMoves)
+    ? flags.futureMoves.filter(Boolean)
+    : [];
+  if (direct.length >= 3) return direct.slice(0, 3);
+
+  const selectedIds = new Set(
+    (flags.moves ?? []).map(move => move?.id).filter(Boolean)
+  );
+  const selectedLevel = Math.max(
+    0,
+    ...(flags.moves ?? [])
+      .map(move => Number(move.learnedAt ?? move.level ?? 0))
+      .filter(level => level > 0)
+  );
+
+  const rows = (flags.levelUpMoves ?? [])
+    .filter(move =>
+      move?.id
+      && Number(move.learnedAt ?? move.level ?? 0) > 0
+      && !selectedIds.has(move.id)
+    );
+
+  const after = rows
+    .filter(move => Number(move.learnedAt ?? move.level ?? 0) > selectedLevel)
+    .sort((a, b) =>
+      Number(a.learnedAt ?? a.level ?? 0) - Number(b.learnedAt ?? b.level ?? 0)
+    );
+  const earlier = rows
+    .filter(move => Number(move.learnedAt ?? move.level ?? 0) <= selectedLevel)
+    .sort((a, b) =>
+      Number(b.learnedAt ?? b.level ?? 0) - Number(a.learnedAt ?? a.level ?? 0)
+    );
+
+  const result = [...direct];
+  const seen = new Set(result.map(move => move?.id).filter(Boolean));
+  for (const move of [...after, ...earlier]) {
+    if (!move.id || seen.has(move.id)) continue;
+    seen.add(move.id);
+    result.push(move);
+    if (result.length >= 3) break;
+  }
+  return result.slice(0, 3);
 }
 
 function capturedThemeData(pokemon, slot = null) {
-  const flags =
-    foundry.utils.deepClone(
-      pokemon.flags?.[MODULE_ID] ?? {}
-    );
-
-  const moveNames =
-    (flags.moves ?? [])
-      .map(move => move.name)
-      .filter(Boolean);
-
-  const natureLabel =
-    flags.nature?.label ?? "";
-
-  const gender =
-    flags.gender ?? "genderless";
+  const flags = foundry.utils.deepClone(pokemon.flags?.[MODULE_ID] ?? {});
+  const speciesName = String(flags.speciesName ?? pokemon.name ?? 'Pokémon').trim() || 'Pokémon';
+  const moveNames = (flags.moves ?? []).map(move => move.name).filter(Boolean);
+  const natureLabel = flags.nature?.label ?? '';
+  const gender = flags.gender ?? 'genderless';
+  const language = flags.contentLanguage ?? 'pt-BR';
+  const titleTag = pokemonThemeTitleTag(speciesName, natureLabel, gender, language);
 
   const powers = [
+    titleTag,
     ...moveNames,
     flags.powerStatTag,
-    natureLabel
-      ? `Natureza: ${natureLabel}`
-      : null,
-    flags.ability?.name
-      ? `Habilidade: ${flags.ability.name}`
-      : null
+    flags.ability?.name ? `Habilidade: ${flags.ability.name}` : null
   ].filter(Boolean);
 
-  const futureTags =
-    (flags.futureMoves ?? [])
-      .slice(0, 3)
-      .map(move =>
-        challengePowerTag(
-          move.name,
-          true
-        )
-      );
-
-  const themeName =
-    pokemonThemeDisplayName(
-      pokemon.name,
-      natureLabel,
-      gender
-    );
+  const futureMoves = futureMovesFromFlags(flags);
+  const futureTags = futureMoves.map(move =>
+    challengePowerTag(
+      move.name,
+      true,
+      Number(move.learnedAt ?? move.level ?? 0) > 0
+        ? (language === 'en'
+            ? `Learns by level at Lv. ${Number(move.learnedAt ?? move.level)}.`
+            : `Aprende por nível no Nv. ${Number(move.learnedAt ?? move.level)}.`)
+        : ''
+    )
+  );
 
   return {
-    name: themeName,
-    type: "themebook",
+    name: speciesName,
+    type: 'themebook',
     img: pokemon.img,
     system: {
       ...pokemonThemeSystem(),
-      description:
-        String(
-          pokemon.system?.biography
-          ?? pokemon.system?.shortDescription
-          ?? ""
-        ),
+      description: String(
+        pokemon.system?.biography
+        ?? pokemon.system?.shortDescription
+        ?? ''
+      ),
       powertags: [
-        ...powers.map(name =>
-          challengePowerTag(name)
-        ),
+        ...powers.map(name => challengePowerTag(name)),
         ...futureTags
       ],
-      weaknesstags:
-        flags.weaknessTag
-          ? [challengePowerTag(flags.weaknessTag)]
-          : []
+      weaknesstags: flags.weaknessTag
+        ? [challengePowerTag(flags.weaknessTag)]
+        : []
     },
     flags: {
       [MODULE_ID]: {
         ...flags,
+        speciesName,
+        themeTitleTag: titleTag,
+        futureMoves,
         pokemonTheme: true,
-        themeRole: "pokemon",
+        themeRole: 'pokemon',
         pokemonActorId: pokemon.id,
-        pokemonInstanceId:
-          flags.pokemonInstanceId
-          ?? newInstanceId(),
-        ...(slot === null
-          ? {}
-          : { pokemonTeamSlot: slot }),
+        pokemonInstanceId: flags.pokemonInstanceId ?? newInstanceId(),
+        ...(slot === null ? {} : { pokemonTeamSlot: slot }),
         capturedFromChallenge: true,
         capturedChallengeId: pokemon.id
       }
@@ -459,26 +484,38 @@ export async function capturePokemonChallenge(pokemon) {
   if (!trainer || trainer.type !== "litm-character") throw new Error("Treinador jogador inválido.");
   const destination = String(choice.destination ?? "team");
 
-  while (getPokemonThemes(trainer).length > 6) {
-    const overflow =
-      getPokemonThemes(trainer)[
-        getPokemonThemes(trainer).length - 1
-      ];
-    if (!overflow) break;
-    await sendThemeToPc(trainer, overflow.id);
-  }
+  if (destination === 'team') {
+    // Nunca criamos um sétimo Pokémon. Se o mundo já estiver em um
+    // estado legado com 6+, o GM escolhe explicitamente quem vai ao PC
+    // até existir um slot livre.
+    while (getPokemonThemes(trainer).length >= 6) {
+      const current = getPokemonThemes(trainer);
+      const beforeCount = current.length;
+      const swapOptions = current
+        .map(theme => `<option value="${theme.id}">${foundry.utils.escapeHTML(theme.name)}</option>`)
+        .join('');
 
-  if (destination === "team" && getPokemonThemes(trainer).length >= 6) {
-    const current = getPokemonThemes(trainer);
-    const swapOptions = current.map(theme => `<option value="${theme.id}">${foundry.utils.escapeHTML(theme.name)}</option>`).join("");
-    const swap = await foundry.applications.api.DialogV2.input({
-      window: { title: "Time cheio" },
-      content: `<div style="display:grid;gap:10px;padding:8px"><p>Escolha qual Pokémon atual irá para o PC.</p><select name="themeId">${swapOptions}</select></div>`,
-      ok: { label: "Enviar para o PC", icon: "fa-solid fa-box" },
-      modal: true
-    });
-    if (!swap) return null;
-    await sendThemeToPc(trainer, String(swap.themeId ?? ""));
+      const swap = await foundry.applications.api.DialogV2.input({
+        window: { title: beforeCount > 6 ? 'Corrigir Time e capturar' : 'Time cheio' },
+        content: `<div style="display:grid;gap:10px;padding:8px">
+          <p>O Time tem ${beforeCount} Pokémon. Escolha quem irá para o PC antes de adicionar ${foundry.utils.escapeHTML(pokemon.name)}.</p>
+          <select name="themeId">${swapOptions}</select>
+        </div>`,
+        ok: { label: 'Enviar para o PC', icon: 'fa-solid fa-box-archive' },
+        modal: true
+      });
+
+      if (!swap) return null;
+      const themeId = String(swap.themeId ?? '');
+      if (!themeId) throw new Error('Escolha qual Pokémon irá para o PC.');
+
+      await sendThemeToPc(trainer, themeId);
+
+      const afterCount = getPokemonThemes(trainer).length;
+      if (afterCount >= beforeCount) {
+        throw new Error('O Pokémon escolhido não saiu do Time. A captura foi cancelada para evitar um sétimo Pokémon.');
+      }
+    }
   }
 
   const instanceId = flags.pokemonInstanceId ?? newInstanceId();

@@ -34,12 +34,18 @@ function gridSize() {
 }
 
 export function getPokemonThemes(actor) {
-  if (actor?.documentName !== "Actor" || actor.type !== "litm-character") return [];
-  return actor.items.filter(item => item.type === "themebook"
-    && item.getFlag(MODULE_ID, "pokemonTheme") === true
-    && item.getFlag(MODULE_ID, "themeRole") === "pokemon")
-    .sort((a, b) => Number(a.getFlag(MODULE_ID, "pokemonTeamSlot") ?? 999)
-      - Number(b.getFlag(MODULE_ID, "pokemonTeamSlot") ?? 999));
+  if (actor?.documentName !== 'Actor' || actor.type !== 'litm-character') return [];
+
+  return actor.items
+    .filter(item =>
+      item.type === 'themebook'
+      && item.getFlag(MODULE_ID, 'pokemonTheme') === true
+      && item.getFlag(MODULE_ID, 'themeRole') !== 'pokemon-reference'
+    )
+    .sort((a, b) =>
+      Number(a.getFlag(MODULE_ID, 'pokemonTeamSlot') ?? 999)
+      - Number(b.getFlag(MODULE_ID, 'pokemonTeamSlot') ?? 999)
+    );
 }
 
 function legacyFollowerThemeId(actor) {

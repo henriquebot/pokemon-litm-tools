@@ -90,22 +90,33 @@
             </label>
           </div>
 
-          <label class="pokemon-builder-trainer-select">
-            <span>Treinador</span>
-            <select data-builder-field="trainerId">
-              <option value="">Escolha um treinador</option>
-              {{#each trainers}}
-                <option
-                  value="{{id}}"
-                  data-trainer-option
-                  data-folder-id="{{folderId}}"
-                  data-search="{{search}}"
-                  {{#if selected}}selected{{/if}}>
-                  {{name}} · {{folderName}}
-                </option>
-              {{/each}}
-            </select>
-          </label>
+          <input
+            type="hidden"
+            data-builder-field="trainerId"
+            value="{{selectedTrainerId}}">
+
+          <div class="pokemon-builder-trainer-grid" data-trainer-list>
+            {{#each trainers}}
+              <button
+                type="button"
+                class="pokemon-builder-trainer-card {{#if selected}}selected{{/if}}"
+                data-trainer-card="{{id}}"
+                data-folder-id="{{folderId}}"
+                data-search="{{search}}">
+                <img src="{{img}}" alt="{{name}}" loading="lazy">
+                <span class="pokemon-builder-trainer-card-copy">
+                  <strong>{{name}}</strong>
+                  <small><i class="fa-regular fa-folder"></i> {{folderName}}</small>
+                </span>
+                <i class="fa-solid fa-circle-check pokemon-builder-trainer-check"></i>
+              </button>
+            {{/each}}
+          </div>
+
+          <div class="pokemon-builder-trainer-empty" data-trainer-empty hidden>
+            <i class="fa-solid fa-user-slash"></i>
+            <span>Nenhum Challenge de treinador encontrado.</span>
+          </div>
         {{/if}}
       </div>
     {{/if}}

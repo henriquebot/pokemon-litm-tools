@@ -12,6 +12,8 @@
 - [x] Gênero oficial do indivíduo preservado como metadata
 - [x] Próximos 3 golpes por nível como Tags de Poder planejadas
 - [x] Editar Challenge Pokémon novamente pelo Wizard
+- [x] Seletor visual de treinador NPC com busca, imagem e filtro por pasta
+- [x] Theme Pokémon com Tag-título do indivíduo e até 3 golpes planejados
 - [ ] Challenge Builder de Pessoas / treinadores NPC com equipe inteira em um único fluxo
 - [ ] Challenge Add-ons / templates nativos do LitM no Importer
 - [ ] Presets de Classes de Treinador

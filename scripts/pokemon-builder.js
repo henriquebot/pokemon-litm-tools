@@ -186,6 +186,12 @@ function genderLabel(id, language = "pt-BR") {
 }
 
 function futureLevelUpMoves(data) {
+  const selectedIds = new Set(
+    (data.moves ?? [])
+      .map(move => move?.id)
+      .filter(Boolean)
+  );
+
   const selectedLevel = Math.max(
     0,
     ...(data.moves ?? [])
@@ -193,16 +199,33 @@ function futureLevelUpMoves(data) {
       .filter(level => level > 0)
   );
 
-  const rows = (data.biographyMoves ?? [])
+  const all = (data.biographyMoves ?? [])
+    .filter(move =>
+      move?.id
+      && Number(move.level ?? 0) > 0
+      && !selectedIds.has(move.id)
+    );
+
+  const after = all
     .filter(move => Number(move.level ?? 0) > selectedLevel)
     .sort((a, b) =>
       Number(a.level ?? 0) - Number(b.level ?? 0)
-      || String(a.name ?? "").localeCompare(String(b.name ?? ""), "pt-BR")
+      || String(a.name ?? '').localeCompare(String(b.name ?? ''), 'pt-BR')
+    );
+
+  // Alguns Pokémon já chegam ao fim do learnset no Rank escolhido.
+  // Nesse caso completamos os slots planejados com golpes por nível
+  // ainda não usados, começando pelos mais avançados.
+  const earlier = all
+    .filter(move => Number(move.level ?? 0) <= selectedLevel)
+    .sort((a, b) =>
+      Number(b.level ?? 0) - Number(a.level ?? 0)
+      || String(a.name ?? '').localeCompare(String(b.name ?? ''), 'pt-BR')
     );
 
   const seen = new Set();
   const result = [];
-  for (const move of rows) {
+  for (const move of [...after, ...earlier]) {
     if (!move.id || seen.has(move.id)) continue;
     seen.add(move.id);
     result.push({
@@ -989,10 +1012,10 @@ async function reviewBuild(entry, config, data) {
 }
 
 
-function powerTag(name, planned = false) {
+function powerTag(name, planned = false, question = '') {
   return {
     name,
-    question: "",
+    question,
     burned: false,
     toBurn: false,
     planned: !!planned,
@@ -1013,29 +1036,49 @@ function floatingTag(name, positive = true) {
     positive,
     markings: [false, false, false, false, false, false],
     might: 0,
-    mightIcon: ""
+    mightIcon: ''
   };
 }
 
-function themeSystem(review, data) {
+function pokemonThemeTitleTag(entry, review, language = 'pt-BR') {
+  const species = String(entry?.name ?? 'Pokémon').trim() || 'Pokémon';
+  const nature = String(review?.natureLabel ?? '').trim();
+  const suffix = nature ? ' ' + nature : '';
+
+  if (language === 'en') return species + suffix;
+  if (review?.genderId === 'male') return 'O ' + species + suffix;
+  if (review?.genderId === 'female') return 'A ' + species + suffix;
+  return nature ? species + ' · ' + nature : species;
+}
+
+function themeSystem(review, data, entry) {
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
   const abilityTag = data.ability?.name
     ? [powerTag(`Habilidade: ${data.ability.name}`)]
     : [];
 
   const futureTags = futureLevelUpMoves(data)
-    .map(move => powerTag(move.name, true));
+    .map(move => powerTag(
+      move.name,
+      true,
+      move.learnedAt
+        ? (language === 'en'
+            ? `Learns by level at Lv. ${move.learnedAt}.`
+            : `Aprende por nível no Nv. ${move.learnedAt}.`)
+        : ''
+    ));
 
   return {
-    description: formatThemeDescription({ data, review }, data.contentLanguage),
-    type: "litm-variable",
-    color: "litm-variable",
-    quest: "",
-    story: "",
-    tabCategory: "main",
+    description: formatThemeDescription({ data, review }, language),
+    type: 'litm-variable',
+    color: 'litm-variable',
+    quest: '',
+    story: '',
+    tabCategory: 'main',
     powertags: [
+      powerTag(pokemonThemeTitleTag(entry, review, language)),
       ...review.moveNames.map(powerTag),
-      powerTag(review.powerStatTag),
-      powerTag(`Natureza: ${review.natureLabel}`),
+      ...(review.powerStatTag ? [powerTag(review.powerStatTag)] : []),
       ...abilityTag,
       ...futureTags
     ],
@@ -1051,6 +1094,7 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
     ...foundry.utils.deepClone(definition.moduleFlags),
     pokemonBuilder: true,
     pokemonInstanceId: instanceId,
+    speciesName: entry.name,
     contentLanguage: data.contentLanguage,
     nature: {
       id: review.natureId,
@@ -1067,6 +1111,15 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
     baseStats: foundry.utils.deepClone(data.stats),
     typeEffectiveness: foundry.utils.deepClone(data.typeEffectiveness),
     futureMoves: futureLevelUpMoves(data),
+    levelUpMoves: (data.biographyMoves ?? [])
+      .filter(move => Number(move.level ?? 0) > 0)
+      .map(move => ({
+        id: move.id,
+        name: move.name,
+        englishName: move.englishName,
+        learnedAt: Number(move.level ?? 0)
+      })),
+    themeTitleTag: pokemonThemeTitleTag(entry, review, data.contentLanguage),
     moves: data.moves.map((move, index) => ({
       id: move.id,
       name: review.moveNames[index],
@@ -1080,7 +1133,7 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
       statChanges: foundry.utils.deepClone(move.statChanges ?? [])
     })),
     tagBindings: data.moves.map((move, index) => ({
-      tagIndex: index,
+      tagIndex: index + 1,
       tagName: review.moveNames[index],
       kind: "pokemonMove",
       moveId: move.id,
@@ -1430,7 +1483,7 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
     name: entry.name,
     type: "themebook",
     img: definition.portraitPath,
-    system: themeSystem(review, data),
+    system: themeSystem(review, data, entry),
     flags: { [MODULE_ID]: flags }
   };
 
@@ -1687,6 +1740,7 @@ class PokemonChallengeWizardApp
       trainerActors.map(actor => ({
         id: actor.id,
         name: actor.name,
+        img: actor.img || 'icons/svg/mystery-man.svg',
         folderId: actor.folder?.id ?? "",
         folderName: actor.folder?.name ?? "Raiz de Actors",
         search: [
@@ -1990,6 +2044,7 @@ class PokemonChallengeWizardApp
       folders,
       trainers,
       trainerFolders,
+      selectedTrainerId: this.config.trainerId,
 
       rootFolderSelected:
         !this.config.folderId,
@@ -2147,6 +2202,55 @@ class PokemonChallengeWizardApp
         "change",
         filterTrainers
       );
+
+    const trainerCards = () =>
+      Array.from(
+        this.element.querySelectorAll(
+          "[data-trainer-card]"
+        )
+      );
+
+    const filterTrainerCards = () => {
+      const query = String(trainerSearch?.value ?? '')
+        .trim()
+        .toLocaleLowerCase();
+      const folderId = String(trainerFolder?.value ?? '');
+      let visible = 0;
+
+      for (const card of trainerCards()) {
+        const searchText = String(card.dataset.search ?? '').toLocaleLowerCase();
+        const cardFolder = String(card.dataset.folderId ?? '');
+        const show = (!query || searchText.includes(query))
+          && (!folderId || cardFolder === folderId);
+        card.hidden = !show;
+        if (show) visible++;
+      }
+
+      const empty = this.element.querySelector('[data-trainer-empty]');
+      if (empty) empty.hidden = visible > 0;
+    };
+
+    trainerSearch?.addEventListener('input', filterTrainerCards);
+    trainerFolder?.addEventListener('change', filterTrainerCards);
+
+    for (const card of trainerCards()) {
+      card.addEventListener('click', () => {
+        const id = card.dataset.trainerCard;
+        if (!id) return;
+
+        this.config.trainerId = id;
+        if (trainerSelect) trainerSelect.value = id;
+
+        for (const other of trainerCards()) {
+          other.classList.toggle('selected', other === card);
+        }
+
+        const next = this.element.querySelector("[data-action='builderNext']");
+        if (next && this.step === 2) next.disabled = false;
+      });
+    }
+
+    filterTrainerCards();
 
     trainerSelect
       ?.addEventListener(

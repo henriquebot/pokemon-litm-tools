@@ -2286,3 +2286,81 @@ has(
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Pokemon Challenge Wizard - visual NPC trainer picker */
+.pokemon-builder-trainer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  max-height: 390px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.pokemon-builder-trainer-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 22px;
+  gap: 10px;
+  align-items: center;
+  min-height: 86px;
+  padding: 7px 9px;
+  text-align: left;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 7px;
+}
+
+.pokemon-builder-trainer-card[hidden] {
+  display: none !important;
+}
+
+.pokemon-builder-trainer-card img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.pokemon-builder-trainer-card-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pokemon-builder-trainer-card-copy strong,
+.pokemon-builder-trainer-card-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pokemon-builder-trainer-card-copy small {
+  opacity: .7;
+}
+
+.pokemon-builder-trainer-check {
+  opacity: 0;
+}
+
+.pokemon-builder-trainer-card.selected {
+  box-shadow: inset 0 0 0 2px var(--color-border-highlight);
+}
+
+.pokemon-builder-trainer-card.selected .pokemon-builder-trainer-check {
+  opacity: 1;
+}
+
+.pokemon-builder-trainer-empty {
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  opacity: .65;
+}
+
+.pokemon-builder-trainer-empty[hidden] {
+  display: none !important;
+}
