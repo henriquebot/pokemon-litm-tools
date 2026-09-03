@@ -235,6 +235,125 @@ function openTheme(theme) {
   void sheet.render({force: true});
 }
 
+function challengePowerTag(name) {
+  return {
+    name: String(name ?? ""), question: "", burned: false, toBurn: false,
+    planned: false, selected: false, expiring: false, expired: false
+  };
+}
+
+function capturedThemeData(pokemon, slot = null) {
+  const flags = foundry.utils.deepClone(pokemon.flags?.[MODULE_ID] ?? {});
+  const moveNames = (flags.moves ?? []).map(move => move.name).filter(Boolean);
+  const powers = [
+    ...moveNames,
+    flags.powerStatTag,
+    flags.nature?.label ? `Natureza: ${flags.nature.label}` : null,
+    flags.ability?.name
+  ].filter(Boolean);
+
+  return {
+    name: pokemon.name,
+    type: "themebook",
+    img: pokemon.img,
+    system: {
+      ...pokemonThemeSystem(),
+      description: String(pokemon.system?.biography ?? pokemon.system?.shortDescription ?? ""),
+      powertags: powers.map(challengePowerTag),
+      weaknesstags: flags.weaknessTag ? [challengePowerTag(flags.weaknessTag)] : []
+    },
+    flags: {
+      [MODULE_ID]: {
+        ...flags,
+        pokemonTheme: true,
+        themeRole: "pokemon",
+        pokemonActorId: pokemon.id,
+        pokemonInstanceId: flags.pokemonInstanceId ?? newInstanceId(),
+        ...(slot === null ? {} : { pokemonTeamSlot: slot }),
+        capturedFromChallenge: true,
+        capturedChallengeId: pokemon.id
+      }
+    }
+  };
+}
+
+async function removeChallengeTokens(pokemon) {
+  if (!game.user.isGM) return;
+  for (const scene of game.scenes) {
+    const ids = scene.tokens.filter(token => token.actorId === pokemon.id).map(token => token.id);
+    if (ids.length) await scene.deleteEmbeddedDocuments("Token", ids);
+  }
+}
+
+export async function capturePokemonChallenge(pokemon) {
+  if (!game.user.isGM || !pokemon) return null;
+  const flags = pokemon.flags?.[MODULE_ID] ?? {};
+  if (flags.pokemonBuilder !== true || flags.encounter?.wild !== true || flags.captured === true) {
+    throw new Error("Somente um Challenge de Pokémon selvagem pode ser convertido.");
+  }
+
+  const trainers = getManagedActors();
+  if (!trainers.length) throw new Error("Nenhum Actor treinador jogador disponível.");
+  const options = trainers.map(actor => `<option value="${actor.id}">${foundry.utils.escapeHTML(actor.name)}</option>`).join("");
+
+  const choice = await foundry.applications.api.DialogV2.input({
+    window: { title: `Capturar ${pokemon.name}` },
+    content: `
+      <div style="display:grid;gap:12px;padding:8px">
+        <label><span>Treinador jogador</span><select name="trainerId">${options}</select></label>
+        <label><span>Destino</span><select name="destination"><option value="team">Time</option><option value="pc">PC</option></select></label>
+      </div>`,
+    ok: { label: "Converter em Tema", icon: "fa-solid fa-right-left" },
+    modal: true
+  });
+  if (!choice) return null;
+
+  const trainer = game.actors.get(String(choice.trainerId ?? ""));
+  if (!trainer || trainer.type !== "litm-character") throw new Error("Treinador jogador inválido.");
+  const destination = String(choice.destination ?? "team");
+
+  if (destination === "team" && getPokemonThemes(trainer).length >= 6) {
+    const current = getPokemonThemes(trainer);
+    const swapOptions = current.map(theme => `<option value="${theme.id}">${foundry.utils.escapeHTML(theme.name)}</option>`).join("");
+    const swap = await foundry.applications.api.DialogV2.input({
+      window: { title: "Time cheio" },
+      content: `<div style="display:grid;gap:10px;padding:8px"><p>Escolha qual Pokémon atual irá para o PC.</p><select name="themeId">${swapOptions}</select></div>`,
+      ok: { label: "Enviar para o PC", icon: "fa-solid fa-box" },
+      modal: true
+    });
+    if (!swap) return null;
+    await sendThemeToPc(trainer, String(swap.themeId ?? ""));
+  }
+
+  const instanceId = flags.pokemonInstanceId ?? newInstanceId();
+  await pokemon.setFlag(MODULE_ID, "pokemonInstanceId", instanceId);
+
+  if (destination === "team") {
+    const slot = nextTeamSlot(trainer);
+    if (slot === null) throw new Error("O time continua cheio.");
+    const data = capturedThemeData(pokemon, slot);
+    data.flags[MODULE_ID].pokemonInstanceId = instanceId;
+    const created = await trainer.createEmbeddedDocuments("Item", [data]);
+    if (!created?.[0]) throw new Error("Não foi possível criar o Tema do Pokémon capturado.");
+  } else {
+    const records = getPcRecords(trainer);
+    const data = capturedThemeData(pokemon, null);
+    data.flags[MODULE_ID].pokemonInstanceId = instanceId;
+    records.push({ id: newInstanceId(), data });
+    await setPcRecords(trainer, records);
+  }
+
+  await pokemon.update({
+    [`flags.${MODULE_ID}.captured`]: true,
+    [`flags.${MODULE_ID}.capturedByTrainerId`]: trainer.id,
+    [`flags.${MODULE_ID}.ownerTrainerId`]: trainer.id,
+    [`flags.${MODULE_ID}.encounter.wild`]: false
+  });
+  await removeChallengeTokens(pokemon);
+  ui.notifications.info(`${pokemon.name} agora pertence a ${trainer.name}.`);
+  return trainer;
+}
+
 class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: "pokemon-litm-manager", classes: ["pokemon-litm-tools", "pokemon-manager"],

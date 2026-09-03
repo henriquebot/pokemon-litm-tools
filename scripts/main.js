@@ -1,5 +1,6 @@
 import {
   openPokemonImporter,
+  openPokemonChallengeEditor,
   handlePokemonImporterCanvasDrop,
   POKEMON_IMPORTER_DRAG_TYPE
 } from "./importer-app.js";
@@ -14,7 +15,8 @@ import {
 } from "./character-creator-app.js";
 
 import {
-  openPokemonManager
+  openPokemonManager,
+  capturePokemonChallenge
 } from "./pokemon-manager-app.js";
 
 import {
@@ -65,6 +67,8 @@ Hooks.once("init", () => {
 
   game.modules.get(MODULE_ID).api = {
     openPokemonImporter,
+    openPokemonChallengeEditor,
+    capturePokemonChallenge,
     openPokemonCharacterCreator,
     openPokemonManager
   };

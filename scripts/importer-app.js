@@ -1400,6 +1400,24 @@ function findCatalogEntry(
 }
 
 
+export async function openPokemonChallengeEditor(actor) {
+  if (!game.user.isGM || !actor) return null;
+  if (actor.getFlag(MODULE_ID, "pokemonBuilder") !== true) {
+    throw new Error("Este Challenge não foi criado pelo Pokémon Builder.");
+  }
+
+  const catalog = await loadCatalog();
+  const assetId = actor.getFlag(MODULE_ID, "assetId");
+  const pokemonId = Number(actor.getFlag(MODULE_ID, "pokemonId") ?? 0);
+  const entry = (catalog.pokemon ?? []).find(item =>
+    (assetId && item.id === assetId)
+    || (pokemonId && Number(item.pokemonId ?? item.dex) === pokemonId)
+  );
+
+  if (!entry) throw new Error("Não encontrei este Pokémon no catálogo atual.");
+  return openPokemonBuilder(entry, prepareActorDefinition, { existingActor: actor });
+}
+
 export async function handlePokemonImporterCanvasDrop(
   data
 ) {

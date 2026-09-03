@@ -380,8 +380,67 @@ function wirePokemonEffectButtons(app, html) {
   }
 }
 
+function addChallengeActionButton(header, marker, title, icon, handler) {
+  if (header.querySelector(`[data-${marker}]`)) return;
+  const button = globalThis.document.createElement("button");
+  button.type = "button";
+  button.setAttribute(`data-${marker}`, "true");
+  button.className = "header-control pokemon-theme-pokedex-button";
+  button.title = title;
+  button.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+  button.addEventListener("click", async event => {
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      await handler();
+    } catch (error) {
+      console.error("Pokemon LITM Tools | Header action:", error);
+      ui.notifications.error(error?.message ?? "Não foi possível executar a ação.");
+    }
+  });
+  const close = header.querySelector('[data-action="close"]');
+  close ? close.before(button) : header.append(button);
+}
+
+function addPokemonChallengeActions(app, html) {
+  const actor = appDocument(app);
+  if (!isPokemonChallenge(actor) || !game.user.isGM) return;
+  const root = appRoot(app, html);
+  const header = root?.querySelector(".window-header");
+  if (!header) return;
+
+  addChallengeActionButton(
+    header,
+    "pokemon-edit-challenge",
+    "Editar no Criador de Challenge",
+    "fa-wand-magic-sparkles",
+    async () => {
+      const api = game.modules.get(MODULE_ID)?.api;
+      if (!api?.openPokemonChallengeEditor) throw new Error("Editor de Challenge indisponível.");
+      await api.openPokemonChallengeEditor(actor);
+    }
+  );
+
+  const encounter = actor.getFlag(MODULE_ID, "encounter") ?? {};
+  const captured = actor.getFlag(MODULE_ID, "captured") === true;
+  if (encounter.wild === true && !captured) {
+    addChallengeActionButton(
+      header,
+      "pokemon-capture-challenge",
+      "Converter Pokémon capturado em Tema",
+      "fa-right-left",
+      async () => {
+        const api = game.modules.get(MODULE_ID)?.api;
+        if (!api?.capturePokemonChallenge) throw new Error("Conversão de captura indisponível.");
+        await api.capturePokemonChallenge(actor);
+      }
+    );
+  }
+}
+
 function enhancePokemonSheet(app, html) {
   addPokemonDbButton(app, html);
+  addPokemonChallengeActions(app, html);
   wirePokemonEffectButtons(app, html);
 }
 

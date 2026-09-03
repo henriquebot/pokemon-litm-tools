@@ -696,6 +696,28 @@ function statStatusName(stat, direction, language) {
   return `${label}-${direction > 0 ? "aumentado" : "reduzido"}`;
 }
 
+function consequenceTier(chance, guaranteed = false) {
+  const value = Number(chance ?? 0);
+  if (guaranteed || value >= 100 || value <= 0) return "principal";
+  if (value >= 30) return "forte";
+  return "extrema";
+}
+
+function tierText(tier, language) {
+  if (language === "en") {
+    return {
+      principal: "Main consequence",
+      forte: "Strong consequence",
+      extrema: "Extreme consequence"
+    }[tier] ?? "Consequence";
+  }
+  return {
+    principal: "Consequência principal",
+    forte: "Consequência forte",
+    extrema: "Consequência extrema"
+  }[tier] ?? "Consequência";
+}
+
 export function buildMoveThreat(move, displayName, might, language = getPokemonContentLanguage()) {
   const power = Number(move.power ?? 0);
   const meta = move.meta ?? {};
@@ -703,10 +725,15 @@ export function buildMoveThreat(move, displayName, might, language = getPokemonC
   const description = moveShortDescription(move, displayName, language);
   const consequences = [];
 
+  const add = (text, tier = "principal") => {
+    if (!text) return;
+    consequences.push(`${tierText(tier, language)} — ${text}`);
+  };
+
   if (power > 0 && move.damageClass !== "status") {
     const level = damageStatusLevel(power);
     if (level > 0) {
-      consequences.push(language === "en"
+      add(language === "en"
         ? `A solid hit can leave the target ${statusMarkup("wounded", level)}.`
         : `Um acerto sólido pode deixar o alvo ${statusMarkup("ferido", level)}.`);
     }
@@ -716,27 +743,34 @@ export function buildMoveThreat(move, displayName, might, language = getPokemonC
   if (ailment && ailment !== "none" && ailment !== "unknown") {
     const status = language === "en" ? ailment : (AILMENT_PTBR[ailment] ?? ailment);
     const chance = Number(meta.ailmentChance ?? move.effectChance ?? 0);
-    const level = chance >= 100 || move.damageClass === "status" ? 3 : 2;
-    consequences.push(language === "en"
-      ? `Can leave the target ${statusMarkup(status, level)}${chance > 0 && chance < 100 ? ` (${chance}% chance)` : ""}.`
-      : `Pode deixar o alvo ${statusMarkup(status, level)}${chance > 0 && chance < 100 ? ` (${chance}% de chance)` : ""}.`);
+    const guaranteed = move.damageClass === "status" || chance >= 100;
+    const level = guaranteed ? 3 : 2;
+    add(
+      language === "en"
+        ? `Can leave the target ${statusMarkup(status, level)}.`
+        : `Pode deixar o alvo ${statusMarkup(status, level)}.`,
+      consequenceTier(chance, guaranteed)
+    );
   }
 
   if (Number(meta.flinchChance) > 0) {
-    consequences.push(language === "en"
-      ? `Can leave the target ${statusMarkup("hesitation-on-next-move", 2)} (${meta.flinchChance}% chance).`
-      : `Pode deixar o alvo ${statusMarkup("hesitacao-no-proximo-movimento", 2)} (${meta.flinchChance}% de chance). O Status expira após a próxima ação relevante.`);
+    add(
+      language === "en"
+        ? `Can leave the target ${statusMarkup("hesitation-on-next-move", 2)}. The Status expires after the next relevant action.`
+        : `Pode deixar o alvo ${statusMarkup("hesitacao-no-proximo-movimento", 2)}. O Status expira após a próxima ação relevante.`,
+      consequenceTier(meta.flinchChance)
+    );
   }
 
   if (Number(meta.drain) < 0) {
     const recoilLevel = Number(meta.drain) <= -50 ? 2 : 1;
-    consequences.push(language === "en"
+    add(language === "en"
       ? `The user suffers ${statusMarkup("hurt-by-recoil", recoilLevel)}.`
       : `O próprio Pokémon recebe ${statusMarkup("ferido-pelo-recuo", recoilLevel)}.`);
   }
 
   if (Number(meta.healing) > 0 || Number(meta.drain) > 0) {
-    consequences.push(language === "en"
+    add(language === "en"
       ? `The user can become ${statusMarkup("recovered", 2)}.`
       : `O Pokémon pode receber ${statusMarkup("recuperado", 2)}.`);
   }
@@ -747,46 +781,45 @@ export function buildMoveThreat(move, displayName, might, language = getPokemonC
     const selfTarget = String(move.target ?? "").includes("user");
     const level = Math.min(4, Math.max(1, Math.abs(amount) + 1));
     const status = statStatusName(change.stat, amount, language);
-    consequences.push(
-      selfTarget
-        ? (language === "en"
-            ? `The Pokémon can become ${statusMarkup(status, level)}.`
-            : `O Pokémon pode ficar ${statusMarkup(status, level)}.`)
-        : (language === "en"
-            ? `Can leave the target ${statusMarkup(status, level)}.`
-            : `Pode deixar o alvo ${statusMarkup(status, level)}.`)
-    );
+    const chance = Number(meta.statChance ?? move.effectChance ?? 0);
+    const text = selfTarget
+      ? (language === "en"
+          ? `The Pokémon can become ${statusMarkup(status, level)}.`
+          : `O Pokémon pode ficar ${statusMarkup(status, level)}.`)
+      : (language === "en"
+          ? `Can leave the target ${statusMarkup(status, level)}.`
+          : `Pode deixar o alvo ${statusMarkup(status, level)}.`);
+    add(text, consequenceTier(chance, chance <= 0));
   }
 
   if (rule.trap) {
-    consequences.push(language === "en"
+    add(language === "en"
       ? `Can leave the target ${statusMarkup("trapped", 2)}.`
       : `Pode deixar o alvo ${statusMarkup("preso", 2)}.`);
   }
   if (rule.recharge) {
-    consequences.push(language === "en"
+    add(language === "en"
       ? `After using it, the Pokémon becomes ${statusMarkup("recovering", 2)}.`
       : `Depois de usar o golpe, o Pokémon fica ${statusMarkup("recuperando-se", 2)}.`);
   }
   if (rule.statusPt || rule.statusEn) {
-    consequences.push(language === "en"
+    add(language === "en"
       ? `Can leave the target ${statusMarkup(rule.statusEn ?? rule.statusPt, rule.statusLevel ?? 2)}.`
       : `Pode deixar o alvo ${statusMarkup(rule.statusPt ?? rule.statusEn, rule.statusLevel ?? 2)}.`);
   }
   if (rule.selfPt || rule.selfEn) {
-    consequences.push(language === "en"
+    add(language === "en"
       ? `The Pokémon can become ${statusMarkup(rule.selfEn ?? rule.selfPt, rule.selfLevel ?? 2)}.`
       : `O Pokémon pode ficar ${statusMarkup(rule.selfPt ?? rule.selfEn, rule.selfLevel ?? 2)}.`);
   }
 
-  const uniqueConsequences = [...new Set(consequences)];
-  if (!uniqueConsequences.length) {
-    uniqueConsequences.push(language === "en"
+  if (!consequences.length) {
+    add(language === "en"
       ? `Creates an opening or complication appropriate to ${displayName}.`
       : `Cria uma abertura ou complicação coerente com ${displayName}.`);
   }
 
-  return { description, list: uniqueConsequences };
+  return { description, list: [...new Set(consequences)] };
 }
 
 export function buildAbilityThreat(ability, language = getPokemonContentLanguage()) {

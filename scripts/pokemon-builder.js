@@ -500,7 +500,11 @@ async function loadPokemonBuildData(entry, might) {
 
 function trainerOptions() {
   return game.actors
-    .filter(actor => actor.type === "litm-character" && (game.user.isGM || actor.isOwner))
+    .filter(actor =>
+      actor.type === "litm-npc"
+      && actor.getFlag(MODULE_ID, "pokemonBuilder") !== true
+      && (game.user.isGM || actor.isOwner)
+    )
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
@@ -946,6 +950,9 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
     },
     ability: data.ability ? foundry.utils.deepClone(data.ability) : null,
     might: config.might,
+    trainerNpcId: config.mode === "trainer" ? (config.trainerId || null) : null,
+    weaknessTag: review.weaknessTag,
+    powerStatTag: review.powerStatTag,
     types: foundry.utils.deepClone(data.types),
     baseStats: foundry.utils.deepClone(data.stats),
     typeEffectiveness: foundry.utils.deepClone(data.typeEffectiveness),
@@ -1124,9 +1131,64 @@ function pokemonThreats(data, review, config) {
 }
 
 
-async function createChallenge(entry, config, data, review, definition) {
+function stripLinkedPokemonSection(html) {
+  return String(html ?? "")
+    .replace(/<section data-pokemon-litm-team="true">[\s\S]*?<\/section>/g, "")
+    .trim();
+}
+
+async function refreshNpcTrainerPokemonSection(trainer) {
+  if (!trainer) return;
+  const recordsRaw = trainer.getFlag(MODULE_ID, "linkedPokemonChallenges");
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  let base = trainer.getFlag(MODULE_ID, "trainerBiographyBase");
+  if (typeof base !== "string") {
+    base = stripLinkedPokemonSection(trainer.system?.biography ?? "");
+    await trainer.setFlag(MODULE_ID, "trainerBiographyBase", base);
+  }
+
+  const rows = records
+    .map(record => {
+      const pokemon = game.actors.get(record.actorId);
+      if (!pokemon) return "";
+      const rank = pokemon.getFlag(MODULE_ID, "might") ?? record.might ?? "origin";
+      return `<li>@UUID[Actor.${pokemon.id}]{${escapeHTML(pokemon.name)}} · ${escapeHTML(MIGHT[rank]?.label ?? rank)}</li>`;
+    })
+    .filter(Boolean)
+    .join("");
+
+  const section = rows
+    ? `<section data-pokemon-litm-team="true"><h2>Pokémon</h2><ul>${rows}</ul></section>`
+    : "";
+
+  await trainer.update({
+    "system.biography": `${base}${base && section ? "\n" : ""}${section}`
+  });
+}
+
+async function linkPokemonChallengeToNpcTrainer(trainerId, pokemon) {
+  if (!trainerId || !pokemon) return;
+  const trainer = game.actors.get(trainerId);
+  if (!trainer || trainer.type !== "litm-npc") {
+    throw new Error("Challenge do treinador NPC não encontrado.");
+  }
+  const raw = trainer.getFlag(MODULE_ID, "linkedPokemonChallenges");
+  const records = Array.isArray(raw) ? foundry.utils.deepClone(raw) : [];
+  if (!records.some(record => record.actorId === pokemon.id)) {
+    records.push({
+      actorId: pokemon.id,
+      pokemonInstanceId: pokemon.getFlag(MODULE_ID, "pokemonInstanceId") ?? null,
+      might: pokemon.getFlag(MODULE_ID, "might") ?? "origin"
+    });
+    await trainer.setFlag(MODULE_ID, "linkedPokemonChallenges", records);
+  }
+  await pokemon.setFlag(MODULE_ID, "trainerNpcId", trainer.id);
+  await refreshNpcTrainerPokemonSection(trainer);
+}
+
+async function createChallenge(entry, config, data, review, definition, existingActor = null) {
   const language = data.contentLanguage ?? getPokemonContentLanguage();
-  const instanceId = randomId();
+  const instanceId = existingActor?.getFlag(MODULE_ID, "pokemonInstanceId") || randomId();
   const flags = moduleMetadata(entry, definition, config, data, review, instanceId);
   flags.encounter = {
     wild: config.mode === "challenge",
@@ -1182,7 +1244,7 @@ async function createChallenge(entry, config, data, review, definition) {
     ...defenses.map(defense => floatingTag(defense.name, defense.positive))
   ];
 
-  const actor = await Actor.implementation.create({
+  const actorData = {
     name: entry.name,
     type: "litm-npc",
     ...(folderId ? { folder: folderId } : {}),
@@ -1208,9 +1270,23 @@ async function createChallenge(entry, config, data, review, definition) {
     },
     prototypeToken: prototypeToken(definition, flags),
     flags: { [MODULE_ID]: flags }
-  });
+  };
+
+  let actor = existingActor;
+  if (actor) {
+    const updateData = foundry.utils.deepClone(actorData);
+    delete updateData.type;
+    actor = await actor.update(updateData);
+  } else {
+    actor = await Actor.implementation.create(actorData);
+  }
 
   if (!actor) throw new Error("Não foi possível criar o Challenge.");
+
+  if (config.mode === "trainer" && config.trainerId) {
+    await linkPokemonChallengeToNpcTrainer(config.trainerId, actor);
+  }
+
   void actor.sheet?.render?.({ force: true });
   return actor;
 }
@@ -1304,6 +1380,8 @@ class PokemonChallengeWizardApp
   weaknessStat = "speed";
   customWeakness = "";
   selectedMoveIds = new Set();
+  existingActor = null;
+  hydratedFromActor = false;
 
   config = {
     mode: "challenge",
@@ -1318,6 +1396,16 @@ class PokemonChallengeWizardApp
     super(options);
     this.entry = entry;
     this.prepareDefinition = prepareDefinition;
+    this.existingActor = options.existingActor ?? null;
+
+    if (this.existingActor) {
+      const flags = this.existingActor.flags?.[MODULE_ID] ?? {};
+      this.config.mode = flags.trainerNpcId ? "trainer" : "challenge";
+      this.config.might = flags.might ?? "adventure";
+      this.config.trainerId = flags.trainerNpcId ?? "";
+      this.config.folderId = this.existingActor.folder?.id ?? "";
+      this.config.newFolder = "";
+    }
   }
 
   async _ensureData() {
@@ -1337,24 +1425,27 @@ class PokemonChallengeWizardApp
 
     this.loadedMight = this.config.might;
 
-    const defaultNature =
-      defaultNatureForStats(this.data.stats);
+    const defaultNature = defaultNatureForStats(this.data.stats);
 
-    this.natureId = defaultNature.id;
-    this.abilityId =
-      this.data.ability?.id ??
-      this.data.abilities?.[0]?.id ??
-      "";
-    this.weaknessStat =
-      this.data.worst?.name ??
-      "speed";
-    this.customWeakness = "";
-    this.selectedMoveIds =
-      new Set(
-        (this.data.moves ?? [])
-          .slice(0, 4)
-          .map(move => move.id)
-      );
+    if (this.existingActor && !this.hydratedFromActor) {
+      const flags = this.existingActor.flags?.[MODULE_ID] ?? {};
+      this.natureId = flags.nature?.id ?? defaultNature.id;
+      this.abilityId = flags.ability?.id ?? this.data.ability?.id ?? this.data.abilities?.[0]?.id ?? "";
+      this.weaknessStat = this.data.worst?.name ?? "speed";
+      this.customWeakness = flags.weaknessTag ?? "";
+      this.selectedMoveIds = new Set((flags.moves ?? []).map(move => move.id).filter(Boolean).slice(0, 4));
+      if (!this.selectedMoveIds.size) {
+        this.selectedMoveIds = new Set((this.data.moves ?? []).slice(0, 4).map(move => move.id));
+      }
+      this.hydratedFromActor = true;
+    } else if (!this.hydratedFromActor) {
+      this.natureId = defaultNature.id;
+      this.abilityId = this.data.ability?.id ?? this.data.abilities?.[0]?.id ?? "";
+      this.weaknessStat = this.data.worst?.name ?? "speed";
+      this.customWeakness = "";
+      this.selectedMoveIds = new Set((this.data.moves ?? []).slice(0, 4).map(move => move.id));
+      this.hydratedFromActor = true;
+    }
   }
 
   _selectedAbility() {
@@ -1801,6 +1892,7 @@ class PokemonChallengeWizardApp
               next;
             this.data = null;
             this.loadedMight = null;
+            if (!this.existingActor) this.hydratedFromActor = false;
           }
         }
       );
@@ -1826,9 +1918,9 @@ class PokemonChallengeWizardApp
     field("trainerId")
       ?.addEventListener(
         "change",
-        event => {
-          this.config.trainerId =
-            event.currentTarget.value;
+        async event => {
+          this.config.trainerId = event.currentTarget.value;
+          await this.render({ force: true });
         }
       );
 
@@ -2052,23 +2144,14 @@ class PokemonChallengeWizardApp
                 this.entry
               );
 
-            const result =
-              this.config.mode ===
-                "trainer"
-                ? await createTrainerPokemon(
-                    this.entry,
-                    this.config,
-                    this.data,
-                    built.review,
-                    definition
-                  )
-                : await createChallenge(
-                    this.entry,
-                    this.config,
-                    this.data,
-                    built.review,
-                    definition
-                  );
+            const result = await createChallenge(
+              this.entry,
+              this.config,
+              this.data,
+              built.review,
+              definition,
+              this.existingActor
+            );
 
             ui.notifications.info(
               `${this.entry.name} criado com sucesso.`
@@ -2114,7 +2197,7 @@ class PokemonChallengeWizardApp
 }
 
 
-export async function openPokemonBuilder(entry, prepareDefinition) {
+export async function openPokemonBuilder(entry, prepareDefinition, options = {}) {
   if (!game.user.isGM) return null;
 
   if (
@@ -2148,7 +2231,8 @@ export async function openPokemonBuilder(entry, prepareDefinition) {
   pokemonBuilderWizardApp =
     new PokemonChallengeWizardApp(
       entry,
-      prepareDefinition
+      prepareDefinition,
+      options
     );
 
   pokemonBuilderWizardApp.render({

@@ -20,7 +20,7 @@
             <span>Criar como</span>
             <select data-builder-field="mode">
               <option value="challenge" {{#if isChallenge}}selected{{/if}}>Pokémon selvagem / Challenge</option>
-              <option value="trainer" {{#if isTrainer}}selected{{/if}}>Pokémon de treinador jogador</option>
+              <option value="trainer" {{#if isTrainer}}selected{{/if}}>Pokémon de Treinador NPC</option>
             </select>
           </label>
 
@@ -67,7 +67,7 @@
             </label>
           </div>
         {{else}}
-          <p>Escolha o treinador e se o Pokémon entra no Time ou no PC.</p>
+          <p>Escolha o Challenge do treinador NPC ao qual este Pokémon pertence.</p>
 
           <div class="pokemon-builder-config-grid">
             <label>
@@ -80,13 +80,6 @@
               </select>
             </label>
 
-            <label>
-              <span>Destino</span>
-              <select data-builder-field="destination">
-                <option value="team" {{#if destinationTeam}}selected{{/if}}>Time</option>
-                <option value="pc" {{#if destinationPc}}selected{{/if}}>PC</option>
-              </select>
-            </label>
           </div>
         {{/if}}
       </div>
