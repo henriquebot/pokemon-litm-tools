@@ -14,6 +14,11 @@
 - [x] Editar Challenge Pokémon novamente pelo Wizard
 - [x] Seletor visual de treinador NPC com busca, imagem e filtro por pasta
 - [x] Theme Pokémon com Tag-título do indivíduo e até 3 golpes planejados
+- [x] Botão Tema no Importer para criar diretamente Pokémon de treinador-jogador
+- [x] Perguntas semânticas das Tags Pokémon (personalidade, movimentos, stat, habilidade e fraqueza)
+- [x] Special Improvements Pokémon pré-preenchidos para gimmicks oficiais
+- [x] Cabeçalho persistente do Pokémon nas etapas 2–5 do Wizard
+- [x] Navegação Pokémon de treinador NPC → Challenge do treinador
 - [ ] Challenge Builder de Pessoas / treinadores NPC com equipe inteira em um único fluxo
 - [ ] Challenge Add-ons / templates nativos do LitM no Importer
 - [ ] Presets de Classes de Treinador
@@ -32,6 +37,7 @@
 - [ ] Finalizar etapa 4 do criador de Pokémon-jogador
 - [ ] Botão no header para reabrir Trainer/Pokémon-jogador no Criador em modo edição
 - [ ] Quest dos Themes Pokémon baseada em Nature, relação e evolução
+- [ ] Regras e ativação de Mega Evolução, Z-Move, Dynamax, Gigantamax, Terastalização, Reversão Primal e Ultra Burst
 - [ ] Themes reais: Habitat, Ability, Nature, Estágio Evolutivo e Move Set
 - [ ] Tags de Poder, Fraquezas e Quests
 - [ ] Refinamentos de Mochila e Trocas

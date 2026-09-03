@@ -4,7 +4,8 @@ import {
 } from "./pokemon-links.js";
 
 import {
-  openPokemonBuilder
+  openPokemonBuilder,
+  openPokemonTrainerThemeBuilder
 } from "./pokemon-builder.js";
 
 const MODULE_ID = "pokemon-litm-tools";
@@ -2194,6 +2195,50 @@ class PokemonImporterApp
 
               button.innerHTML =
                 oldHTML;
+            }
+          }
+        }
+      );
+    }
+
+
+    /* POKEMON THEME BUILDER */
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-pokemon-theme-builder]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+        async event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const id = button.dataset.pokemonThemeBuilder;
+          if (!id) return;
+
+          const oldHTML = button.innerHTML;
+          button.disabled = true;
+          button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Tema';
+
+          try {
+            const catalog = await loadCatalog();
+            const entry = catalog.pokemon.find(item => item.id === id);
+            if (!entry) throw new Error("Pokemon nao encontrado no catalogo.");
+
+            await openPokemonTrainerThemeBuilder(
+              entry,
+              prepareActorDefinition
+            );
+          } catch (error) {
+            console.error("Pokemon LITM Tools | Theme Builder:", error);
+            ui.notifications.error(error?.message ?? "Falha ao criar Tema Pokémon.");
+          } finally {
+            if (button?.isConnected) {
+              button.disabled = false;
+              button.innerHTML = oldHTML;
             }
           }
         }

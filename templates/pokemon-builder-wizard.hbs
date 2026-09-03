@@ -8,6 +8,16 @@
     {{/each}}
   </nav>
 
+  {{#if showPokemonHeader}}
+    <div class="pokemon-builder-pokemon-header">
+      <img src="{{pokemonHeaderImage}}" alt="{{entry.name}}">
+      <div>
+        <strong>{{entry.name}}</strong>
+        <small>{{pokemonHeaderMeta}}</small>
+      </div>
+    </div>
+  {{/if}}
+
   <section class="pokemon-challenge-wizard-body">
 
     {{#if stepIsConfig}}
@@ -16,13 +26,20 @@
         <p>Defina como este Pokémon será criado. O arraste rápido do Importer continua funcionando normalmente.</p>
 
         <div class="pokemon-builder-config-grid">
-          <label>
-            <span>Criar como</span>
-            <select data-builder-field="mode">
-              <option value="challenge" {{#if isChallenge}}selected{{/if}}>Pokémon selvagem / Challenge</option>
-              <option value="trainer" {{#if isTrainer}}selected{{/if}}>Pokémon de Treinador NPC</option>
-            </select>
-          </label>
+          {{#if isPlayerTheme}}
+            <label>
+              <span>Criar como</span>
+              <strong class="pokemon-builder-fixed-mode">Tema de Pokémon de treinador-jogador</strong>
+            </label>
+          {{else}}
+            <label>
+              <span>Criar como</span>
+              <select data-builder-field="mode">
+                <option value="challenge" {{#if isChallenge}}selected{{/if}}>Pokémon selvagem / Challenge</option>
+                <option value="trainer" {{#if isTrainer}}selected{{/if}}>Pokémon de Treinador NPC</option>
+              </select>
+            </label>
+          {{/if}}
 
           <label>
             <span>Rank / Might</span>
@@ -67,7 +84,20 @@
             </label>
           </div>
         {{else}}
-          <p>Escolha o Challenge do treinador NPC ao qual este Pokémon pertence.</p>
+          {{#if isPlayerTheme}}
+            <p>Escolha o treinador-jogador que receberá este Themebook.</p>
+            <div class="pokemon-builder-config-grid pokemon-builder-player-destination">
+              <label>
+                <span>Destino</span>
+                <select data-builder-field="destination">
+                  <option value="team" {{#if destinationTeam}}selected{{/if}}>Time</option>
+                  <option value="pc" {{#if destinationPc}}selected{{/if}}>PC</option>
+                </select>
+              </label>
+            </div>
+          {{else}}
+            <p>Escolha o Challenge do treinador NPC ao qual este Pokémon pertence.</p>
+          {{/if}}
 
           <div class="pokemon-builder-trainer-tools">
             <label>
@@ -115,7 +145,7 @@
 
           <div class="pokemon-builder-trainer-empty" data-trainer-empty hidden>
             <i class="fa-solid fa-user-slash"></i>
-            <span>Nenhum Challenge de treinador encontrado.</span>
+            <span>{{trainerEmptyText}}</span>
           </div>
         {{/if}}
       </div>

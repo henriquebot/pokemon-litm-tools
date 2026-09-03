@@ -158,7 +158,13 @@ const MOVE_PTBR = {
   "future-sight": "Visão do Futuro", "rock-smash": "Quebra-Rocha", whirlpool: "Redemoinho", "beat-up": "Espancamento",
   "seed-bomb": "Bomba de Sementes", "energy-ball": "Bola de Energia", "aqua-tail": "Cauda d'Água", "air-slash": "Corte de Ar",
   roost: "Poleiro", "brave-bird": "Pássaro Bravo", "leaf-storm": "Tempestade de Folhas", "power-whip": "Chicote Poderoso",
-  "worry-seed": "Semente da Preocupação"
+  "worry-seed": "Semente da Preocupação",
+  "grassy-terrain": "Campo de Grama",
+  "grass-whistle": "Assobio de Grama",
+  "acid-spray": "Spray Ácido",
+  "bullet-seed": "Rajada de Sementes",
+  "poison-fang": "Presa Venenosa",
+  "toxic-spikes": "Espinhos Tóxicos"
 };
 
 const MOVE_WORD_PTBR = {
@@ -486,6 +492,35 @@ export function natureProfile(id, language = getPokemonContentLanguage()) {
   };
 }
 
+export function pokemonSpecialImprovements(language = getPokemonContentLanguage()) {
+  const pt = language !== "en";
+  const rows = pt
+    ? [
+        ["Mega Evolução", "Transformação temporária ativada quando a espécie e os itens necessários permitirem."],
+        ["Z-Move", "Libera um golpe especial ligado a um Cristal Z quando os requisitos ficcionais forem atendidos."],
+        ["Dynamax", "Aumenta temporariamente a escala e libera movimentos Max quando a situação permitir."],
+        ["Gigantamax", "Forma especial de Dynamax disponível apenas para espécies compatíveis, com movimento G-Max próprio."],
+        ["Terastalização", "Ativa o Tipo Tera do Pokémon e altera como sua tipagem influencia a ficção e os confrontos."],
+        ["Reversão Primal", "Transformação especial reservada a Pokémon compatíveis, como Groudon e Kyogre."],
+        ["Ultra Burst", "Transformação especial reservada a formas compatíveis de Necrozma."]
+      ]
+    : [
+        ["Mega Evolution", "Temporary transformation when the species and required items allow it."],
+        ["Z-Move", "Unlocks a special move tied to a Z-Crystal when its fictional requirements are met."],
+        ["Dynamax", "Temporarily increases scale and enables Max Moves when the situation allows it."],
+        ["Gigantamax", "Special Dynamax form for compatible species, including its unique G-Max Move."],
+        ["Terastallization", "Activates the Pokémon's Tera Type and changes how typing matters in the fiction."],
+        ["Primal Reversion", "Special transformation reserved for compatible Pokémon such as Groudon and Kyogre."],
+        ["Ultra Burst", "Special transformation reserved for compatible Necrozma forms."]
+      ];
+
+  return rows.map(([name, description]) => ({
+    name,
+    description,
+    active: false
+  }));
+}
+
 export function moveEnglishLabel(id, names = []) {
   return exactLocalizedName(names, "en") || titleCase(id);
 }
@@ -501,8 +536,10 @@ export function moveLabel(id, names = [], language = getPokemonContentLanguage()
   if (MOVE_PTBR[id]) return MOVE_PTBR[id];
 
   // Nunca mistura palavras PT-BR e ingles no mesmo nome.
-  // Se ainda nao houver traducao curada, preserva o nome original inteiro.
-  return exactLocalizedName(names, 'en') || titleCase(id) || 'Golpe';
+  const words = String(id ?? "").split("-").filter(Boolean);
+  const translated = words.map(word => MOVE_WORD_PTBR[word] ?? null);
+  if (translated.length && translated.every(Boolean)) return translated.join(" ");
+  return exactLocalizedName(names, "en") || titleCase(id) || "Golpe";
 }
 
 export function abilityLabel(id, names = [], language = getPokemonContentLanguage()) {

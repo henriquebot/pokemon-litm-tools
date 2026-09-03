@@ -17,8 +17,13 @@ import {
   buildAbilityThreat,
   moveShortDescription,
   moveEnglishLabel,
-  formatThemeDescription
+  formatThemeDescription,
+  pokemonSpecialImprovements
 } from "./pokemon-content.js";
+
+import {
+  sendPokemonThemeToPc
+} from "./pokemon-manager-app.js";
 
 const MODULE_ID = "pokemon-litm-tools";
 const PC_FLAG = "pokemonPC";
@@ -611,7 +616,7 @@ async function loadPokemonBuildData(entry, might) {
 }
 
 
-function trainerOptions() {
+function npcTrainerOptions() {
   return game.actors
     .filter(actor => {
       if (actor.type !== "litm-npc") return false;
@@ -630,6 +635,16 @@ function trainerOptions() {
 
       return !pokemonChallenge;
     })
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
+
+function playerTrainerOptions() {
+  return game.actors
+    .filter(actor =>
+      actor.type === "litm-character"
+      && actor.getFlag(MODULE_ID, "kind") !== "pokemon"
+      && (game.user.isGM || actor.isOwner)
+    )
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
@@ -805,7 +820,7 @@ async function askBuildConfig(entry) {
     };
   }
 
-  const options = trainerOptions()
+  const options = npcTrainerOptions()
     .map(actor => `<option value="${actor.id}">${escapeHTML(actor.name)}</option>`)
     .join("");
 
@@ -1053,19 +1068,25 @@ function pokemonThemeTitleTag(entry, review, language = 'pt-BR') {
 
 function themeSystem(review, data, entry) {
   const language = data.contentLanguage ?? getPokemonContentLanguage();
+  const pt = language !== "en";
+
+  const moveTags = review.moveNames.map((name, index) =>
+    powerTag(name, false, pt ? `Movimento ${index + 1}` : `Move ${index + 1}`)
+  );
+
   const abilityTag = data.ability?.name
-    ? [powerTag(`Habilidade: ${data.ability.name}`)]
+    ? [powerTag(
+        `Habilidade: ${data.ability.name}`,
+        false,
+        pt ? "Habilidade nata" : "Innate Ability"
+      )]
     : [];
 
   const futureTags = futureLevelUpMoves(data)
-    .map(move => powerTag(
+    .map((move, index) => powerTag(
       move.name,
       true,
-      move.learnedAt
-        ? (language === 'en'
-            ? `Learns by level at Lv. ${move.learnedAt}.`
-            : `Aprende por nível no Nv. ${move.learnedAt}.`)
-        : ''
+      pt ? `Próximo movimento ${index + 1}` : `Next move ${index + 1}`
     ));
 
   return {
@@ -1076,13 +1097,30 @@ function themeSystem(review, data, entry) {
     story: '',
     tabCategory: 'main',
     powertags: [
-      powerTag(pokemonThemeTitleTag(entry, review, language)),
-      ...review.moveNames.map(powerTag),
-      ...(review.powerStatTag ? [powerTag(review.powerStatTag)] : []),
+      powerTag(
+        pokemonThemeTitleTag(entry, review, language),
+        false,
+        pt
+          ? "O Pokémon, sua natureza e personalidade"
+          : "The Pokémon, its nature and personality"
+      ),
+      ...moveTags,
+      ...(review.powerStatTag
+        ? [powerTag(
+            review.powerStatTag,
+            false,
+            pt ? "Stat de destaque" : "Standout Stat"
+          )]
+        : []),
       ...abilityTag,
       ...futureTags
     ],
-    weaknesstags: [powerTag(review.weaknessTag)],
+    weaknesstags: [powerTag(
+      review.weaknessTag,
+      false,
+      pt ? "Stat mais fraco" : "Weakest Stat"
+    )],
+    specialImprovements: pokemonSpecialImprovements(language),
     options: { isStoryTheme: false }
   };
 }
@@ -1461,14 +1499,48 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
     throw new Error("Treinador não encontrado.");
   }
 
-  const existingThemes = trainer.items.filter(item =>
+  let destination = config.destination === "pc" ? "pc" : "team";
+  let existingThemes = trainer.items.filter(item =>
     item.type === "themebook"
     && item.getFlag(MODULE_ID, "pokemonTheme") === true
     && item.getFlag(MODULE_ID, "themeRole") === "pokemon"
   );
 
-  if (config.destination === "team" && existingThemes.length >= 6) {
-    throw new Error("O time já tem 6 Pokémon.");
+  if (destination === "team" && existingThemes.length >= 6) {
+    const options = [
+      `<option value="__new__">${escapeHTML(entry.name)} → PC · manter o Time atual</option>`,
+      ...existingThemes.map(theme =>
+        `<option value="${theme.id}">${escapeHTML(theme.name)} → PC · ${escapeHTML(entry.name)} entra no Time</option>`
+      )
+    ].join("");
+
+    const choice = await foundry.applications.api.DialogV2.input({
+      window: { title: "Time cheio" },
+      content: `<div style="display:grid;gap:10px;padding:8px">
+        <p>O Time de ${escapeHTML(trainer.name)} já tem 6 Pokémon. Escolha o destino.</p>
+        <select name="choice">${options}</select>
+      </div>`,
+      ok: { label: "Confirmar", icon: "fa-solid fa-check" },
+      modal: true
+    });
+
+    if (!choice) return null;
+    const selected = String(choice.choice ?? "__new__");
+    if (selected === "__new__") {
+      destination = "pc";
+    } else {
+      await sendPokemonThemeToPc(trainer, selected);
+    }
+
+    existingThemes = trainer.items.filter(item =>
+      item.type === "themebook"
+      && item.getFlag(MODULE_ID, "pokemonTheme") === true
+      && item.getFlag(MODULE_ID, "themeRole") === "pokemon"
+    );
+  }
+
+  if (destination === "team" && existingThemes.length >= 6) {
+    throw new Error("O time continua cheio; a criação foi cancelada para impedir um sétimo Pokémon.");
   }
 
   const instanceId = randomId();
@@ -1476,7 +1548,7 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
   Object.assign(flags, {
     pokemonTheme: true,
     themeRole: "pokemon",
-    ...(config.destination === "team" ? { pokemonTeamSlot: existingThemes.length } : {})
+    ...(destination === "team" ? { pokemonTeamSlot: existingThemes.length } : {})
   });
 
   const themeData = {
@@ -1487,7 +1559,7 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
     flags: { [MODULE_ID]: flags }
   };
 
-  if (config.destination === "team") {
+  if (destination === "team") {
     const created = await trainer.createEmbeddedDocuments("Item", [themeData]);
     if (!created?.[0]) throw new Error("Não foi possível adicionar o Pokémon ao time.");
     void created[0].sheet?.render?.({ force: true });
@@ -1499,7 +1571,7 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
   records.push({ id: randomId(), data: themeData });
   await trainer.setFlag(MODULE_ID, PC_FLAG, records);
   ui.notifications.info(`${entry.name} foi enviado para o PC de ${trainer.name}.`);
-  return null;
+  return trainer;
 }
 
 class PokemonChallengeWizardApp
@@ -1547,6 +1619,7 @@ class PokemonChallengeWizardApp
   selectedMoveIds = new Set();
   existingActor = null;
   hydratedFromActor = false;
+  launchKind = "challenge";
 
   config = {
     mode: "challenge",
@@ -1558,13 +1631,27 @@ class PokemonChallengeWizardApp
   };
 
   constructor(entry, prepareDefinition, options = {}) {
-    super(options);
+    const requestedKind = options.launchKind === "theme" ? "theme" : "challenge";
+    const appOptions = { ...options };
+    delete appOptions.launchKind;
+    delete appOptions.existingActor;
+    appOptions.window = {
+      ...(appOptions.window ?? {}),
+      title: requestedKind === "theme"
+        ? "Criar Tema Pokémon"
+        : "Criar Challenge Pokémon"
+    };
+
+    super(appOptions);
     this.entry = entry;
     this.prepareDefinition = prepareDefinition;
     this.existingActor = options.existingActor ?? null;
+    this.launchKind = requestedKind;
+    this.config.mode = requestedKind === "theme" ? "player-theme" : "challenge";
 
     if (this.existingActor) {
       const flags = this.existingActor.flags?.[MODULE_ID] ?? {};
+      this.launchKind = "challenge";
       this.config.mode = flags.trainerNpcId ? "trainer" : "challenge";
       this.config.might = flags.might ?? "adventure";
       this.config.trainerId = flags.trainerNpcId ?? "";
@@ -1734,7 +1821,9 @@ class PokemonChallengeWizardApp
         }));
 
     const trainerActors =
-      trainerOptions();
+      this.config.mode === "player-theme"
+        ? playerTrainerOptions()
+        : npcTrainerOptions();
 
     const trainers =
       trainerActors.map(actor => ({
@@ -2017,6 +2106,13 @@ class PokemonChallengeWizardApp
         this.config.mode ===
         "trainer",
 
+      isPlayerTheme:
+        this.config.mode ===
+        "player-theme",
+
+      launchIsTheme:
+        this.launchKind === "theme",
+
       mode:
         this.config.mode,
 
@@ -2045,6 +2141,25 @@ class PokemonChallengeWizardApp
       trainers,
       trainerFolders,
       selectedTrainerId: this.config.trainerId,
+      trainerEmptyText:
+        this.config.mode === "player-theme"
+          ? "Nenhum treinador-jogador encontrado."
+          : "Nenhum Challenge de treinador encontrado.",
+
+      showPokemonHeader:
+        this.step >= 2,
+      pokemonHeaderImage:
+        this.entry.portrait
+        ?? this.entry.preview
+        ?? this.entry.sheet
+        ?? "icons/svg/mystery-man.svg",
+      pokemonHeaderMeta:
+        [
+          this.data?.types?.length
+            ? this.data.types.map(type => typeLabel(type, language)).join(" / ")
+            : null,
+          MIGHT[this.config.might]?.label ?? this.config.might
+        ].filter(Boolean).join(" · "),
 
       rootFolderSelected:
         !this.config.folderId,
@@ -2415,8 +2530,8 @@ class PokemonChallengeWizardApp
           if (
             this.step === 2
             &&
-            this.config.mode ===
-              "trainer"
+            this.config.mode !==
+              "challenge"
             &&
             !this.config.trainerId
           ) {
@@ -2494,14 +2609,30 @@ class PokemonChallengeWizardApp
                 this.entry
               );
 
-            const result = await createChallenge(
-              this.entry,
-              this.config,
-              this.data,
-              built.review,
-              definition,
-              this.existingActor
-            );
+            const result =
+              this.config.mode === "player-theme"
+                ? await createTrainerPokemon(
+                    this.entry,
+                    this.config,
+                    this.data,
+                    built.review,
+                    definition
+                  )
+                : await createChallenge(
+                    this.entry,
+                    this.config,
+                    this.data,
+                    built.review,
+                    definition,
+                    this.existingActor
+                  );
+
+            if (this.config.mode === "player-theme" && !result) {
+              this.busy = false;
+              button.disabled = false;
+              button.innerHTML = '<i class="fa-solid fa-check"></i> Criar Pokémon';
+              return null;
+            }
 
             ui.notifications.info(
               `${this.entry.name} criado com sucesso.`
@@ -2546,6 +2677,14 @@ class PokemonChallengeWizardApp
   }
 }
 
+
+export async function openPokemonTrainerThemeBuilder(entry, prepareDefinition) {
+  return openPokemonBuilder(
+    entry,
+    prepareDefinition,
+    { launchKind: "theme" }
+  );
+}
 
 export async function openPokemonBuilder(entry, prepareDefinition, options = {}) {
   if (!game.user.isGM) return null;

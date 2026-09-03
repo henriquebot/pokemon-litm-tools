@@ -1,4 +1,5 @@
 import { getPokemonDbUrl, openPokemonDb } from "./pokemon-links.js";
+import { pokemonSpecialImprovements } from "./pokemon-content.js";
 import {
   getPokemonThemes,
   getPokemonFollowerThemeId,
@@ -13,9 +14,18 @@ const PC_FLAG = "pokemonPC";
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 let managerApp = null;
 
-function pokemonThemeSystem() {
-  return {type: "litm-variable", color: "litm-variable", quest: "", story: "", tabCategory: "main",
-    powertags: [], weaknesstags: [], options: {isStoryTheme: false}};
+function pokemonThemeSystem(language = null) {
+  return {
+    type: "litm-variable",
+    color: "litm-variable",
+    quest: "",
+    story: "",
+    tabCategory: "main",
+    powertags: [],
+    weaknesstags: [],
+    specialImprovements: pokemonSpecialImprovements(language ?? undefined),
+    options: {isStoryTheme: false}
+  };
 }
 
 function newInstanceId() { return foundry.utils.randomID(16); }
@@ -152,7 +162,7 @@ function nextTeamSlot(trainer) {
   return count < 6 ? count : null;
 }
 
-async function sendThemeToPc(trainer, themeId) {
+export async function sendPokemonThemeToPc(trainer, themeId) {
   const theme = trainer.items.get(themeId);
   if (!theme || theme.getFlag(MODULE_ID, "pokemonTheme") !== true) {
     throw new Error("Pokémon do time não encontrado.");
@@ -390,46 +400,71 @@ function capturedThemeData(pokemon, slot = null) {
   const natureLabel = flags.nature?.label ?? '';
   const gender = flags.gender ?? 'genderless';
   const language = flags.contentLanguage ?? 'pt-BR';
+  const pt = language !== 'en';
   const titleTag = pokemonThemeTitleTag(speciesName, natureLabel, gender, language);
 
-  const powers = [
-    titleTag,
-    ...moveNames,
-    flags.powerStatTag,
-    flags.ability?.name ? `Habilidade: ${flags.ability.name}` : null
-  ].filter(Boolean);
+  const moveTags = moveNames.map((name, index) =>
+    challengePowerTag(name, false, pt ? `Movimento ${index + 1}` : `Move ${index + 1}`)
+  );
 
   const futureMoves = futureMovesFromFlags(flags);
-  const futureTags = futureMoves.map(move =>
+  const futureTags = futureMoves.map((move, index) =>
     challengePowerTag(
       move.name,
       true,
-      Number(move.learnedAt ?? move.level ?? 0) > 0
-        ? (language === 'en'
-            ? `Learns by level at Lv. ${Number(move.learnedAt ?? move.level)}.`
-            : `Aprende por nível no Nv. ${Number(move.learnedAt ?? move.level)}.`)
-        : ''
+      pt ? `Próximo movimento ${index + 1}` : `Next move ${index + 1}`
     )
   );
+
+  const powerTags = [
+    challengePowerTag(
+      titleTag,
+      false,
+      pt
+        ? 'O Pokémon, sua natureza e personalidade'
+        : 'The Pokémon, its nature and personality'
+    ),
+    ...moveTags
+  ];
+
+  if (flags.powerStatTag) {
+    powerTags.push(challengePowerTag(
+      flags.powerStatTag,
+      false,
+      pt ? 'Stat de destaque' : 'Standout Stat'
+    ));
+  }
+
+  if (flags.ability?.name) {
+    powerTags.push(challengePowerTag(
+      `Habilidade: ${flags.ability.name}`,
+      false,
+      pt ? 'Habilidade nata' : 'Innate Ability'
+    ));
+  }
+
+  powerTags.push(...futureTags);
 
   return {
     name: speciesName,
     type: 'themebook',
     img: pokemon.img,
     system: {
-      ...pokemonThemeSystem(),
+      ...pokemonThemeSystem(language),
       description: String(
         pokemon.system?.biography
         ?? pokemon.system?.shortDescription
         ?? ''
       ),
-      powertags: [
-        ...powers.map(name => challengePowerTag(name)),
-        ...futureTags
-      ],
+      powertags: powerTags,
       weaknesstags: flags.weaknessTag
-        ? [challengePowerTag(flags.weaknessTag)]
-        : []
+        ? [challengePowerTag(
+            flags.weaknessTag,
+            false,
+            pt ? 'Stat mais fraco' : 'Weakest Stat'
+          )]
+        : [],
+      specialImprovements: pokemonSpecialImprovements(language)
     },
     flags: {
       [MODULE_ID]: {
@@ -482,38 +517,54 @@ export async function capturePokemonChallenge(pokemon) {
 
   const trainer = game.actors.get(String(choice.trainerId ?? ""));
   if (!trainer || trainer.type !== "litm-character") throw new Error("Treinador jogador inválido.");
-  const destination = String(choice.destination ?? "team");
+  let destination = String(choice.destination ?? "team");
 
   if (destination === 'team') {
-    // Nunca criamos um sétimo Pokémon. Se o mundo já estiver em um
-    // estado legado com 6+, o GM escolhe explicitamente quem vai ao PC
-    // até existir um slot livre.
-    while (getPokemonThemes(trainer).length >= 6) {
+    // First normalize legacy parties that somehow contain more than 6.
+    while (getPokemonThemes(trainer).length > 6) {
       const current = getPokemonThemes(trainer);
-      const beforeCount = current.length;
-      const swapOptions = current
-        .map(theme => `<option value="${theme.id}">${foundry.utils.escapeHTML(theme.name)}</option>`)
+      const options = current
+        .map(theme => `<option value="${theme.id}">${foundry.utils.escapeHTML(theme.name)} → PC</option>`)
         .join('');
 
-      const swap = await foundry.applications.api.DialogV2.input({
-        window: { title: beforeCount > 6 ? 'Corrigir Time e capturar' : 'Time cheio' },
+      const fix = await foundry.applications.api.DialogV2.input({
+        window: { title: 'Corrigir Time' },
         content: `<div style="display:grid;gap:10px;padding:8px">
-          <p>O Time tem ${beforeCount} Pokémon. Escolha quem irá para o PC antes de adicionar ${foundry.utils.escapeHTML(pokemon.name)}.</p>
-          <select name="themeId">${swapOptions}</select>
+          <p>O Time tem ${current.length} Pokémon. Escolha um para enviar ao PC antes de continuar.</p>
+          <select name="themeId">${options}</select>
         </div>`,
         ok: { label: 'Enviar para o PC', icon: 'fa-solid fa-box-archive' },
         modal: true
       });
+      if (!fix) return null;
+      await sendPokemonThemeToPc(trainer, String(fix.themeId ?? ''));
+    }
+
+    if (getPokemonThemes(trainer).length === 6) {
+      const current = getPokemonThemes(trainer);
+      const options = [
+        `<option value="__captured__">${foundry.utils.escapeHTML(pokemon.name)} → PC · manter o Time atual</option>`,
+        ...current.map(theme =>
+          `<option value="${theme.id}">${foundry.utils.escapeHTML(theme.name)} → PC · ${foundry.utils.escapeHTML(pokemon.name)} entra no Time</option>`
+        )
+      ].join('');
+
+      const swap = await foundry.applications.api.DialogV2.input({
+        window: { title: 'Time cheio' },
+        content: `<div style="display:grid;gap:10px;padding:8px">
+          <p>O Time tem 6 Pokémon. Você pode mandar o próprio ${foundry.utils.escapeHTML(pokemon.name)} para o PC ou abrir uma vaga no Time.</p>
+          <select name="choice">${options}</select>
+        </div>`,
+        ok: { label: 'Confirmar', icon: 'fa-solid fa-check' },
+        modal: true
+      });
 
       if (!swap) return null;
-      const themeId = String(swap.themeId ?? '');
-      if (!themeId) throw new Error('Escolha qual Pokémon irá para o PC.');
-
-      await sendThemeToPc(trainer, themeId);
-
-      const afterCount = getPokemonThemes(trainer).length;
-      if (afterCount >= beforeCount) {
-        throw new Error('O Pokémon escolhido não saiu do Time. A captura foi cancelada para evitar um sétimo Pokémon.');
+      const selected = String(swap.choice ?? '__captured__');
+      if (selected === '__captured__') {
+        destination = 'pc';
+      } else {
+        await sendPokemonThemeToPc(trainer, selected);
       }
     }
   }
@@ -678,7 +729,7 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       event.stopPropagation();
       const actor = this.actor;
       const themeId = button.dataset.sendToPc;
-      if (actor && themeId) void this._run(() => sendThemeToPc(actor, themeId));
+      if (actor && themeId) void this._run(() => sendPokemonThemeToPc(actor, themeId));
     });
 
     for (const button of root.querySelectorAll("[data-add-to-team]")) button.addEventListener("click", () => {

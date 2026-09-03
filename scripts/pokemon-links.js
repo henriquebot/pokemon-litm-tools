@@ -100,16 +100,7 @@ function isPokemonChallenge(doc) {
 function addPokemonDbButton(app, html) {
   const doc = appDocument(app);
 
-  const isTheme =
-    doc?.documentName === "Item"
-    &&
-    doc?.type === "themebook";
-
-  if (
-    !isTheme
-    &&
-    !isPokemonChallenge(doc)
-  ) return;
+  if (!isPokemonChallenge(doc)) return;
 
   const url =
     doc.getFlag?.(
@@ -420,6 +411,20 @@ function addPokemonChallengeActions(app, html) {
       await api.openPokemonChallengeEditor(actor);
     }
   );
+
+  const trainerNpcId = actor.getFlag(MODULE_ID, "trainerNpcId");
+  const trainerNpc = trainerNpcId ? game.actors.get(trainerNpcId) : null;
+  if (trainerNpc?.type === "litm-npc") {
+    addChallengeActionButton(
+      header,
+      "pokemon-open-trainer",
+      `Abrir treinador: ${trainerNpc.name}`,
+      "fa-user",
+      async () => {
+        void trainerNpc.sheet?.render?.({ force: true });
+      }
+    );
+  }
 
   const encounter = actor.getFlag(MODULE_ID, "encounter") ?? {};
   const captured = actor.getFlag(MODULE_ID, "captured") === true;

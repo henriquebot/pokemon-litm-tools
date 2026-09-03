@@ -7,7 +7,8 @@ import {
 } from "./pokemon-links.js";
 
 import {
-  loadPokemonThemeProfile
+  loadPokemonThemeProfile,
+  pokemonSpecialImprovements
 } from "./pokemon-content.js";
 
 const MODULE_ID = "pokemon-litm-tools";
@@ -30,6 +31,7 @@ function buildThemeSystem(description = "") {
     tabCategory: "main",
     powertags: [],
     weaknesstags: [],
+    specialImprovements: pokemonSpecialImprovements(),
     options: {
       isStoryTheme: false
     }
