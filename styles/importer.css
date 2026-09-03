@@ -2420,3 +2420,184 @@ has(
 .pokemon-builder-player-destination {
   margin-bottom: 12px;
 }
+
+
+/* ========================================================= */
+/* Importer responsive hardening                              */
+/* ========================================================= */
+
+.pokemon-importer-list {
+  grid-template-columns:
+    repeat(auto-fill, minmax(340px, 1fr));
+}
+
+.pokemon-asset-card {
+  grid-template-columns:
+    28px
+    88px
+    minmax(0, 1fr);
+  min-height: 112px;
+  overflow: hidden;
+}
+
+.pokemon-asset-preview {
+  width: 88px;
+  height: 88px;
+  min-width: 0;
+}
+
+.pokemon-asset-info {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.pokemon-asset-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  gap: 4px;
+}
+
+.pokemon-asset-actions button {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .72rem;
+  padding-inline: 4px;
+}
+
+.pokemon-importer-shell.preview-zoomed
+.pokemon-importer-list {
+  grid-template-columns:
+    repeat(auto-fill, minmax(430px, 1fr));
+}
+
+.pokemon-importer-shell.preview-zoomed
+.pokemon-asset-card {
+  grid-template-columns:
+    28px
+    144px
+    minmax(210px, 1fr);
+}
+
+@media (max-width: 760px) {
+  .pokemon-importer-list,
+  .pokemon-importer-shell.preview-zoomed
+  .pokemon-importer-list {
+    grid-template-columns: 1fr;
+  }
+
+  .pokemon-asset-actions {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ========================================================= */
+/* Pokemon Combat Layer                                      */
+/* ========================================================= */
+
+.pokemon-combat-hud-control {
+  cursor: pointer;
+}
+
+.pokemon-combat-team-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pokemon-combat-team-picker > p {
+  margin: 0;
+  opacity: .78;
+}
+
+.pokemon-combat-team-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pokemon-combat-team-card {
+  display: grid;
+  grid-template-columns:
+    22px
+    58px
+    minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 72px;
+  padding: 7px;
+  border:
+    1px solid
+    var(--color-border-light-primary);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pokemon-combat-team-card:has(input:checked) {
+  box-shadow:
+    inset 0 0 0 2px
+    var(--color-border-highlight);
+}
+
+.pokemon-combat-team-card img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.pokemon-combat-team-card > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pokemon-combat-team-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pokemon-combat-field-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .72rem;
+  opacity: .9;
+}
+
+.pokemon-combat-field-badge.off {
+  opacity: .55;
+}
+
+.pokemon-combat-placement-ghost {
+  position: fixed;
+  z-index: 100000;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+  opacity: .72;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 5px rgb(255 255 255 / .55));
+}
+
+.pokemon-combat-existing {
+  display: grid;
+  gap: 10px;
+}
+
+.pokemon-combat-existing label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}

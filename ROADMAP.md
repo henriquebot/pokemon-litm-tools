@@ -24,10 +24,18 @@
 - [ ] Presets de Classes de Treinador
 
 ## Marco 2 — Combate 0.8.3
+- [x] Modelo estruturado de efeitos por Move para automação futura
+- [x] Combat Actor como projeção temporária de um Theme Pokémon
+- [x] Token HUD do treinador para colocar um Pokémon do Time por vez
+- [x] Posicionamento individual com preview e clique no mapa
+- [x] Arrastar Theme Pokémon diretamente para o Canvas
+- [x] Reutilização por pokemonInstanceId e prevenção de duplicatas na cena
+- [x] Recolher / focar Pokémon que já está em campo
 - [ ] Metadata de tipo por Move
 - [ ] Targeting e múltiplos alvos
 - [ ] Fraqueza, resistência e imunidade pré-selecionadas na rolagem
 - [ ] Aprovação do GM antes da rolagem
+- [ ] Target → aplicação automática de Tags e Status no alvo
 - [ ] Aplicação e expiração de Status
 - [ ] Recuo, cura, dreno, queimadura, veneno, sono, paralisia e hesitação
 - [ ] Resolver VFX semântico com integrações opcionais

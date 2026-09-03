@@ -35,6 +35,14 @@ import {
   registerPokemonContentSettings
 } from "./pokemon-content.js";
 
+import {
+  activatePokemonCombatLayer,
+  deployPokemonTheme,
+  recollectPokemonTheme,
+  isPokemonThemeCanvasDrop,
+  handlePokemonThemeCanvasDrop
+} from "./pokemon-combat.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -70,7 +78,9 @@ Hooks.once("init", () => {
     openPokemonChallengeEditor,
     capturePokemonChallenge,
     openPokemonCharacterCreator,
-    openPokemonManager
+    openPokemonManager,
+    deployPokemonTheme,
+    recollectPokemonTheme
   };
 });
 
@@ -168,38 +178,60 @@ Hooks.on(
     event
   ) => {
     if (
-      data?.type
-        !==
-        POKEMON_IMPORTER_DRAG_TYPE ||
-      data?.moduleId
-        !==
-        MODULE_ID
+      data?.type === POKEMON_IMPORTER_DRAG_TYPE
+      &&
+      data?.moduleId === MODULE_ID
     ) {
-      return;
+      event?.preventDefault();
+
+      void handlePokemonImporterCanvasDrop(
+        data
+      )
+        .catch(error => {
+          console.error(
+            "Pokemon LITM Tools | Canvas drop:",
+            error
+          );
+
+          ui.notifications.error(
+            "Nao foi possivel colocar o asset. Veja F12."
+          );
+        });
+
+      return false;
     }
 
-    event?.preventDefault();
+    if (
+      isPokemonThemeCanvasDrop(
+        data
+      )
+    ) {
+      event?.preventDefault();
 
-    void handlePokemonImporterCanvasDrop(
-      data
-    )
-      .catch(error => {
-        console.error(
-          "Pokemon LITM Tools | Canvas drop:",
-          error
-        );
+      void handlePokemonThemeCanvasDrop(
+        data
+      )
+        .catch(error => {
+          console.error(
+            "Pokemon LITM Tools | Pokemon Theme drop:",
+            error
+          );
 
-        ui.notifications.error(
-          "Nao foi possivel colocar o asset. Veja F12."
-        );
-      });
+          ui.notifications.error(
+            error?.message
+            ?? "Nao foi possivel colocar o Pokemon na cena."
+          );
+        });
 
-    return false;
+      return false;
+    }
   }
 );
 
 
 Hooks.once("ready", () => {
+
+  activatePokemonCombatLayer();
 
   activateTokenOutline();
 

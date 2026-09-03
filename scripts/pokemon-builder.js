@@ -14,6 +14,7 @@ import {
   statWeaknessText,
   typeDefenseGroups,
   buildMoveThreat,
+  buildMoveEffects,
   buildAbilityThreat,
   moveShortDescription,
   moveEnglishLabel,
@@ -532,6 +533,11 @@ async function loadPokemonBuildData(entry, might) {
         }
       };
       move.shortDescription = moveShortDescription(move, move.name, language);
+      move.effects = buildMoveEffects(
+        move,
+        might,
+        language
+      );
       return move;
     } catch (error) {
       console.warn("Pokemon LITM Tools | Move:", source.id, error);
@@ -643,6 +649,8 @@ function playerTrainerOptions() {
     .filter(actor =>
       actor.type === "litm-character"
       && actor.getFlag(MODULE_ID, "kind") !== "pokemon"
+      && actor.getFlag(MODULE_ID, "kind") !== "pokemon-combat"
+      && actor.getFlag(MODULE_ID, "combatProjection") !== true
       && (game.user.isGM || actor.isOwner)
     )
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
@@ -1168,7 +1176,15 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
       learnedAt: move.level,
       target: move.target,
       meta: foundry.utils.deepClone(move.meta ?? {}),
-      statChanges: foundry.utils.deepClone(move.statChanges ?? [])
+      statChanges: foundry.utils.deepClone(move.statChanges ?? []),
+      effects: foundry.utils.deepClone(
+        move.effects
+        ?? buildMoveEffects(
+          move,
+          config.might,
+          data.contentLanguage
+        )
+      )
     })),
     tagBindings: data.moves.map((move, index) => ({
       tagIndex: index + 1,
@@ -2147,7 +2163,7 @@ class PokemonChallengeWizardApp
           : "Nenhum Challenge de treinador encontrado.",
 
       showPokemonHeader:
-        this.step >= 2,
+        true,
       pokemonHeaderImage:
         this.entry.portrait
         ?? this.entry.preview

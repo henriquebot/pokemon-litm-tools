@@ -221,6 +221,295 @@ const SPECIAL_MOVE_RULES = {
   rest: { selfPt: "adormecido", selfEn: "asleep", selfLevel: 3 }
 };
 
+
+const MOVE_EFFECT_RULES = {
+  "worry-seed": {
+    descriptionPt: "Substitui a Habilidade do alvo por Insônia, impedindo que ele adormeça enquanto o efeito permanecer.",
+    descriptionEn: "Changes the target's Ability to Insomnia.",
+    target: "target", kind: "status",
+    statusPt: "habilidade-substituida-por-insonia",
+    statusEn: "ability-changed-to-insomnia",
+    level: 2
+  },
+  "gastro-acid": {
+    descriptionPt: "Suprime temporariamente a Habilidade do alvo, impedindo que seus efeitos funcionem.",
+    descriptionEn: "Suppresses the target's Ability.",
+    target: "target", kind: "status",
+    statusPt: "habilidade-anulada",
+    statusEn: "ability-suppressed",
+    level: 2
+  },
+  "skill-swap": {
+    descriptionPt: "Troca a Habilidade do usuário com a Habilidade do alvo.",
+    descriptionEn: "Swaps the user's Ability with the target's Ability.",
+    target: "target", kind: "status",
+    statusPt: "habilidades-trocadas",
+    statusEn: "abilities-swapped",
+    level: 2
+  },
+  "role-play": {
+    descriptionPt: "Copia a Habilidade do alvo e passa a utilizá-la temporariamente.",
+    descriptionEn: "Copies the target's Ability.",
+    target: "self", kind: "status",
+    statusPt: "habilidade-copiada",
+    statusEn: "ability-copied",
+    level: 2
+  },
+  "simple-beam": {
+    descriptionPt: "Substitui a Habilidade do alvo por Simples, alterando a forma como mudanças de atributos o afetam.",
+    descriptionEn: "Changes the target's Ability to Simple.",
+    target: "target", kind: "status",
+    statusPt: "habilidade-substituida-por-simples",
+    statusEn: "ability-changed-to-simple",
+    level: 2
+  },
+  entrainment: {
+    descriptionPt: "Faz o alvo copiar a Habilidade do usuário.",
+    descriptionEn: "Makes the target copy the user's Ability.",
+    target: "target", kind: "status",
+    statusPt: "habilidade-copiada",
+    statusEn: "ability-copied",
+    level: 2
+  },
+  soak: {
+    descriptionPt: "Altera temporariamente o tipo do alvo para Água.",
+    descriptionEn: "Changes the target's type to Water.",
+    target: "target", kind: "status",
+    statusPt: "tipo-alterado-para-agua",
+    statusEn: "type-changed-to-water",
+    level: 2
+  },
+  "forests-curse": {
+    descriptionPt: "Adiciona temporariamente o tipo Planta ao alvo.",
+    descriptionEn: "Adds the Grass type to the target.",
+    target: "target", kind: "status",
+    statusPt: "tipo-planta-adicionado",
+    statusEn: "grass-type-added",
+    level: 2
+  },
+  "trick-or-treat": {
+    descriptionPt: "Adiciona temporariamente o tipo Fantasma ao alvo.",
+    descriptionEn: "Adds the Ghost type to the target.",
+    target: "target", kind: "status",
+    statusPt: "tipo-fantasma-adicionado",
+    statusEn: "ghost-type-added",
+    level: 2
+  },
+  encore: {
+    descriptionPt: "Força o alvo a repetir por algum tempo o último movimento que utilizou.",
+    descriptionEn: "Forces the target to repeat its last move.",
+    target: "target", kind: "status",
+    statusPt: "preso-ao-ultimo-movimento",
+    statusEn: "locked-into-last-move",
+    level: 2
+  },
+  disable: {
+    descriptionPt: "Impede temporariamente que o alvo utilize o último movimento que executou.",
+    descriptionEn: "Temporarily prevents the target from using its last move.",
+    target: "target", kind: "status",
+    statusPt: "movimento-inabilitado",
+    statusEn: "move-disabled",
+    level: 2
+  },
+  taunt: {
+    descriptionPt: "Provoca o alvo e o impede temporariamente de utilizar movimentos que não causam dano direto.",
+    descriptionEn: "Prevents the target from using status moves.",
+    target: "target", kind: "status",
+    statusPt: "provocado",
+    statusEn: "taunted",
+    level: 2
+  },
+  torment: {
+    descriptionPt: "Impede o alvo de repetir o mesmo movimento em ações consecutivas.",
+    descriptionEn: "Prevents the target from using the same move twice in a row.",
+    target: "target", kind: "status",
+    statusPt: "impedido-de-repetir-movimento",
+    statusEn: "cannot-repeat-move",
+    level: 2
+  },
+  yawn: {
+    descriptionPt: "Deixa o alvo sonolento; se a ameaça não for resolvida, ele pode adormecer em seguida.",
+    descriptionEn: "Makes the target drowsy and may put it to sleep shortly afterward.",
+    target: "target", kind: "status",
+    statusPt: "sonolento",
+    statusEn: "drowsy",
+    level: 2
+  },
+  "grassy-terrain": {
+    descriptionPt: "Cobre o terreno com vegetação energética, favorecendo Pokémon no chão e fortalecendo efeitos ligados a Planta.",
+    descriptionEn: "Turns the battlefield into Grassy Terrain.",
+    target: "scene", kind: "status",
+    statusPt: "campo-de-grama",
+    statusEn: "grassy-terrain",
+    level: 2
+  },
+  "rain-dance": {
+    descriptionPt: "Invoca chuva e muda as condições do campo de batalha.",
+    descriptionEn: "Changes the weather to rain.",
+    target: "scene", kind: "status",
+    statusPt: "chuva",
+    statusEn: "rain",
+    level: 2
+  },
+  "sunny-day": {
+    descriptionPt: "Intensifica a luz solar e muda as condições do campo de batalha.",
+    descriptionEn: "Intensifies sunlight.",
+    target: "scene", kind: "status",
+    statusPt: "sol-forte",
+    statusEn: "harsh-sunlight",
+    level: 2
+  },
+  sandstorm: {
+    descriptionPt: "Levanta uma tempestade de areia que altera as condições do campo.",
+    descriptionEn: "Creates a sandstorm.",
+    target: "scene", kind: "status",
+    statusPt: "tempestade-de-areia",
+    statusEn: "sandstorm",
+    level: 2
+  },
+  hail: {
+    descriptionPt: "Invoca granizo e altera as condições do campo.",
+    descriptionEn: "Creates hail.",
+    target: "scene", kind: "status",
+    statusPt: "granizo",
+    statusEn: "hail",
+    level: 2
+  },
+  spikes: {
+    descriptionPt: "Espalha espinhos no lado adversário do campo, ameaçando Pokémon que entrarem em contato com o terreno.",
+    descriptionEn: "Scatters damaging spikes on the opposing side.",
+    target: "scene", kind: "status",
+    statusPt: "campo-com-espinhos",
+    statusEn: "spikes-on-field",
+    level: 2
+  },
+  "toxic-spikes": {
+    descriptionPt: "Espalha espinhos tóxicos no campo adversário, capazes de envenenar quem entrar em contato com eles.",
+    descriptionEn: "Scatters poisonous spikes on the opposing side.",
+    target: "scene", kind: "status",
+    statusPt: "campo-com-espinhos-toxicos",
+    statusEn: "toxic-spikes-on-field",
+    level: 2
+  },
+  "stealth-rock": {
+    descriptionPt: "Mantém pedras afiadas suspensas ao redor do campo adversário, ferindo quem entrar.",
+    descriptionEn: "Sets floating rocks around the opposing field.",
+    target: "scene", kind: "status",
+    statusPt: "campo-com-pedras-flutuantes",
+    statusEn: "stealth-rock-on-field",
+    level: 2
+  },
+  tailwind: {
+    descriptionPt: "Cria um vento favorável que acelera o próprio lado do confronto.",
+    descriptionEn: "Creates a tailwind that boosts the user's side.",
+    target: "self", kind: "status",
+    statusPt: "vento-a-favor",
+    statusEn: "tailwind",
+    level: 2
+  },
+  "trick-room": {
+    descriptionPt: "Distorce o espaço ao redor e altera a ordem natural de quem consegue agir mais rápido.",
+    descriptionEn: "Twists the dimensions and reverses normal speed order.",
+    target: "scene", kind: "status",
+    statusPt: "espaco-distorcido",
+    statusEn: "trick-room",
+    level: 3
+  },
+  gravity: {
+    descriptionPt: "Intensifica a gravidade no campo, dificultando voo e evasão.",
+    descriptionEn: "Intensifies gravity across the battlefield.",
+    target: "scene", kind: "status",
+    statusPt: "gravidade-intensificada",
+    statusEn: "gravity-intensified",
+    level: 2
+  }
+};
+
+function databaseMoveEffectPt(move, displayName) {
+  const text = String(
+    move?.shortEffectEn
+    ?? move?.flavorEn
+    ?? ""
+  )
+    .replace(/$effect_chance/g, "")
+    .replace(/s+/g, " ")
+    .trim()
+    .toLocaleLowerCase();
+
+  if (!text) return "";
+
+  if (
+    /changes? the target'?s ability to insomnia/.test(text)
+  ) {
+    return "Substitui a Habilidade do alvo por Insônia, impedindo que ele adormeça enquanto o efeito permanecer.";
+  }
+
+  if (
+    /suppresses? the target'?s ability/.test(text)
+  ) {
+    return "Suprime temporariamente a Habilidade do alvo e impede que seus efeitos funcionem.";
+  }
+
+  if (
+    /swaps?.*abilit/.test(text)
+  ) {
+    return "Troca as Habilidades do usuário e do alvo enquanto o efeito permanecer.";
+  }
+
+  if (
+    /copies?.*target'?s ability/.test(text)
+  ) {
+    return "Copia temporariamente a Habilidade do alvo.";
+  }
+
+  if (
+    /prevents?.*status moves/.test(text)
+  ) {
+    return "Impede temporariamente o alvo de utilizar movimentos que não causam dano direto.";
+  }
+
+  if (
+    /same move twice in a row/.test(text)
+  ) {
+    return "Impede o alvo de repetir o mesmo movimento em ações consecutivas.";
+  }
+
+  if (
+    /repeat.*last move/.test(text)
+  ) {
+    return "Força o alvo a continuar repetindo o último movimento utilizado.";
+  }
+
+  if (
+    /changes? the weather to rain|summons? rain/.test(text)
+  ) {
+    return "Invoca chuva e altera as condições do campo de batalha.";
+  }
+
+  if (
+    /sunlight|sunny/.test(text)
+    && /weather|intensif|summon|changes/.test(text)
+  ) {
+    return "Intensifica a luz solar e altera as condições do campo de batalha.";
+  }
+
+  if (
+    /terrain/.test(text)
+    && /grass/.test(text)
+  ) {
+    return "Transforma o terreno em um Campo de Grama e modifica como certas técnicas interagem com o campo.";
+  }
+
+  if (
+    /switches the user out|user switches out/.test(text)
+  ) {
+    return String(displayName) + " permite atacar ou produzir seu efeito e então retirar o usuário do confronto.";
+  }
+
+  return "";
+}
+
+
 const ABILITY_EFFECT_PTBR = {
   hustle: "Aumenta bastante a força dos golpes físicos, mas sacrifica parte da precisão desses ataques.",
   guts: "Quando sofre uma condição negativa, transforma a adversidade em força e aumenta o poder de seus ataques físicos.",
@@ -693,6 +982,13 @@ function damageStatusLevel(power) {
 function moveDescriptionPt(move, displayName) {
   const meta = move.meta ?? {};
   const rule = SPECIAL_MOVE_RULES[move.id] ?? {};
+  const effectRule = MOVE_EFFECT_RULES[move.id] ?? null;
+  const specific =
+    effectRule?.descriptionPt
+    || databaseMoveEffectPt(move, displayName);
+
+  if (specific) return specific;
+
   const type = typeLabel(move.type, "pt-BR");
   const ailment = meta.ailment && meta.ailment !== "none" && meta.ailment !== "unknown"
     ? (AILMENT_PTBR[meta.ailment] ?? meta.ailment)
@@ -759,6 +1055,7 @@ export function buildMoveThreat(move, displayName, might, language = getPokemonC
   const power = Number(move.power ?? 0);
   const meta = move.meta ?? {};
   const rule = SPECIAL_MOVE_RULES[move.id] ?? {};
+  const effectRule = MOVE_EFFECT_RULES[move.id] ?? null;
   const description = moveShortDescription(move, displayName, language);
   const consequences = [];
 
@@ -850,6 +1147,35 @@ export function buildMoveThreat(move, displayName, might, language = getPokemonC
       : `O Pokémon pode ficar ${statusMarkup(rule.selfPt ?? rule.selfEn, rule.selfLevel ?? 2)}.`);
   }
 
+  if (effectRule?.statusPt || effectRule?.statusEn) {
+    const status =
+      language === "en"
+        ? (effectRule.statusEn ?? effectRule.statusPt)
+        : (effectRule.statusPt ?? effectRule.statusEn);
+    const level = Number(effectRule.level ?? 2);
+    const target = effectRule.target ?? "target";
+
+    if (target === "self") {
+      add(
+        language === "en"
+          ? `The Pokémon can become ${statusMarkup(status, level)}.`
+          : `O Pokémon pode ficar ${statusMarkup(status, level)}.`
+      );
+    } else if (target === "scene") {
+      add(
+        language === "en"
+          ? `Changes the battlefield: ${statusMarkup(status, level)}.`
+          : `Altera o campo: ${statusMarkup(status, level)}.`
+      );
+    } else {
+      add(
+        language === "en"
+          ? `Can leave the target ${statusMarkup(status, level)}.`
+          : `Pode deixar o alvo ${statusMarkup(status, level)}.`
+      );
+    }
+  }
+
   if (!consequences.length) {
     add(language === "en"
       ? `Creates an opening or complication appropriate to ${displayName}.`
@@ -857,6 +1183,205 @@ export function buildMoveThreat(move, displayName, might, language = getPokemonC
   }
 
   return { description, list: [...new Set(consequences)] };
+}
+
+
+export function buildMoveEffects(move, might, language = getPokemonContentLanguage()) {
+  const effects = [];
+  const meta = move?.meta ?? {};
+  const rule = SPECIAL_MOVE_RULES[move?.id] ?? {};
+  const effectRule = MOVE_EFFECT_RULES[move?.id] ?? null;
+
+  const push = effect => {
+    if (!effect?.name) return;
+    const key = [
+      effect.target,
+      effect.kind,
+      effect.name,
+      effect.level,
+      effect.trigger
+    ].join("|");
+
+    if (effects.some(existing => existing._key === key)) return;
+    effects.push({
+      ...effect,
+      _key: key
+    });
+  };
+
+  const power = Number(move?.power ?? 0);
+  if (power > 0 && move?.damageClass !== "status") {
+    const level = damageStatusLevel(power);
+    if (level > 0) {
+      push({
+        target: "target",
+        kind: "status",
+        name: language === "en" ? "wounded" : "ferido",
+        level,
+        trigger: "principal",
+        source: "damage"
+      });
+    }
+  }
+
+  const ailment = meta.ailment;
+  if (ailment && ailment !== "none" && ailment !== "unknown") {
+    const chance = Number(meta.ailmentChance ?? move.effectChance ?? 0);
+    const guaranteed = move.damageClass === "status" || chance >= 100;
+    push({
+      target: "target",
+      kind: "status",
+      name:
+        language === "en"
+          ? ailment
+          : (AILMENT_PTBR[ailment] ?? ailment),
+      level: guaranteed ? 3 : 2,
+      trigger: consequenceTier(chance, guaranteed),
+      source: "ailment"
+    });
+  }
+
+  if (Number(meta.flinchChance) > 0) {
+    push({
+      target: "target",
+      kind: "status",
+      name:
+        language === "en"
+          ? "hesitation-on-next-move"
+          : "hesitacao-no-proximo-movimento",
+      level: 2,
+      trigger: consequenceTier(meta.flinchChance),
+      expires: "next-action",
+      source: "flinch"
+    });
+  }
+
+  if (Number(meta.drain) < 0) {
+    push({
+      target: "self",
+      kind: "status",
+      name:
+        language === "en"
+          ? "hurt-by-recoil"
+          : "ferido-pelo-recuo",
+      level: Number(meta.drain) <= -50 ? 2 : 1,
+      trigger: "principal",
+      source: "recoil"
+    });
+  }
+
+  if (Number(meta.healing) > 0 || Number(meta.drain) > 0) {
+    push({
+      target: "self",
+      kind: "status",
+      name:
+        language === "en"
+          ? "recovered"
+          : "recuperado",
+      level: 2,
+      trigger: "principal",
+      source: Number(meta.drain) > 0 ? "drain" : "healing"
+    });
+  }
+
+  for (const change of move?.statChanges ?? []) {
+    const amount = Number(change.change ?? 0);
+    if (!amount) continue;
+
+    const selfTarget =
+      String(move?.target ?? "").includes("user");
+
+    const chance =
+      Number(meta.statChance ?? move?.effectChance ?? 0);
+
+    push({
+      target: selfTarget ? "self" : "target",
+      kind: "status",
+      name: statStatusName(
+        change.stat,
+        amount,
+        language
+      ),
+      level: Math.min(
+        4,
+        Math.max(1, Math.abs(amount) + 1)
+      ),
+      trigger: consequenceTier(
+        chance,
+        chance <= 0
+      ),
+      source: "stat-change"
+    });
+  }
+
+  if (rule.trap) {
+    push({
+      target: "target",
+      kind: "status",
+      name: language === "en" ? "trapped" : "preso",
+      level: 2,
+      trigger: "principal",
+      source: "trap"
+    });
+  }
+
+  if (rule.recharge) {
+    push({
+      target: "self",
+      kind: "status",
+      name:
+        language === "en"
+          ? "recovering"
+          : "recuperando-se",
+      level: 2,
+      trigger: "principal",
+      source: "recharge"
+    });
+  }
+
+  if (rule.statusPt || rule.statusEn) {
+    push({
+      target: "target",
+      kind: "status",
+      name:
+        language === "en"
+          ? (rule.statusEn ?? rule.statusPt)
+          : (rule.statusPt ?? rule.statusEn),
+      level: Number(rule.statusLevel ?? 2),
+      trigger: "principal",
+      source: "move-rule"
+    });
+  }
+
+  if (rule.selfPt || rule.selfEn) {
+    push({
+      target: "self",
+      kind: "status",
+      name:
+        language === "en"
+          ? (rule.selfEn ?? rule.selfPt)
+          : (rule.selfPt ?? rule.selfEn),
+      level: Number(rule.selfLevel ?? 2),
+      trigger: "principal",
+      source: "move-rule"
+    });
+  }
+
+  if (effectRule?.statusPt || effectRule?.statusEn) {
+    push({
+      target: effectRule.target ?? "target",
+      kind: effectRule.kind ?? "status",
+      name:
+        language === "en"
+          ? (effectRule.statusEn ?? effectRule.statusPt)
+          : (effectRule.statusPt ?? effectRule.statusEn),
+      level: Number(effectRule.level ?? 2),
+      trigger: "principal",
+      source: "database-effect"
+    });
+  }
+
+  return effects.map(({ _key, ...effect }) => effect);
 }
 
 export function buildAbilityThreat(ability, language = getPokemonContentLanguage()) {

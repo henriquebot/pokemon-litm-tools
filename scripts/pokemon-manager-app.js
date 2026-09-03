@@ -31,7 +31,13 @@ function pokemonThemeSystem(language = null) {
 function newInstanceId() { return foundry.utils.randomID(16); }
 
 function getManagedActors() {
-  return game.actors.filter(actor => actor.type === "litm-character" && (game.user.isGM || actor.isOwner))
+  return game.actors
+    .filter(actor =>
+      actor.type === "litm-character"
+      && actor.getFlag(MODULE_ID, "combatProjection") !== true
+      && actor.getFlag(MODULE_ID, "kind") !== "pokemon-combat"
+      && (game.user.isGM || actor.isOwner)
+    )
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
