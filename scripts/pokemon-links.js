@@ -325,9 +325,18 @@ function wirePokemonEffectButtons(app, html) {
   ) {
     if (
       article.querySelector(
-        "[data-pokemon-effect-trigger]"
+        "[data-pokemon-effect-actions]"
       )
     ) continue;
+
+    const actions =
+      globalThis.document.createElement(
+        "div"
+      );
+
+    actions.dataset.pokemonEffectActions = "true";
+    actions.className =
+      "pokemon-biography-effect-actions";
 
     const button =
       globalThis.document.createElement(
@@ -351,8 +360,8 @@ function wirePokemonEffectButtons(app, html) {
         : "Disparar efeito no alvo marcado";
     button.innerHTML =
       self
-        ? '<i class="fa-solid fa-wand-magic-sparkles"></i> Efeito em si'
-        : '<i class="fa-solid fa-bullseye"></i> Efeito no alvo';
+        ? '<i class="fa-solid fa-wand-magic-sparkles"></i> Token'
+        : '<i class="fa-solid fa-bullseye"></i> Token';
 
     button.addEventListener(
       "click",
@@ -367,7 +376,62 @@ function wirePokemonEffectButtons(app, html) {
       }
     );
 
-    article.append(button);
+    actions.append(button);
+
+    if (
+      article.dataset.pokemonEffectKind === "move"
+      && article.dataset.pokemonEffectId
+    ) {
+      const areaButton =
+        globalThis.document.createElement(
+          "button"
+        );
+
+      areaButton.type = "button";
+      areaButton.dataset.pokemonEffectArea = "true";
+      areaButton.className =
+        "pokemon-biography-effect-area";
+      areaButton.title =
+        "Gerar uma área visual deste golpe";
+      areaButton.innerHTML =
+        '<i class="fa-solid fa-circle-nodes"></i> Área';
+
+      areaButton.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const api =
+            game.modules.get(MODULE_ID)?.api;
+
+          if (!api?.startPokemonChallengeMoveArea) {
+            ui.notifications.error(
+              "Gerador de Área Pokémon indisponível."
+            );
+            return;
+          }
+
+          void api.startPokemonChallengeMoveArea(
+            actor,
+            article.dataset.pokemonEffectId
+          ).catch(error => {
+            console.error(
+              "Pokemon LITM Tools | Área do Challenge:",
+              error
+            );
+            ui.notifications.error(
+              error?.message
+              ?? "Não foi possível criar a área."
+            );
+          });
+        }
+      );
+
+      actions.append(areaButton);
+    }
+
+    article.append(actions);
   }
 }
 

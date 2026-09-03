@@ -43,6 +43,12 @@ import {
   handlePokemonThemeCanvasDrop
 } from "./pokemon-combat.js";
 
+import {
+  activatePokemonCombatEffects,
+  startPokemonChallengeMoveArea,
+  deletePokemonCombatProjection
+} from "./pokemon-combat-effects.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -80,7 +86,9 @@ Hooks.once("init", () => {
     openPokemonCharacterCreator,
     openPokemonManager,
     deployPokemonTheme,
-    recollectPokemonTheme
+    recollectPokemonTheme,
+    startPokemonChallengeMoveArea,
+    deletePokemonCombatProjection
   };
 });
 
@@ -232,6 +240,7 @@ Hooks.on(
 Hooks.once("ready", () => {
 
   activatePokemonCombatLayer();
+  activatePokemonCombatEffects();
 
   activateTokenOutline();
 

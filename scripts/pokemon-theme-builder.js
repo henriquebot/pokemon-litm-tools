@@ -66,85 +66,38 @@ export async function createPokemonTeamThemes(
     );
   }
 
-  const prepared = [];
-
-  for (const entry of entries) {
-    const [definition, profile] =
-      await Promise.all([
-        preparePokemonActorDefinition(entry),
-        loadPokemonThemeProfile(entry)
-      ]);
-
-    prepared.push({
-      entry,
-      definition,
-      profile
-    });
-  }
-
-  if (!prepared.length) {
+  if (!entries?.length) {
     return [];
   }
 
-  const data =
-    prepared.map(
-      ({ entry, definition, profile }, index) => ({
-        name: entry.name,
-        type: "themebook",
-        img: definition.portraitPath,
+  const {
+    buildPokemonTrainerThemeData
+  } = await import("./pokemon-builder.js");
 
-        system:
-          buildThemeSystem(
-            profile?.description
-            ?? ""
-          ),
+  const data = [];
 
-        flags: {
-          [MODULE_ID]: {
-            ...definition.moduleFlags,
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    const definition =
+      await preparePokemonActorDefinition(entry);
 
-            pokemonTheme: true,
-            pokemonTeamSlot: index,
-            themeRole: "pokemon",
-            pokemonInstanceId:
-              foundry.utils.randomID(16),
-
-            contentLanguage:
-              profile?.contentLanguage
-              ?? "pt-BR",
-
-            types:
-              foundry.utils.deepClone(
-                profile?.types
-                ?? []
-              ),
-
-            baseStats:
-              foundry.utils.deepClone(
-                profile?.stats
-                ?? {}
-              ),
-
-            ability:
-              foundry.utils.deepClone(
-                profile?.ability
-                ?? null
-              ),
-
-            pokedexUrl:
-              getPokemonDbUrl(entry)
-          }
+    data.push(
+      await buildPokemonTrainerThemeData(
+        entry,
+        definition,
+        {
+          might: "origin",
+          slot: index,
+          trainerId: actor.id
         }
-      })
+      )
     );
+  }
 
-  const created =
-    await actor.createEmbeddedDocuments(
-      "Item",
-      data
-    );
-
-  return created;
+  return actor.createEmbeddedDocuments(
+    "Item",
+    data
+  );
 }
 
 

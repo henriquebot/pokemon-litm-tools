@@ -19,6 +19,9 @@
 - [x] Special Improvements Pokémon pré-preenchidos para gimmicks oficiais
 - [x] Cabeçalho persistente do Pokémon nas etapas 2–5 do Wizard
 - [x] Navegação Pokémon de treinador NPC → Challenge do treinador
+- [x] Pokémon iniciais do Character Creator usam o mesmo Theme completo do Builder/captura
+- [x] Pokémon Manager com Time / PC / Liberados e retorno do mesmo indivíduo por pokemonInstanceId
+- [x] Limpeza de referências órfãs sem transformar Actors antigos em entradas do PC
 - [ ] Challenge Builder de Pessoas / treinadores NPC com equipe inteira em um único fluxo
 - [ ] Challenge Add-ons / templates nativos do LitM no Importer
 - [ ] Presets de Classes de Treinador
@@ -30,16 +33,23 @@
 - [x] Posicionamento individual com preview e clique no mapa
 - [x] Arrastar Theme Pokémon diretamente para o Canvas
 - [x] Reutilização por pokemonInstanceId e prevenção de duplicatas na cena
-- [x] Recolher / focar Pokémon que já está em campo
-- [ ] Metadata de tipo por Move
-- [ ] Targeting e múltiplos alvos
-- [ ] Fraqueza, resistência e imunidade pré-selecionadas na rolagem
-- [ ] Aprovação do GM antes da rolagem
-- [ ] Target → aplicação automática de Tags e Status no alvo
-- [ ] Aplicação e expiração de Status
-- [ ] Recuo, cura, dreno, queimadura, veneno, sono, paralisia e hesitação
-- [ ] Resolver VFX semântico com integrações opcionais
-- [ ] Sequencer / Eskie / BLFX / JB2A opcionais; fallback nativo obrigatório
+- [x] Recolher / focar Pokémon que já está em campo com botões diretos
+- [x] Estado de combate persistido no Theme e restaurado quando o Combat Actor é recriado
+- [x] Follower e Combat Token unificados por pokemonInstanceId; nunca duplicar o mesmo Pokémon na cena
+- [x] HUD do Combat Token com Recolher, Seguir/Parar e até 4 Moves
+- [x] Metadata de tipo por Move
+- [x] Targeting e múltiplos alvos pelo target nativo do Foundry
+- [x] Prévia de fraqueza, resistência e imunidade por alvo
+- [ ] Injetar automaticamente a eficácia de tipo na rolagem nativa do LitM
+- [ ] Aprovação do GM antes da rolagem nativa
+- [x] Target → aplicação de Tags e Status estruturados no alvo
+- [x] Aplicação e empilhamento de Status conforme o modelo do LitM
+- [ ] Expiração automática de Status por próxima ação / confronto
+- [x] Recuo, cura, dreno, queimadura, veneno, sono, paralisia e hesitação disponíveis via effects
+- [x] Áreas Pokémon como Regions v14 com cor por tipo e targeting dos Tokens dentro
+- [x] Challenge Bio com botão Área para apresentar ameaça antes da reação dos jogadores
+- [x] Sequencer opcional para áreas animadas e VFX de golpe; JB2A opcional para assets
+- [x] Fallback nativo obrigatório sem módulos externos
 
 ## Marco 3 — Pokémon-jogador
 - [ ] Finalizar etapa 4 do criador de Pokémon-jogador

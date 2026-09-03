@@ -11,6 +11,7 @@ import {
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 const PC_FLAG = "pokemonPC";
+const RELEASED_FLAG = "pokemonReleased";
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 let managerApp = null;
 
@@ -70,7 +71,17 @@ function getPcRecords(trainer) {
   const raw = trainer?.getFlag(MODULE_ID, PC_FLAG);
   return Array.isArray(raw) ? foundry.utils.deepClone(raw) : [];
 }
-async function setPcRecords(trainer, records) { await trainer.setFlag(MODULE_ID, PC_FLAG, records); }
+async function setPcRecords(trainer, records) {
+  await trainer.setFlag(MODULE_ID, PC_FLAG, records);
+}
+
+function getReleasedRecords(trainer) {
+  const raw = trainer?.getFlag(MODULE_ID, RELEASED_FLAG);
+  return Array.isArray(raw) ? foundry.utils.deepClone(raw) : [];
+}
+async function setReleasedRecords(trainer, records) {
+  await trainer.setFlag(MODULE_ID, RELEASED_FLAG, records);
+}
 
 function ensureDataInstanceId(data) {
   data.flags ??= {};
@@ -85,68 +96,57 @@ async function ensurePokemonFoundation(trainer) {
 
   const themes = getPokemonThemes(trainer);
   const updates = [];
+
   for (const theme of themes) {
+    const update = { _id: theme.id };
+    let changed = false;
+
     if (!theme.getFlag(MODULE_ID, "pokemonInstanceId")) {
-      updates.push({
-        _id: theme.id,
-        [`flags.${MODULE_ID}.pokemonInstanceId`]: newInstanceId()
-      });
+      update[`flags.${MODULE_ID}.pokemonInstanceId`] = newInstanceId();
+      changed = true;
     }
+
+    for (const key of ["pokemonActorId", "combatActorId"]) {
+      const actorId = theme.getFlag(MODULE_ID, key);
+      if (actorId && !game.actors.get(actorId)) {
+        update[`flags.${MODULE_ID}.-=${key}`] = null;
+        changed = true;
+      }
+    }
+
+    if (changed) updates.push(update);
   }
+
   if (updates.length) {
     await trainer.updateEmbeddedDocuments("Item", updates);
   }
 
-  const records = getPcRecords(trainer);
-  let changed = false;
-  for (const record of records) {
-    record.data ??= {};
-    const before =
-      record.data?.flags?.[MODULE_ID]?.pokemonInstanceId;
-    ensureDataInstanceId(record.data);
-    if (!before) changed = true;
+  async function normalizeRecords(flagName, records) {
+    let changed = false;
+
+    for (const record of records) {
+      record.data ??= {};
+      const before = record.data?.flags?.[MODULE_ID]?.pokemonInstanceId;
+      ensureDataInstanceId(record.data);
+      if (!before) changed = true;
+
+      const flags = record.data?.flags?.[MODULE_ID] ?? {};
+      for (const key of ["pokemonActorId", "combatActorId"]) {
+        const actorId = flags[key];
+        if (actorId && !game.actors.get(actorId)) {
+          delete flags[key];
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      await trainer.setFlag(MODULE_ID, flagName, records);
+    }
   }
 
-  const knownInstances = new Set(
-    records
-      .map(record =>
-        record.data?.flags?.[MODULE_ID]?.pokemonInstanceId
-      )
-      .filter(Boolean)
-  );
-
-  const teamActorIds = new Set(
-    themes
-      .map(theme =>
-        theme.getFlag(MODULE_ID, "pokemonActorId")
-      )
-      .filter(Boolean)
-  );
-
-  for (const pokemon of pokemonActorsForTrainer(trainer, teamActorIds)) {
-    const stored =
-      pokemon.getFlag(MODULE_ID, "storedThemeData");
-
-    if (!stored || typeof stored !== "object") continue;
-
-    const data =
-      foundry.utils.deepClone(stored);
-    const instanceId =
-      ensureDataInstanceId(data);
-
-    if (knownInstances.has(instanceId)) continue;
-
-    records.push({
-      id: newInstanceId(),
-      data
-    });
-    knownInstances.add(instanceId);
-    changed = true;
-  }
-
-  if (changed) {
-    await setPcRecords(trainer, records);
-  }
+  await normalizeRecords(PC_FLAG, getPcRecords(trainer));
+  await normalizeRecords(RELEASED_FLAG, getReleasedRecords(trainer));
 }
 
 function themeSnapshot(theme) {
@@ -174,6 +174,15 @@ export async function sendPokemonThemeToPc(trainer, themeId) {
     throw new Error("Pokémon do time não encontrado.");
   }
 
+  const combatApi = game.modules.get(MODULE_ID)?.api;
+  if (combatApi?.recollectPokemonTheme) {
+    try {
+      await combatApi.recollectPokemonTheme(theme);
+    } catch (error) {
+      console.warn("Pokemon LITM Tools | Recolher antes do PC:", error);
+    }
+  }
+
   if (getPokemonFollowerThemeId(trainer) === theme.id) {
     await setPokemonFollowerTheme(trainer, null);
   }
@@ -186,15 +195,6 @@ export async function sendPokemonThemeToPc(trainer, themeId) {
     data: snapshot
   });
   await setPcRecords(trainer, records);
-
-  const linkedActorId = theme.getFlag(MODULE_ID, "pokemonActorId");
-  const linkedActor = linkedActorId ? game.actors.get(linkedActorId) : null;
-  if (linkedActor && (game.user.isGM || linkedActor.isOwner)) {
-    await linkedActor.update({
-      [`flags.${MODULE_ID}.storedThemeData`]: snapshot,
-      [`flags.${MODULE_ID}.pcThemeBackupOnly`]: true
-    });
-  }
 
   await trainer.deleteEmbeddedDocuments("Item", [theme.id]);
   await reindexTeam(trainer);
@@ -277,6 +277,136 @@ async function addPcPokemonToTeam(trainer, source, id) {
   await setPcRecords(trainer, records);
 }
 
+function snapshotCombatStateIntoData(data) {
+  const instanceId = data?.flags?.[MODULE_ID]?.pokemonInstanceId;
+  if (!instanceId) return data;
+
+  const actor = game.actors.find(candidate =>
+    candidate.getFlag(MODULE_ID, "combatProjection") === true
+    && candidate.getFlag(MODULE_ID, "pokemonInstanceId") === instanceId
+  );
+
+  if (!actor) return data;
+
+  data.flags ??= {};
+  data.flags[MODULE_ID] ??= {};
+  data.flags[MODULE_ID].combatState = {
+    floatingTagsAndStatuses: foundry.utils.deepClone(
+      actor.system?.floatingTagsAndStatuses ?? []
+    ),
+    updatedAt: Date.now()
+  };
+
+  return data;
+}
+
+async function removeCombatProjectionForData(data) {
+  const instanceId = data?.flags?.[MODULE_ID]?.pokemonInstanceId;
+  if (!instanceId) return;
+
+  const api = game.modules.get(MODULE_ID)?.api;
+  if (api?.deletePokemonCombatProjection) {
+    await api.deletePokemonCombatProjection(instanceId);
+  }
+}
+
+async function releaseTeamPokemon(trainer, themeId) {
+  const theme = trainer.items.get(themeId);
+  if (!theme || theme.getFlag(MODULE_ID, "pokemonTheme") !== true) {
+    throw new Error("Pokémon do Time não encontrado.");
+  }
+
+  const api = game.modules.get(MODULE_ID)?.api;
+  if (api?.recollectPokemonTheme) {
+    try {
+      await api.recollectPokemonTheme(theme);
+    } catch {}
+  }
+
+  if (getPokemonFollowerThemeId(trainer) === theme.id) {
+    await setPokemonFollowerTheme(trainer, null);
+  }
+
+  let data = themeSnapshot(theme);
+  data = snapshotCombatStateIntoData(data);
+  delete data.flags?.[MODULE_ID]?.pokemonTeamSlot;
+
+  const released = getReleasedRecords(trainer);
+  released.push({
+    id: newInstanceId(),
+    releasedAt: Date.now(),
+    data
+  });
+
+  await setReleasedRecords(trainer, released);
+  await removeCombatProjectionForData(data);
+  await trainer.deleteEmbeddedDocuments("Item", [theme.id]);
+  await reindexTeam(trainer);
+}
+
+async function releasePcPokemon(trainer, recordId) {
+  const pc = getPcRecords(trainer);
+  const index = pc.findIndex(record => record.id === recordId);
+  if (index < 0) throw new Error("Pokémon do PC não encontrado.");
+
+  const [record] = pc.splice(index, 1);
+  record.data = snapshotCombatStateIntoData(record.data);
+  record.releasedAt = Date.now();
+
+  const released = getReleasedRecords(trainer);
+  released.push(record);
+
+  await setPcRecords(trainer, pc);
+  await setReleasedRecords(trainer, released);
+  await removeCombatProjectionForData(record.data);
+}
+
+async function releasedPokemonToPc(trainer, recordId) {
+  const released = getReleasedRecords(trainer);
+  const index = released.findIndex(record => record.id === recordId);
+  if (index < 0) throw new Error("Pokémon liberado não encontrado.");
+
+  const [record] = released.splice(index, 1);
+  delete record.releasedAt;
+
+  const pc = getPcRecords(trainer);
+  pc.push(record);
+
+  await setReleasedRecords(trainer, released);
+  await setPcRecords(trainer, pc);
+}
+
+async function releasedPokemonToTeam(trainer, recordId) {
+  const slot = nextTeamSlot(trainer);
+  if (slot === null) throw new Error("O Time já tem 6 Pokémon.");
+
+  const released = getReleasedRecords(trainer);
+  const index = released.findIndex(record => record.id === recordId);
+  if (index < 0) throw new Error("Pokémon liberado não encontrado.");
+
+  const [record] = released.splice(index, 1);
+  const created = await trainer.createEmbeddedDocuments(
+    "Item",
+    [buildThemeFromPcRecord(record, slot)]
+  );
+
+  if (!created?.[0]) {
+    throw new Error("Não foi possível trazer o Pokémon de volta ao Time.");
+  }
+
+  await setReleasedRecords(trainer, released);
+}
+
+async function deleteReleasedPokemon(trainer, recordId) {
+  const released = getReleasedRecords(trainer);
+  const index = released.findIndex(record => record.id === recordId);
+  if (index < 0) throw new Error("Pokémon liberado não encontrado.");
+
+  const [record] = released.splice(index, 1);
+  await removeCombatProjectionForData(record.data);
+  await setReleasedRecords(trainer, released);
+}
+
 function pokemonActorPreview(pokemon) {
   const assets = pokemon.getFlag(MODULE_ID, "assets") ?? {};
   return assets.portrait ?? pokemon.img ?? "icons/svg/mystery-man.svg";
@@ -296,12 +426,15 @@ function openTheme(theme) {
   void sheet.render({force: true});
 }
 
-function openPcThemeRecord(trainer, recordId) {
+function openPcThemeRecord(trainer, recordId, source = "pc") {
   if (!trainer || !recordId) return;
 
+  const records = source === "released"
+    ? getReleasedRecords(trainer)
+    : getPcRecords(trainer);
+
   const record =
-    getPcRecords(trainer)
-      .find(row => row.id === recordId);
+    records.find(row => row.id === recordId);
 
   if (!record?.data) return;
 
@@ -634,6 +767,7 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const themes = getPokemonThemes(trainer);
     const followerThemeId = trainer ? getPokemonFollowerThemeId(trainer) : null;
     const storedRecords = getPcRecords(trainer);
+    const releasedRecords = getReleasedRecords(trainer);
 
     const team = themes.map((theme, index) => ({
       id: theme.id, number: index + 1, name: theme.name, img: themePreview(theme),
@@ -660,11 +794,38 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         a.name.localeCompare(b.name, "pt-BR")
       );
 
+    const releasedItems = releasedRecords
+      .map(record => ({
+        id: record.id,
+        name: record.data?.name ?? "Pokémon",
+        img: storedPreview(record),
+        instanceId:
+          record.data?.flags?.[MODULE_ID]?.pokemonInstanceId
+          ?? "",
+        pokedexUrl:
+          record.data?.flags?.[MODULE_ID]?.pokedexUrl
+          ?? getPokemonDbUrl(record.data?.name)
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
     return {...context,
       hasActors: actors.length > 0,
       actors: actors.map(actor => ({id: actor.id, name: actor.name, selected: actor.id === this.actorId})),
-      tabTeam: this.tab === "team", tabPc: this.tab === "pc", tabItems: this.tab === "items", tabTrade: this.tab === "trade",
-      team, emptySlots, pcItems, teamCount: team.length, pcCount: pcItems.length, teamFull: team.length >= 6, busy: this.busy
+      tabTeam: this.tab === "team",
+      tabPc: this.tab === "pc",
+      tabReleased: this.tab === "released",
+      tabItems: this.tab === "items",
+      tabTrade: this.tab === "trade",
+      team,
+      emptySlots,
+      pcItems,
+      releasedItems,
+      teamCount: team.length,
+      pcCount: pcItems.length,
+      releasedCount: releasedItems.length,
+      teamFull: team.length >= 6,
+      busy: this.busy,
+      isGM: game.user.isGM
     };
   }
 
@@ -724,6 +885,22 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     }
 
+    for (const card of root.querySelectorAll("[data-open-released-theme]")) {
+      card.addEventListener("click", event => {
+        if (event.target.closest("button,input,select,a")) return;
+        const actor = this.actor;
+        const recordId = card.dataset.openReleasedTheme;
+        if (!actor || !recordId) return;
+
+        try {
+          openPcThemeRecord(actor, recordId, "released");
+        } catch (error) {
+          console.error("Pokemon LITM Tools | Abrir Theme liberado:", error);
+          ui.notifications.error(error?.message ?? "Não foi possível abrir o Tema.");
+        }
+      });
+    }
+
     for (const input of root.querySelectorAll("[data-follower-theme-id]")) input.addEventListener("change", () => {
       const actor = this.actor;
       const themeId = input.dataset.followerThemeId;
@@ -742,6 +919,89 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const actor = this.actor, source = button.dataset.pcSource, id = button.dataset.addToTeam;
       if (actor && source && id) void this._run(() => addPcPokemonToTeam(actor, source, id));
     });
+
+    for (const button of root.querySelectorAll("[data-release-team]")) {
+      button.addEventListener("click", async event => {
+        event.stopPropagation();
+        const actor = this.actor;
+        const themeId = button.dataset.releaseTeam;
+        const theme = actor?.items?.get(themeId);
+        if (!actor || !theme) return;
+
+        const ok = await foundry.applications.api.DialogV2.confirm({
+          window: { title: "Libertar " + theme.name + "?" },
+          content: "<p>O Pokémon sairá do Time e irá para <strong>Liberados</strong>. O indivíduo e seu histórico serão preservados.</p>",
+          yes: { label: "Libertar", icon: "fa-solid fa-dove" },
+          no: { label: "Cancelar" },
+          rejectClose: false,
+          modal: true
+        });
+
+        if (ok) void this._run(() => releaseTeamPokemon(actor, themeId));
+      });
+    }
+
+    for (const button of root.querySelectorAll("[data-release-pc]")) {
+      button.addEventListener("click", async event => {
+        event.stopPropagation();
+        const actor = this.actor;
+        const recordId = button.dataset.releasePc;
+        const record = actor ? getPcRecords(actor).find(row => row.id === recordId) : null;
+        if (!actor || !record) return;
+
+        const name = record.data?.name ?? "Pokémon";
+        const ok = await foundry.applications.api.DialogV2.confirm({
+          window: { title: "Libertar " + name + "?" },
+          content: "<p>O Pokémon sairá do PC e irá para <strong>Liberados</strong>. O registro continuará disponível caso ele retorne.</p>",
+          yes: { label: "Libertar", icon: "fa-solid fa-dove" },
+          no: { label: "Cancelar" },
+          rejectClose: false,
+          modal: true
+        });
+
+        if (ok) void this._run(() => releasePcPokemon(actor, recordId));
+      });
+    }
+
+    for (const button of root.querySelectorAll("[data-released-to-pc]")) {
+      button.addEventListener("click", event => {
+        event.stopPropagation();
+        const actor = this.actor;
+        const recordId = button.dataset.releasedToPc;
+        if (actor && recordId) void this._run(() => releasedPokemonToPc(actor, recordId));
+      });
+    }
+
+    for (const button of root.querySelectorAll("[data-released-to-team]")) {
+      button.addEventListener("click", event => {
+        event.stopPropagation();
+        const actor = this.actor;
+        const recordId = button.dataset.releasedToTeam;
+        if (actor && recordId) void this._run(() => releasedPokemonToTeam(actor, recordId));
+      });
+    }
+
+    for (const button of root.querySelectorAll("[data-delete-released]")) {
+      button.addEventListener("click", async event => {
+        event.stopPropagation();
+        const actor = this.actor;
+        const recordId = button.dataset.deleteReleased;
+        const record = actor ? getReleasedRecords(actor).find(row => row.id === recordId) : null;
+        if (!actor || !record || !game.user.isGM) return;
+
+        const name = record.data?.name ?? "Pokémon";
+        const ok = await foundry.applications.api.DialogV2.confirm({
+          window: { title: "Excluir permanentemente?" },
+          content: "<p><strong>" + foundry.utils.escapeHTML(name) + "</strong> será removido de Liberados e seu Combat Actor será apagado. Esta ação não poderá ser desfeita.</p>",
+          yes: { label: "Excluir permanentemente", icon: "fa-solid fa-trash" },
+          no: { label: "Cancelar" },
+          rejectClose: false,
+          modal: true
+        });
+
+        if (ok) void this._run(() => deleteReleasedPokemon(actor, recordId));
+      });
+    }
 
     for (const button of root.querySelectorAll("[data-pokedex-url]")) button.addEventListener("click", event => {
       event.stopPropagation();

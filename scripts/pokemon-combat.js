@@ -77,6 +77,25 @@ function pokemonInstanceId(theme) {
   );
 }
 
+function combatStateFromTheme(theme) {
+  const state = theme?.getFlag(MODULE_ID, "combatState");
+  const rows = state?.floatingTagsAndStatuses;
+  return Array.isArray(rows)
+    ? foundry.utils.deepClone(rows)
+    : [];
+}
+
+async function saveCombatState(theme, actor) {
+  if (!theme || !actor) return;
+  const rows = foundry.utils.deepClone(
+    actor.system?.floatingTagsAndStatuses ?? []
+  );
+  await theme.setFlag(MODULE_ID, "combatState", {
+    floatingTagsAndStatuses: rows,
+    updatedAt: Date.now()
+  });
+}
+
 function deployedToken(scene, instanceId) {
   if (!scene || !instanceId) return null;
   return (
@@ -169,6 +188,7 @@ async function ensureCombatActor(trainer, theme) {
   );
 
   let actor = combatActor(instanceId, trainer.id);
+  const actorWasNew = !actor;
   const folder = await ensureCombatFolder();
 
   const combatFlags = {
@@ -255,6 +275,17 @@ async function ensureCombatActor(trainer, theme) {
     throw new Error("Não foi possível criar o Combat Actor do Pokémon.");
   }
 
+  if (actorWasNew) {
+    const saved = combatStateFromTheme(theme);
+    if (saved.length) {
+      await actor.update({
+        "system.floatingTagsAndStatuses": saved,
+        "system.floatingTagsAndStatusesEditable": true
+      });
+    }
+  }
+
+  await theme.setFlag(MODULE_ID, "combatActorId", actor.id);
   await syncCombatTheme(actor, theme);
   return actor;
 }
@@ -306,6 +337,19 @@ async function deployDirect({
 
   if (getPokemonFollowerThemeId(trainer) === theme.id) {
     await setPokemonFollowerTheme(trainer, null);
+
+    const duplicates = scene.tokens
+      .filter(token =>
+        token.getFlag(MODULE_ID, "pokemonInstanceId") === instanceId
+        && token.getFlag(MODULE_ID, "pokemonCombatToken") !== true
+      )
+      .map(token => token.id);
+
+    if (duplicates.length) {
+      await scene.deleteEmbeddedDocuments("Token", duplicates, {
+        pokemonFollowerSync: true
+      });
+    }
   }
 
   const actor = await ensureCombatActor(trainer, theme);
@@ -381,6 +425,15 @@ async function recollectDirect({
   const instanceId = pokemonInstanceId(theme);
 
   if (!scene || !trainer || !instanceId) return false;
+
+  const actor = combatActor(instanceId, trainer.id);
+  if (actor && theme) {
+    await saveCombatState(theme, actor);
+  }
+
+  if (theme && getPokemonFollowerThemeId(trainer) === theme.id) {
+    await setPokemonFollowerTheme(trainer, null);
+  }
 
   const ids = scene.tokens
     .filter(token =>
@@ -643,37 +696,40 @@ function focusToken(tokenDoc) {
 }
 
 async function chooseAlreadyDeployed(theme, tokenDoc) {
-  const choice = await foundry.applications.api.DialogV2.input({
+  const choice = await foundry.applications.api.DialogV2.wait({
     window: {
       title: `${theme.name} · Em campo`
     },
     content: `
       <div class="pokemon-combat-existing">
         <p><strong>${foundry.utils.escapeHTML(theme.name)}</strong> já está nesta cena.</p>
-        <label>
-          <span>Ação</span>
-          <select name="action">
-            <option value="focus">Focar Pokémon</option>
-            <option value="recollect">Recolher Pokémon</option>
-          </select>
-        </label>
       </div>
     `,
-    ok: {
-      label: "Confirmar",
-      icon: "fa-solid fa-check"
-    },
+    buttons: [
+      {
+        action: "focus",
+        label: "Focar Pokémon",
+        icon: "fa-solid fa-crosshairs",
+        default: true
+      },
+      {
+        action: "recollect",
+        label: "Recolher Pokémon",
+        icon: "fa-solid fa-arrow-right-to-bracket"
+      }
+    ],
+    rejectClose: false,
     modal: true
   });
 
-  if (!choice) return;
-
-  if (String(choice.action ?? "focus") === "recollect") {
+  if (choice === "recollect") {
     await recollectPokemonTheme(theme);
     return;
   }
 
-  focusToken(tokenDoc);
+  if (choice === "focus") {
+    focusToken(tokenDoc);
+  }
 }
 
 function placementPoint(event) {
@@ -890,10 +946,55 @@ function onRenderTokenHUD(hud, html) {
   column.appendChild(control);
 }
 
+function combatActorTheme(actor) {
+  if (actor?.getFlag(MODULE_ID, "combatProjection") !== true) return null;
+  const trainerId = actor.getFlag(MODULE_ID, "sourceTrainerActorId");
+  const themeId = actor.getFlag(MODULE_ID, "sourceThemeId");
+  return game.actors.get(trainerId)?.items?.get(themeId) ?? null;
+}
+
+function onCombatActorUpdate(actor, changes) {
+  if (actor?.getFlag(MODULE_ID, "combatProjection") !== true) return;
+
+  const changed = (
+    changes?.system?.floatingTagsAndStatuses !== undefined
+    || Object.prototype.hasOwnProperty.call(
+      changes ?? {},
+      "system.floatingTagsAndStatuses"
+    )
+  );
+  if (!changed) return;
+
+  const theme = combatActorTheme(actor);
+  if (!theme) return;
+
+  void saveCombatState(theme, actor).catch(error => {
+    console.error("Pokemon LITM Tools | Salvando estado de combate:", error);
+  });
+}
+
+function onCombatActorDelete(actor) {
+  if (actor?.getFlag(MODULE_ID, "combatProjection") !== true) return;
+
+  const theme = combatActorTheme(actor);
+  if (!theme) return;
+
+  void (async () => {
+    await saveCombatState(theme, actor);
+    await theme.update({
+      [`flags.${MODULE_ID}.-=combatActorId`]: null
+    });
+  })().catch(error => {
+    console.error("Pokemon LITM Tools | Limpando Combat Actor:", error);
+  });
+}
+
 export function activatePokemonCombatLayer() {
   if (activated) return;
   activated = true;
 
   game.socket.on(SOCKET_NAME, onSocket);
   Hooks.on("renderTokenHUD", onRenderTokenHUD);
+  Hooks.on("updateActor", onCombatActorUpdate);
+  Hooks.on("deleteActor", onCombatActorDelete);
 }

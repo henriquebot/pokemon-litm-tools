@@ -1590,6 +1590,68 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
   return trainer;
 }
 
+export async function buildPokemonTrainerThemeData(
+  entry,
+  definition,
+  {
+    might = "origin",
+    slot = 0,
+    trainerId = ""
+  } = {}
+) {
+  const data = await loadPokemonBuildData(entry, might);
+  const suggestedNature = defaultNatureForStats(data.stats);
+  const nature = natureProfile(
+    suggestedNature?.id ?? "hardy",
+    data.contentLanguage
+  );
+  const genderId = defaultGenderForRate(data.genderRate);
+
+  const review = {
+    might,
+    natureId: nature.id,
+    natureLabel: nature.label,
+    genderId,
+    genderLabel: genderLabel(genderId, data.contentLanguage),
+    weaknessStat: data.worst?.name ?? "speed",
+    weaknessTag: data.weaknessTag,
+    powerStatTag: data.powerStatTag,
+    moveNames: data.moves.map(move => move.name)
+  };
+
+  const config = {
+    mode: "player-theme",
+    destination: "team",
+    trainerId,
+    might
+  };
+
+  const instanceId = randomId();
+  const flags = moduleMetadata(
+    entry,
+    definition,
+    config,
+    data,
+    review,
+    instanceId
+  );
+
+  flags.pokemonTheme = true;
+  flags.themeRole = "pokemon";
+  flags.pokemonTeamSlot = Number(slot ?? 0);
+
+  return {
+    name: entry.name,
+    type: "themebook",
+    img: definition.portraitPath,
+    system: themeSystem(review, data, entry),
+    flags: {
+      [MODULE_ID]: flags
+    }
+  };
+}
+
+
 class PokemonChallengeWizardApp
   extends HandlebarsApplicationMixin(ApplicationV2) {
 

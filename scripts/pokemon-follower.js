@@ -80,14 +80,41 @@ export async function migratePokemonFollowerState(actor) {
 function isManagedToken(token) {
   return token?.getFlag(MODULE_ID, TOKEN_FLAG) === true || token?.getFlag(MODULE_ID, LEGACY_TOKEN_FLAG) === true;
 }
+function isCombatToken(token) {
+  return token?.getFlag(MODULE_ID, "pokemonCombatToken") === true
+    || token?.actor?.getFlag?.(MODULE_ID, "combatProjection") === true;
+}
 function isLegacyToken(token) {
   return token?.getFlag(MODULE_ID, LEGACY_TOKEN_FLAG) === true && token?.getFlag(MODULE_ID, TOKEN_FLAG) !== true;
 }
 function isActiveToken(token) { return token?.getFlag(MODULE_ID, ACTIVE_FLAG) === true; }
-function tokenThemeId(token) { return token?.getFlag(MODULE_ID, "pokemonThemeId") ?? null; }
+function tokenThemeId(token) {
+  return token?.getFlag(MODULE_ID, "pokemonThemeId")
+    ?? token?.getFlag(MODULE_ID, "sourceThemeId")
+    ?? null;
+}
 function trainerForToken(token) {
   const id = token?.getFlag(MODULE_ID, "trainerTokenId");
-  return id ? token.parent?.tokens?.get(id) ?? null : null;
+  if (id) return token.parent?.tokens?.get(id) ?? null;
+
+  const actorId = token?.getFlag(MODULE_ID, "trainerActorId")
+    ?? token?.getFlag(MODULE_ID, "sourceTrainerActorId");
+  if (!actorId) return null;
+
+  return token.parent?.tokens?.find(candidate =>
+    !isCombatToken(candidate)
+    && candidate.actor?.id === actorId
+  ) ?? null;
+}
+function combatTokenForTheme(scene, trainerActor, theme) {
+  const instanceId = theme?.getFlag(MODULE_ID, "pokemonInstanceId");
+  if (!scene || !trainerActor || !instanceId) return null;
+
+  return scene.tokens.find(token =>
+    isCombatToken(token)
+    && token.getFlag(MODULE_ID, "pokemonInstanceId") === instanceId
+    && token.getFlag(MODULE_ID, "sourceTrainerActorId") === trainerActor.id
+  ) ?? null;
 }
 function getPokemonTokens(scene, trainerId) {
   return scene?.tokens.filter(t => isManagedToken(t) && t.getFlag(MODULE_ID, "trainerTokenId") === trainerId) ?? [];
@@ -181,74 +208,122 @@ async function deleteIds(scene, ids) {
 }
 
 async function reconcileTrainer(trainer, {place = false} = {}) {
-  if (!isAuthority() || !trainer?.parent || isManagedToken(trainer) || trainer.actor?.type !== "litm-character") return;
+  if (
+    !isAuthority()
+    || !trainer?.parent
+    || isManagedToken(trainer)
+    || isCombatToken(trainer)
+    || trainer.actor?.type !== "litm-character"
+    || trainer.actor?.getFlag(MODULE_ID, "combatProjection") === true
+  ) return;
+
   const scene = trainer.parent;
   if (!scene.tokens.get(trainer.id)) return;
   await migratePokemonFollowerState(trainer.actor);
 
   const themes = getPokemonThemes(trainer.actor);
-  const themeById = new Map(themes.map(t => [t.id, t]));
+  const themeById = new Map(themes.map(theme => [theme.id, theme]));
   const desired = getPokemonFollowerThemeId(trainer.actor);
   const all = getPokemonTokens(scene, trainer.id);
-  const byTheme = new Map();
-  const remove = [];
 
+  const invalid = [];
   for (const token of all) {
     const tid = tokenThemeId(token);
-    if (!tid || !themeById.has(tid) || (isLegacyToken(token) && tid !== desired)) { remove.push(token.id); continue; }
-    if (byTheme.has(tid)) {
-      const old = byTheme.get(tid);
-      if (isActiveToken(token) && !isActiveToken(old)) { remove.push(old.id); byTheme.set(tid, token); }
-      else remove.push(token.id);
-      continue;
+    if (!tid || !themeById.has(tid)) {
+      if (isCombatToken(token)) {
+        await detachToken(token);
+      } else {
+        invalid.push(token.id);
+      }
     }
-    byTheme.set(tid, token);
   }
-  await deleteIds(scene, remove);
+  await deleteIds(scene, invalid);
 
-  for (const [tid, token] of [...byTheme]) {
-    if (tid !== desired && isActiveToken(token)) {
+  const active = getPokemonTokens(scene, trainer.id).filter(isActiveToken);
+  for (const token of active) {
+    const tid = tokenThemeId(token);
+    if (tid === desired) continue;
+
+    if (isCombatToken(token)) {
+      await detachToken(token);
+    } else {
       await deleteIds(scene, [token.id]);
-      byTheme.delete(tid);
     }
   }
 
-  if (!desired) {
-    await deleteIds(scene, getPokemonTokens(scene, trainer.id).filter(isActiveToken).map(t => t.id));
-    return;
-  }
+  if (!desired) return;
 
   const theme = themeById.get(desired);
   if (!theme) {
-    await trainer.actor.update({[`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: ""}, {pokemonFollowerSync: true});
+    await trainer.actor.update({
+      [`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: ""
+    }, {pokemonFollowerSync: true});
     return;
   }
+
   if (!canFollow()) warnFollow();
 
-  let follower = getPokemonTokens(scene, trainer.id).find(t => tokenThemeId(t) === desired) ?? null;
+  let follower = combatTokenForTheme(scene, trainer.actor, theme);
+
+  if (follower) {
+    const duplicates = getPokemonTokens(scene, trainer.id)
+      .filter(token => tokenThemeId(token) === desired && token.id !== follower.id)
+      .map(token => token.id);
+    await deleteIds(scene, duplicates);
+  } else {
+    follower = getPokemonTokens(scene, trainer.id)
+      .find(token => tokenThemeId(token) === desired)
+      ?? null;
+  }
+
   if (!follower) {
-    const made = await scene.createEmbeddedDocuments("Token", [createData(trainer, theme)], {pokemonFollowerSync: true});
+    const made = await scene.createEmbeddedDocuments(
+      "Token",
+      [createData(trainer, theme)],
+      {pokemonFollowerSync: true}
+    );
     follower = made?.[0] ?? null;
     place = false;
   }
+
   if (!follower) return;
 
   const update = {
     _id: follower.id,
     locked: false,
-    [`flags.${MODULE_ID}`]: {...(follower.flags?.[MODULE_ID] ?? {}), ...tokenFlags(trainer, theme, true)},
+    [`flags.${MODULE_ID}`]: {
+      ...(follower.flags?.[MODULE_ID] ?? {}),
+      ...tokenFlags(trainer, theme, true)
+    },
     [`flags.${DYLAN_ID}.${FOLLOWING_FLAG}`]: followingData(trainer, follower)
   };
-  if (place) {
+
+  if (place && !isCombatToken(follower)) {
     const p = behindPosition(trainer);
-    update.x = p.x; update.y = p.y; update.elevation = p.elevation;
+    update.x = p.x;
+    update.y = p.y;
+    update.elevation = p.elevation;
   }
-  if (follower.hidden !== Boolean(trainer.hidden)) update.hidden = Boolean(trainer.hidden);
-  const disposition = Number(trainer.disposition ?? CONST.TOKEN_DISPOSITIONS.FRIENDLY);
-  if (Number(follower.disposition) !== disposition) update.disposition = disposition;
+
+  if (follower.hidden !== Boolean(trainer.hidden)) {
+    update.hidden = Boolean(trainer.hidden);
+  }
+
+  const disposition = Number(
+    trainer.disposition
+    ?? CONST.TOKEN_DISPOSITIONS.FRIENDLY
+  );
+
+  if (Number(follower.disposition) !== disposition) {
+    update.disposition = disposition;
+  }
 
   await scene.updateEmbeddedDocuments("Token", [update], {
-    follower_updates: [], forced: true, teleport: place, animate: false, pokemonFollowerSync: true
+    follower_updates: [],
+    forced: true,
+    teleport: place && !isCombatToken(follower),
+    animate: false,
+    pokemonFollowerSync: true
   });
 }
 
@@ -266,7 +341,12 @@ function queueReconcile(trainer, options = {}) {
 
 function reconcileActorTokens(actor, options = {}) {
   if (!isAuthority() || !canvas?.ready || !canvas.scene) return;
-  for (const trainer of canvas.scene.tokens.filter(t => !isManagedToken(t) && t.actor?.id === actor.id)) {
+  for (const trainer of canvas.scene.tokens.filter(t =>
+    !isManagedToken(t)
+    && !isCombatToken(t)
+    && t.actor?.id === actor.id
+    && t.actor?.getFlag(MODULE_ID, "combatProjection") !== true
+  )) {
     void queueReconcile(trainer, options);
   }
 }
@@ -287,35 +367,85 @@ export async function setPokemonFollowerTheme(actor, themeId) {
 
 export async function removePokemonThemeTokens(actor, themeId) {
   if (!isAuthority() || !canvas?.ready || !canvas.scene || !actor || !themeId) return;
-  const ids = canvas.scene.tokens.filter(t => isManagedToken(t)
-    && t.getFlag(MODULE_ID, "trainerActorId") === actor.id && tokenThemeId(t) === themeId).map(t => t.id);
+
+  const theme = actor.items?.get(themeId) ?? null;
+  const instanceId = theme?.getFlag(MODULE_ID, "pokemonInstanceId") ?? null;
+
+  const ids = canvas.scene.tokens
+    .filter(token =>
+      (
+        isManagedToken(token)
+        && token.getFlag(MODULE_ID, "trainerActorId") === actor.id
+        && tokenThemeId(token) === themeId
+      )
+      || (
+        instanceId
+        && isCombatToken(token)
+        && token.getFlag(MODULE_ID, "pokemonInstanceId") === instanceId
+      )
+    )
+    .map(token => token.id);
+
   await deleteIds(canvas.scene, ids);
 }
 
 async function detachToken(token) {
-  if (!token || !isManagedToken(token)) return;
+  if (!token || (!isManagedToken(token) && !isCombatToken(token))) return;
+
   const trainer = trainerForToken(token);
-  const actor = trainer?.actor ?? (token.getFlag(MODULE_ID, "trainerActorId") ? game.actors.get(token.getFlag(MODULE_ID, "trainerActorId")) : null);
+  const trainerActorId = token.getFlag(MODULE_ID, "trainerActorId")
+    ?? token.getFlag(MODULE_ID, "sourceTrainerActorId");
+  const actor = trainer?.actor
+    ?? (trainerActorId ? game.actors.get(trainerActorId) : null);
+
   await token.update({
-    [`flags.${MODULE_ID}.${TOKEN_FLAG}`]: true,
+    [`flags.${MODULE_ID}.${TOKEN_FLAG}`]: isCombatToken(token) ? false : true,
     [`flags.${MODULE_ID}.${ACTIVE_FLAG}`]: false,
     [`flags.${DYLAN_ID}.${FOLLOWING_FLAG}.who`]: null
   }, {pokemonFollowerSync: true, follower_updates: []});
+
   if (actor && getPokemonFollowerThemeId(actor) === tokenThemeId(token)) {
-    await actor.update({[`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: ""}, {pokemonFollowerSync: true});
+    await actor.update({
+      [`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: ""
+    }, {pokemonFollowerSync: true});
   }
 }
 
 async function resumeToken(token) {
   const trainer = trainerForToken(token);
+  const trainerActorId = token?.getFlag(MODULE_ID, "trainerActorId")
+    ?? token?.getFlag(MODULE_ID, "sourceTrainerActorId");
+  const actor = trainer?.actor
+    ?? (trainerActorId ? game.actors.get(trainerActorId) : null);
   const themeId = tokenThemeId(token);
-  if (!trainer?.actor || !themeId) throw new Error("Treinador ou Pokémon não encontrado.");
-  await setPokemonFollowerTheme(trainer.actor, themeId);
-  if (isAuthority()) await queueReconcile(trainer, {place: true});
+
+  if (!actor || !themeId) {
+    throw new Error("Treinador ou Pokémon não encontrado.");
+  }
+
+  await setPokemonFollowerTheme(actor, themeId);
+
+  if (isAuthority()) {
+    const trainerToken = trainer
+      ?? canvas?.scene?.tokens?.find(candidate =>
+        !isCombatToken(candidate)
+        && candidate.actor?.id === actor.id
+      )
+      ?? null;
+    if (trainerToken) await queueReconcile(trainerToken, {place: false});
+  }
 }
 
 function onCreateToken(token) {
-  if (isAuthority() && !isManagedToken(token) && token.actor?.type === "litm-character") void queueReconcile(token, {place: true});
+  if (
+    isAuthority()
+    && !isManagedToken(token)
+    && !isCombatToken(token)
+    && token.actor?.type === "litm-character"
+    && token.actor?.getFlag(MODULE_ID, "combatProjection") !== true
+  ) {
+    void queueReconcile(token, {place: true});
+  }
 }
 
 function onUpdateToken(token, changes, options) {
@@ -329,12 +459,28 @@ function onUpdateToken(token, changes, options) {
     }
     return;
   }
+  if (isCombatToken(token)) return;
   if (!isAuthority() || token.actor?.type !== "litm-character") return;
   if (changes.hidden !== undefined || changes.disposition !== undefined) void queueReconcile(token);
 }
 
 function onDeleteToken(token) {
-  if (!isAuthority() || isManagedToken(token)) return;
+  if (!isAuthority()) return;
+
+  if (isCombatToken(token)) {
+    const trainerActorId = token.getFlag(MODULE_ID, "trainerActorId")
+      ?? token.getFlag(MODULE_ID, "sourceTrainerActorId");
+    const actor = trainerActorId ? game.actors.get(trainerActorId) : null;
+
+    if (actor && getPokemonFollowerThemeId(actor) === tokenThemeId(token)) {
+      void actor.update({
+        [`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: ""
+      }, {pokemonFollowerSync: true});
+    }
+    return;
+  }
+
+  if (isManagedToken(token)) return;
   void deleteIds(token.parent, getPokemonTokens(token.parent, token.id).map(t => t.id))
     .catch(error => console.error("Pokemon LITM Tools | Removendo Pokémon do mapa:", error));
 }
@@ -366,7 +512,11 @@ function hudToken(app) {
 
 function renderHud(app, html) {
   const token = hudToken(app);
-  if (!token || !isManagedToken(token) || (!game.user.isGM && !token.isOwner)) return;
+  if (
+    !token
+    || (!isManagedToken(token) && !isCombatToken(token))
+    || (!game.user.isGM && !token.isOwner)
+  ) return;
   const root = hudRoot(app, html);
   if (!root || root.querySelector("[data-pokemon-follow-toggle]")) return;
   const column = root.querySelector(".col.right") ?? root.querySelector(".right") ?? root;
@@ -386,13 +536,57 @@ function renderHud(app, html) {
   column.append(button);
 }
 
+async function cleanupDuplicatePokemonTokens(scene) {
+  const groups = new Map();
+
+  for (const token of scene.tokens) {
+    const instanceId = token.getFlag(MODULE_ID, "pokemonInstanceId");
+    if (!instanceId || (!isManagedToken(token) && !isCombatToken(token))) continue;
+    const rows = groups.get(instanceId) ?? [];
+    rows.push(token);
+    groups.set(instanceId, rows);
+  }
+
+  const remove = [];
+  for (const rows of groups.values()) {
+    if (rows.length <= 1) continue;
+    const keep = rows.find(isCombatToken) ?? rows[0];
+    for (const token of rows) {
+      if (token.id !== keep.id) remove.push(token.id);
+    }
+  }
+
+  await deleteIds(scene, remove);
+}
+
 async function syncScene() {
   if (!isAuthority() || game.system.id !== LITM_SYSTEM_ID || !canvas?.ready || !canvas.scene) return;
-  const trainers = canvas.scene.tokens.filter(t => !isManagedToken(t) && t.actor?.type === "litm-character");
-  const trainerIds = new Set(trainers.map(t => t.id));
-  await deleteIds(canvas.scene, canvas.scene.tokens.filter(t => isManagedToken(t)
-    && !trainerIds.has(t.getFlag(MODULE_ID, "trainerTokenId"))).map(t => t.id));
-  for (const trainer of trainers) await queueReconcile(trainer, {place: true});
+
+  await cleanupDuplicatePokemonTokens(canvas.scene);
+
+  const trainers = canvas.scene.tokens.filter(token =>
+    !isManagedToken(token)
+    && !isCombatToken(token)
+    && token.actor?.type === "litm-character"
+    && token.actor?.getFlag(MODULE_ID, "combatProjection") !== true
+  );
+
+  const trainerIds = new Set(trainers.map(token => token.id));
+
+  await deleteIds(
+    canvas.scene,
+    canvas.scene.tokens
+      .filter(token =>
+        isManagedToken(token)
+        && !isCombatToken(token)
+        && !trainerIds.has(token.getFlag(MODULE_ID, "trainerTokenId"))
+      )
+      .map(token => token.id)
+  );
+
+  for (const trainer of trainers) {
+    await queueReconcile(trainer, {place: true});
+  }
 }
 
 export function activatePokemonFollowers() {

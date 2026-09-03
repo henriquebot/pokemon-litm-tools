@@ -12,12 +12,14 @@
       <div class="pokemon-manager-summary">
         <span><i class="fa-solid fa-paw"></i> Time {{teamCount}}/6</span>
         <span><i class="fa-solid fa-box-archive"></i> PC {{pcCount}}</span>
+        <span><i class="fa-solid fa-dove"></i> Liberados {{releasedCount}}</span>
       </div>
     </header>
 
     <nav class="pokemon-manager-tabs">
       <button type="button" data-manager-tab="team" class="{{#if tabTeam}}active{{/if}}"><i class="fa-solid fa-paw"></i> Time</button>
       <button type="button" data-manager-tab="pc" class="{{#if tabPc}}active{{/if}}"><i class="fa-solid fa-box-archive"></i> PC</button>
+      <button type="button" data-manager-tab="released" class="{{#if tabReleased}}active{{/if}}"><i class="fa-solid fa-dove"></i> Liberados</button>
       <button type="button" data-manager-tab="items" class="{{#if tabItems}}active{{/if}}"><i class="fa-solid fa-bag-shopping"></i> Mochila</button>
       <button type="button" data-manager-tab="trade" class="{{#if tabTrade}}active{{/if}}"><i class="fa-solid fa-right-left"></i> Trocas</button>
     </nav>
@@ -28,7 +30,7 @@
           <div class="pokemon-manager-section-heading">
             <div>
               <h2>Time Pokémon</h2>
-              <p>Apenas um Pokémon pode seguir. Mover o seguidor manualmente o deixa solto no mapa e desmarca a opção.</p>
+              <p>Até seis Pokémon. Seguir é apenas o follower visual no mapa.</p>
             </div>
             <span>{{teamCount}}/6</span>
           </div>
@@ -48,6 +50,7 @@
                 <div class="pokemon-manager-card-actions">
                   <button type="button" data-pokedex-url="{{pokedexUrl}}" title="Abrir Pokédex"><i class="fa-solid fa-mobile-screen-button"></i></button>
                   <button type="button" data-send-to-pc="{{id}}" title="Enviar para o PC" {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-box-archive"></i></button>
+                  <button type="button" data-release-team="{{id}}" title="Libertar Pokémon" {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-dove"></i></button>
                 </div>
               </article>
             {{/each}}
@@ -65,7 +68,7 @@
       {{#if tabPc}}
         <section class="pokemon-manager-section">
           <div class="pokemon-manager-section-heading">
-            <div><h2>PC Pokémon</h2><p>Pokémon deste treinador que não estão entre os seis do time.</p></div>
+            <div><h2>PC Pokémon</h2><p>Pokémon guardados deste treinador.</p></div>
             <span>{{pcCount}}</span>
           </div>
 
@@ -78,6 +81,7 @@
                   <div class="pokemon-manager-card-actions">
                     <button type="button" data-pokedex-url="{{pokedexUrl}}" title="Abrir Pokédex"><i class="fa-solid fa-mobile-screen-button"></i></button>
                     <button type="button" data-add-to-team="{{id}}" data-pc-source="{{source}}" title="Adicionar ao time" {{#if ../teamFull}}disabled{{/if}} {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-arrow-up"></i></button>
+                    <button type="button" data-release-pc="{{id}}" title="Libertar Pokémon" {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-dove"></i></button>
                   </div>
                 </article>
               {{/each}}
@@ -85,7 +89,43 @@
           {{else}}
             <div class="pokemon-manager-empty-state">
               <i class="fa-solid fa-box-open"></i><strong>PC vazio</strong>
-              <span>Envie um Theme Pokémon do time para o PC. Actors Pokémon não aparecem aqui.</span>
+              <span>Envie um Theme Pokémon do Time para o PC.</span>
+            </div>
+          {{/if}}
+        </section>
+      {{/if}}
+
+      {{#if tabReleased}}
+        <section class="pokemon-manager-section">
+          <div class="pokemon-manager-section-heading">
+            <div>
+              <h2>Pokémon Liberados</h2>
+              <p>Não pertencem mais ao treinador, mas o registro do indivíduo é preservado caso ele volte à história.</p>
+            </div>
+            <span>{{releasedCount}}</span>
+          </div>
+
+          {{#if releasedItems.length}}
+            <div class="pokemon-manager-released-grid">
+              {{#each releasedItems}}
+                <article class="pokemon-manager-card pokemon-manager-pc-card pokemon-manager-openable" data-open-released-theme="{{id}}" title="Clique para visualizar o Theme preservado">
+                  <img src="{{img}}" alt="{{name}}" loading="lazy">
+                  <strong>{{name}}</strong>
+                  <div class="pokemon-manager-card-actions">
+                    <button type="button" data-pokedex-url="{{pokedexUrl}}" title="Abrir Pokédex"><i class="fa-solid fa-mobile-screen-button"></i></button>
+                    <button type="button" data-released-to-pc="{{id}}" title="Retornar ao PC" {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-box-archive"></i></button>
+                    <button type="button" data-released-to-team="{{id}}" title="Retornar ao Time" {{#if ../teamFull}}disabled{{/if}} {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-arrow-up"></i></button>
+                    {{#if ../isGM}}
+                      <button type="button" data-delete-released="{{id}}" title="Excluir permanentemente" {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-trash"></i></button>
+                    {{/if}}
+                  </div>
+                </article>
+              {{/each}}
+            </div>
+          {{else}}
+            <div class="pokemon-manager-empty-state">
+              <i class="fa-solid fa-dove"></i><strong>Nenhum Pokémon liberado</strong>
+              <span>Pokémon libertados ficam preservados aqui sem contar como Time ou PC.</span>
             </div>
           {{/if}}
         </section>
@@ -102,7 +142,7 @@
   {{else}}
     <div class="pokemon-manager-empty-state pokemon-manager-no-trainer">
       <i class="fa-solid fa-user-slash"></i><strong>Nenhum treinador disponível</strong>
-      <span>Crie um personagem Pokémon ou receba ownership de um Actor do tipo personagem.</span>
+      <span>Crie um personagem treinador ou receba ownership de um Actor do tipo personagem.</span>
     </div>
   {{/if}}
 </div>

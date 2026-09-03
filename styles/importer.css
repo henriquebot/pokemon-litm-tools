@@ -2601,3 +2601,144 @@ has(
   flex-direction: column;
   gap: 5px;
 }
+
+/* ========================================================= */
+/* Pokemon Combat Layer 0.8.3 - HUD, Areas and lifecycle      */
+/* ========================================================= */
+
+.pokemon-manager-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.pokemon-manager-released-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+  gap: 10px;
+}
+
+.pokemon-biography-effect {
+  padding-right: 230px;
+}
+
+.pokemon-biography-effect-actions {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  width: 218px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.pokemon-biography-effect-actions .pokemon-biography-effect-trigger,
+.pokemon-biography-effect-area {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 5px 6px;
+  font-size: .72rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.pokemon-combat-area-ghost {
+  --pokemon-area-color: #ffd54f;
+  position: fixed;
+  z-index: 100000;
+  border: 3px solid var(--pokemon-area-color);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: .72;
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(
+      circle,
+      color-mix(in srgb, var(--pokemon-area-color) 24%, transparent) 0%,
+      color-mix(in srgb, var(--pokemon-area-color) 12%, transparent) 58%,
+      transparent 72%
+    );
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--pokemon-area-color) 60%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--pokemon-area-color) 45%, transparent);
+  animation: pokemon-area-pulse .9s ease-in-out infinite alternate;
+}
+
+@keyframes pokemon-area-pulse {
+  from {
+    opacity: .48;
+    filter: brightness(.9);
+  }
+  to {
+    opacity: .82;
+    filter: brightness(1.22);
+  }
+}
+
+.pokemon-combat-move-control {
+  position: relative;
+}
+
+.pokemon-combat-move-letter {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  min-width: 14px;
+  padding: 0 2px;
+  border-radius: 3px;
+  font-size: 8px;
+  line-height: 12px;
+  text-align: center;
+  background: rgb(0 0 0 / .72);
+}
+
+.pokemon-combat-resolve,
+.pokemon-combat-move-choice {
+  display: grid;
+  gap: 9px;
+  padding: 5px;
+}
+
+.pokemon-combat-resolve p,
+.pokemon-combat-move-choice p {
+  margin: 0;
+}
+
+.pokemon-combat-matchups {
+  display: grid;
+  gap: 5px;
+}
+
+.pokemon-combat-matchups > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 5px;
+}
+
+.pokemon-combat-matchups span {
+  opacity: .78;
+}
+
+@media (max-width: 760px) {
+  .pokemon-manager-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pokemon-manager-released-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pokemon-biography-effect {
+    padding-right: 4px;
+  }
+
+  .pokemon-biography-effect-actions {
+    position: static;
+    width: 100%;
+    margin-top: 6px;
+  }
+}
