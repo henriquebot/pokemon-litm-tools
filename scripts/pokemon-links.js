@@ -1,5 +1,26 @@
 const MODULE_ID = "pokemon-litm-tools";
 
+const TYPE_EFFECT_COLORS = {
+  normal: 0xd8d8d0,
+  fire: 0xff7043,
+  water: 0x42a5f5,
+  electric: 0xffd54f,
+  grass: 0x66bb6a,
+  ice: 0x80deea,
+  fighting: 0xef5350,
+  poison: 0xab47bc,
+  ground: 0xbcaaa4,
+  flying: 0x90caf9,
+  psychic: 0xec407a,
+  bug: 0x9ccc65,
+  rock: 0xb0a06f,
+  ghost: 0x7e57c2,
+  dragon: 0x5c6bc0,
+  dark: 0x616161,
+  steel: 0xb0bec5,
+  fairy: 0xf48fb1
+};
+
 export function getPokemonDbSlug(entryOrName) {
   const raw =
     typeof entryOrName === "string"
@@ -43,48 +64,62 @@ export function openPokemonDb(url) {
   if (opened) opened.opener = null;
 }
 
-function addPokemonDbButton(app, html) {
-  const document =
+function appDocument(app) {
+  return (
     app?.document ??
     app?.item ??
     app?.actor ??
-    app?.object;
+    app?.object ??
+    null
+  );
+}
 
-  const isTheme =
-    document?.documentName === "Item"
-    &&
-    document?.type === "themebook";
+function appRoot(app, html) {
+  return (
+    app?.element ??
+    (
+      html instanceof HTMLElement
+        ? html
+        : html?.[0]
+    ) ??
+    null
+  );
+}
 
-  const isPokemonChallenge =
-    document?.documentName === "Actor"
+function isPokemonChallenge(doc) {
+  return (
+    doc?.documentName === "Actor"
     &&
-    document?.getFlag?.(
+    doc?.getFlag?.(
       MODULE_ID,
       "pokemonBuilder"
-    ) === true;
+    ) === true
+  );
+}
+
+function addPokemonDbButton(app, html) {
+  const doc = appDocument(app);
+
+  const isTheme =
+    doc?.documentName === "Item"
+    &&
+    doc?.type === "themebook";
 
   if (
     !isTheme
     &&
-    !isPokemonChallenge
+    !isPokemonChallenge(doc)
   ) return;
 
   const url =
-    document.getFlag?.(
+    doc.getFlag?.(
       MODULE_ID,
       "pokedexUrl"
     );
 
   if (!url) return;
 
-  const root =
-    app?.element ??
-    (
-      html instanceof HTMLElement
-        ? html
-        : html?.[0]
-    );
-
+  const root = appRoot(app, html);
   if (!root) return;
 
   const header =
@@ -101,17 +136,15 @@ function addPokemonDbButton(app, html) {
   ) return;
 
   const button =
-    document.createElement(
+    globalThis.document.createElement(
       "button"
     );
 
   button.type = "button";
-  button.dataset.pokemonPokedex =
-    "true";
+  button.dataset.pokemonPokedex = "true";
   button.className =
     "header-control pokemon-theme-pokedex-button";
-  button.title =
-    "Abrir no PokémonDB";
+  button.title = "Abrir no PokémonDB";
   button.innerHTML =
     '<i class="fa-solid fa-mobile-screen-button"></i>';
 
@@ -134,19 +167,237 @@ function addPokemonDbButton(app, html) {
     : header.append(button);
 }
 
+function sourceTokenForActor(actor) {
+  const controlled =
+    globalThis.canvas?.tokens?.controlled
+      ?.find(token =>
+        token.actor?.id === actor?.id
+      );
+
+  if (controlled) return controlled;
+
+  const active =
+    actor?.getActiveTokens?.(
+      true,
+      true
+    ) ?? [];
+
+  return active[0] ?? null;
+}
+
+function currentTargetToken() {
+  return Array.from(
+    game.user?.targets ?? []
+  )[0] ?? null;
+}
+
+function isSelfTarget(target) {
+  const value =
+    String(target ?? "")
+      .toLowerCase();
+
+  return (
+    value === "self"
+    ||
+    value === "user"
+    ||
+    value === "users-field"
+    ||
+    value === "user-or-ally"
+  );
+}
+
+function pulseToken(token, type = "normal") {
+  const mesh =
+    token?.mesh ??
+    token?.icon ??
+    null;
+
+  if (!mesh) return;
+
+  const oldTint = mesh.tint;
+  const oldAlpha = mesh.alpha;
+  const tint =
+    TYPE_EFFECT_COLORS[type]
+    ??
+    0xf5d76e;
+
+  try {
+    mesh.tint = tint;
+    mesh.alpha = 0.62;
+
+    setTimeout(() => {
+      try {
+        if (!mesh.destroyed) {
+          mesh.tint = oldTint;
+          mesh.alpha = oldAlpha;
+        }
+      } catch {}
+    }, 380);
+  } catch {}
+}
+
+function triggerPokemonEffect({ actor, article, button }) {
+  const kind =
+    article.dataset.pokemonEffectKind
+    ??
+    "move";
+
+  const id =
+    article.dataset.pokemonEffectId
+    ??
+    "";
+
+  const type =
+    article.dataset.pokemonEffectType
+    ??
+    "normal";
+
+  const targetMode =
+    article.dataset.pokemonEffectTarget
+    ??
+    "selected-pokemon";
+
+  const sourceToken =
+    sourceTokenForActor(actor);
+
+  if (!sourceToken) {
+    ui.notifications.warn(
+      "Coloque ou selecione o token deste Pokémon na cena para disparar o efeito."
+    );
+    return;
+  }
+
+  const self =
+    kind === "ability"
+    ||
+    isSelfTarget(targetMode);
+
+  const targetToken =
+    self
+      ? sourceToken
+      : currentTargetToken();
+
+  if (!targetToken) {
+    ui.notifications.warn(
+      "Marque o alvo com T antes de disparar este efeito."
+    );
+    return;
+  }
+
+  button.disabled = true;
+
+  pulseToken(sourceToken, type);
+
+  if (targetToken !== sourceToken) {
+    setTimeout(
+      () => pulseToken(targetToken, type),
+      120
+    );
+  }
+
+  Hooks.callAll(
+    "pokemonLitmEffect",
+    {
+      actor,
+      sourceToken,
+      targetToken,
+      kind,
+      id,
+      type,
+      targetMode
+    }
+  );
+
+  setTimeout(() => {
+    button.disabled = false;
+  }, 450);
+}
+
+function wirePokemonEffectButtons(app, html) {
+  const actor = appDocument(app);
+
+  if (
+    !isPokemonChallenge(actor)
+    ||
+    (!game.user.isGM && !actor.isOwner)
+  ) return;
+
+  const root = appRoot(app, html);
+  if (!root) return;
+
+  for (
+    const article
+    of root.querySelectorAll(
+      ".pokemon-biography-effect[data-pokemon-effect-kind]"
+    )
+  ) {
+    if (
+      article.querySelector(
+        "[data-pokemon-effect-trigger]"
+      )
+    ) continue;
+
+    const button =
+      globalThis.document.createElement(
+        "button"
+      );
+
+    const self =
+      article.dataset.pokemonEffectKind === "ability"
+      ||
+      isSelfTarget(
+        article.dataset.pokemonEffectTarget
+      );
+
+    button.type = "button";
+    button.dataset.pokemonEffectTrigger = "true";
+    button.className =
+      "pokemon-biography-effect-trigger";
+    button.title =
+      self
+        ? "Disparar efeito no próprio Pokémon"
+        : "Disparar efeito no alvo marcado";
+    button.innerHTML =
+      self
+        ? '<i class="fa-solid fa-wand-magic-sparkles"></i> Efeito em si'
+        : '<i class="fa-solid fa-bullseye"></i> Efeito no alvo';
+
+    button.addEventListener(
+      "click",
+      event => {
+        event.preventDefault();
+        event.stopPropagation();
+        triggerPokemonEffect({
+          actor,
+          article,
+          button
+        });
+      }
+    );
+
+    article.append(button);
+  }
+}
+
+function enhancePokemonSheet(app, html) {
+  addPokemonDbButton(app, html);
+  wirePokemonEffectButtons(app, html);
+}
+
 export function activatePokemonThemePokedexButtons() {
   Hooks.on(
     "renderItemSheet",
-    addPokemonDbButton
+    enhancePokemonSheet
   );
 
   Hooks.on(
     "renderActorSheet",
-    addPokemonDbButton
+    enhancePokemonSheet
   );
 
   Hooks.on(
     "renderApplicationV2",
-    addPokemonDbButton
+    enhancePokemonSheet
   );
 }

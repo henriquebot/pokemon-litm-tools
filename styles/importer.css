@@ -2214,3 +2214,43 @@ has(
     grid-column: auto;
   }
 }
+
+
+/* Pokemon Challenge Biography Effect Buttons */
+.pokemon-biography-effect {
+  position: relative;
+  padding: 8px 132px 8px 4px;
+  min-height: 44px;
+}
+
+.pokemon-biography-effect + .pokemon-biography-effect {
+  border-top: 1px solid rgb(90 63 45 / .18);
+}
+
+.pokemon-biography-effect-trigger {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  width: 118px;
+  min-height: 30px;
+  padding: 5px 8px;
+  font-size: .72rem;
+  line-height: 1.15;
+  white-space: normal;
+}
+
+.pokemon-biography-effect-trigger i {
+  margin-right: 4px;
+}
+
+@media (max-width: 720px) {
+  .pokemon-biography-effect {
+    padding-right: 4px;
+  }
+
+  .pokemon-biography-effect-trigger {
+    position: static;
+    width: 100%;
+    margin-top: 6px;
+  }
+}

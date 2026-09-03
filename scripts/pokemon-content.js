@@ -214,6 +214,78 @@ const SPECIAL_MOVE_RULES = {
   rest: { selfPt: "adormecido", selfEn: "asleep", selfLevel: 3 }
 };
 
+const ABILITY_EFFECT_PTBR = {
+  hustle: "Aumenta bastante a força dos golpes físicos, mas sacrifica parte da precisão desses ataques.",
+  guts: "Quando sofre uma condição negativa, transforma a adversidade em força e aumenta o poder de seus ataques físicos.",
+  "sand-veil": "Durante uma tempestade de areia, fica mais difícil de acertar e atravessa a areia sem sofrer seus efeitos normais.",
+  "run-away": "Encontra rapidamente uma rota de fuga, tornando mais difícil impedir que abandone o confronto.",
+  "keen-eye": "Sua visão aguçada impede que efeitos adversários reduzam sua precisão.",
+  intimidate: "Ao entrar em confronto, sua presença intimidadora reduz a capacidade ofensiva dos adversários próximos.",
+  static: "O contato direto com seu corpo pode transmitir uma descarga e paralisar quem o atinge.",
+  "poison-point": "O contato com seus espinhos pode inocular veneno em quem o atinge.",
+  "effect-spore": "O contato pode liberar esporos capazes de causar sono, paralisia ou envenenamento.",
+  "flame-body": "O calor intenso de seu corpo pode queimar quem fizer contato direto com ele.",
+  "cute-charm": "O contato próximo pode encantar o adversário e fazê-lo hesitar ao agir contra este Pokémon.",
+  "rough-skin": "Sua pele áspera machuca adversários que o atingem com ataques de contato.",
+  pressure: "Sua presença opressiva força os adversários a gastar mais esforço para enfrentá-lo.",
+  "arena-trap": "Controla o terreno ao redor e dificulta que adversários em contato com o chão escapem.",
+  "shadow-tag": "Prende o adversário à própria presença e dificulta sua retirada do confronto.",
+  levitate: "Flutua acima do solo, ficando imune a golpes e efeitos que dependem de contato com o terreno.",
+  insomnia: "Não consegue adormecer por efeitos externos e permanece desperto mesmo diante de técnicas de sono.",
+  immunity: "Seu organismo neutraliza toxinas, impedindo que seja envenenado.",
+  limber: "Seu corpo extremamente flexível impede que seja paralisado.",
+  "water-absorb": "Ao receber um golpe de Água, absorve a energia em vez de sofrer o efeito e pode recuperar suas forças.",
+  "volt-absorb": "Ao receber um golpe Elétrico, absorve a energia em vez de sofrer o efeito e pode recuperar suas forças.",
+  "flash-fire": "Ao receber um golpe de Fogo, absorve o calor e fortalece seus próprios golpes de Fogo.",
+  overgrow: "Quando está muito ferido, seus golpes de Planta se tornam mais poderosos.",
+  blaze: "Quando está muito ferido, seus golpes de Fogo se tornam mais poderosos.",
+  torrent: "Quando está muito ferido, seus golpes de Água se tornam mais poderosos.",
+  swarm: "Quando está muito ferido, seus golpes de Inseto se tornam mais poderosos.",
+  sturdy: "Sua estrutura resistente impede que seja derrubado facilmente por um único golpe devastador.",
+  "battle-armor": "Sua armadura natural protege pontos vulneráveis e impede golpes críticos.",
+  "shell-armor": "Sua carapaça protege pontos vulneráveis e impede golpes críticos.",
+  damp: "Sua presença impede técnicas explosivas de serem executadas normalmente ao redor dele.",
+  "inner-focus": "Mantém a concentração sob pressão e não hesita por efeitos que normalmente causariam recuo ou interrupção.",
+  "clear-body": "Seu corpo impede que efeitos adversários reduzam seus atributos.",
+  "white-smoke": "A proteção ao redor de seu corpo impede que efeitos adversários reduzam seus atributos.",
+  "hyper-cutter": "Suas garras ou mandíbulas não perdem força por efeitos que tentem reduzir seu Ataque.",
+  "own-tempo": "Mantém seu próprio ritmo e não pode ser confundido por efeitos externos.",
+  "natural-cure": "Ao deixar o confronto, seu organismo elimina condições negativas persistentes.",
+  synchronize: "Quando recebe certas condições negativas, pode transmiti-las de volta ao responsável.",
+  "lightning-rod": "Atrai golpes Elétricos para si, anulando seu dano e convertendo a energia em poder especial.",
+  "motor-drive": "Absorve golpes Elétricos sem sofrer dano e transforma a energia recebida em velocidade.",
+  "swift-swim": "Move-se muito mais rápido enquanto estiver chovendo.",
+  chlorophyll: "A luz solar intensa aumenta muito sua velocidade.",
+  "rain-dish": "Recupera gradualmente suas forças enquanto estiver chovendo.",
+  "ice-body": "Recupera gradualmente suas forças durante granizo ou condições de gelo intenso.",
+  "snow-cloak": "Durante granizo ou neve intensa, fica mais difícil de acertar.",
+  "thick-fat": "Sua camada corporal reduz significativamente o impacto de golpes de Fogo e Gelo.",
+  "rock-head": "Pode executar golpes de grande impacto sem sofrer dano de recuo.",
+  "magma-armor": "O calor constante de seu corpo impede que seja congelado.",
+  "water-veil": "A película de água que o envolve impede que seja queimado.",
+  soundproof: "Bloqueia técnicas baseadas em som, impedindo que seus efeitos o atinjam.",
+  "compound-eyes": "Sua visão composta aumenta a precisão de seus golpes.",
+  "shield-dust": "O pó que cobre seu corpo bloqueia efeitos adicionais provocados por golpes inimigos.",
+  "serene-grace": "Sua presença incomum aumenta a chance de efeitos adicionais de seus golpes acontecerem.",
+  "huge-power": "Possui força física muito acima do esperado, aumentando drasticamente seu poder de Ataque.",
+  "pure-power": "Concentra energia de forma extraordinária, aumentando drasticamente seu poder de Ataque.",
+  technician: "Golpes de menor potência são executados com precisão técnica e causam impacto maior.",
+  sniper: "Quando acerta um ponto crítico, aproveita a abertura para causar um impacto muito maior.",
+  "quick-feet": "Quando sofre uma condição negativa, reage acelerando seus movimentos.",
+  "marvel-scale": "Quando sofre uma condição negativa, suas escamas endurecem e aumentam sua resistência física.",
+  adaptability: "A afinidade com seus próprios tipos é excepcional, tornando golpes desses tipos mais poderosos.",
+  "magic-guard": "Só sofre dano direto de ataques; perigos indiretos e efeitos ambientais não o ferem normalmente.",
+  "no-guard": "Luta sem se preocupar em esquivar: seus golpes e os golpes direcionados a ele tendem a acertar.",
+  "mold-breaker": "Seus golpes ignoram Habilidades defensivas que normalmente impediriam ou alterariam seus efeitos.",
+  "super-luck": "Tem uma facilidade incomum para encontrar pontos críticos do adversário.",
+  "poison-heal": "Em vez de ser enfraquecido por veneno, usa a toxina para recuperar gradualmente suas forças.",
+  "dry-skin": "Absorve Água para se recuperar, mas sofre mais com calor intenso e golpes de Fogo.",
+  download: "Analisa as defesas do adversário ao entrar em confronto e fortalece o atributo ofensivo mais vantajoso.",
+  "iron-fist": "Golpes executados com os punhos recebem força adicional.",
+  "leaf-guard": "Sob luz solar intensa, sua proteção natural impede novas condições negativas.",
+  scrappy: "Consegue atingir normalmente até adversários que, por sua natureza, seriam imunes a golpes Normais ou Lutadores."
+};
+
 const ABILITY_THREAT_RULES = {
   intimidate: {
     pt: "Sua presença intimidadora reduz a confiança ofensiva do adversário.",
@@ -722,9 +794,14 @@ export function buildAbilityThreat(ability, language = getPokemonContentLanguage
   const rule = ABILITY_THREAT_RULES[ability.id] ?? null;
   const description = rule
     ? (language === "en" ? rule.en : rule.pt)
-    : (language === "en"
-        ? (ability.effectTextEn || `The Ability ${ability.name} changes how this Pokémon behaves in the confrontation.`)
-        : `A Habilidade ${ability.name} altera como este Pokémon reage durante o confronto.`);
+    : (
+        language === "en"
+          ? (ability.effectTextEn || `The Ability ${ability.name} changes how this Pokémon behaves in the confrontation.`)
+          : (
+              ABILITY_EFFECT_PTBR[ability.id]
+              || `A Habilidade ${ability.name} possui um efeito passivo próprio desta espécie. Use-a quando sua condição de ativação for relevante na ficção.`
+            )
+      );
 
   const list = [];
   if (rule?.statusPt || rule?.statusEn) {
