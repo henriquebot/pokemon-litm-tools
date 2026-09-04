@@ -58,7 +58,10 @@ async function getReferenceFolder() {
 
 export async function createPokemonTeamThemes(
   actor,
-  entries
+  entries,
+  {
+    customizations = []
+  } = {}
 ) {
   if (!actor) {
     throw new Error(
@@ -88,7 +91,10 @@ export async function createPokemonTeamThemes(
         {
           might: "origin",
           slot: index,
-          trainerId: actor.id
+          trainerId: actor.id,
+          customization:
+            customizations[index]
+            ?? null
         }
       )
     );

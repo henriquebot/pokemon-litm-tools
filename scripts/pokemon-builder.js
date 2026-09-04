@@ -1624,63 +1624,382 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
   return trainer;
 }
 
+
+export async function loadPokemonTrainerCustomization(
+  entry,
+  might = "origin"
+) {
+  const data =
+    await loadPokemonBuildData(
+      entry,
+      might
+    );
+
+  const suggestedNature =
+    defaultNatureForStats(
+      data.stats
+    );
+
+  const nature =
+    natureProfile(
+      suggestedNature?.id
+        ?? "hardy",
+      data.contentLanguage
+    );
+
+  const genderId =
+    defaultGenderForRate(
+      data.genderRate
+    );
+
+  return {
+    defaults: {
+      assetId:
+        entry.id,
+
+      natureId:
+        nature.id,
+
+      abilityId:
+        data.ability?.id
+        ?? data.abilities?.[0]?.id
+        ?? "",
+
+      genderId,
+
+      weaknessStat:
+        data.worst?.name
+        ?? "speed",
+
+      customWeakness:
+        "",
+
+      moveIds:
+        (data.moves ?? [])
+          .slice(0, 4)
+          .map(
+            move => move.id
+          )
+    },
+
+    natureOptions:
+      NATURE_IDS.map(
+        id => {
+          const row =
+            natureProfile(
+              id,
+              data.contentLanguage
+            );
+
+          return {
+            id:
+              row.id,
+
+            label:
+              row.label,
+
+            effect:
+              row.effect
+          };
+        }
+      ),
+
+    abilityOptions:
+      (data.abilities ?? [])
+        .map(
+          ability => ({
+            id:
+              ability.id,
+
+            name:
+              ability.name,
+
+            hidden:
+              !!ability.hidden,
+
+            description:
+              buildAbilityThreat(
+                ability,
+                data.contentLanguage
+              )?.description
+              ?? ""
+          })
+        ),
+
+    genderOptions:
+      genderOptionsForRate(
+        data.genderRate,
+        data.contentLanguage
+      ),
+
+    weaknessOptions: [
+      "attack",
+      "defense",
+      "special-attack",
+      "special-defense",
+      "speed"
+    ].map(
+      stat => ({
+        id:
+          stat,
+
+        label:
+          statWeaknessText(
+            stat,
+            data.contentLanguage
+          ),
+
+        statLabel:
+          statLabel(
+            stat,
+            data.contentLanguage
+          ),
+
+        value:
+          Number(
+            data.stats?.[stat]
+            ?? 0
+          )
+      })
+    ),
+
+    moveOptions:
+      (data.moveChoices ?? [])
+        .map(
+          move => ({
+            id:
+              move.id,
+
+            name:
+              pokemonMoveDisplayName(
+                move,
+                move.name
+              ),
+
+            typeLabel:
+              typeLabel(
+                move.type,
+                data.contentLanguage
+              ),
+
+            methodLabel:
+              move.methodLabel,
+
+            description:
+              move.shortDescription
+          })
+        )
+  };
+}
+
+
 export async function buildPokemonTrainerThemeData(
   entry,
   definition,
   {
     might = "origin",
     slot = 0,
-    trainerId = ""
+    trainerId = "",
+    customization = null
   } = {}
 ) {
-  const data = await loadPokemonBuildData(entry, might);
-  const suggestedNature = defaultNatureForStats(data.stats);
-  const nature = natureProfile(
-    suggestedNature?.id ?? "hardy",
-    data.contentLanguage
-  );
-  const genderId = defaultGenderForRate(data.genderRate);
+  const data =
+    await loadPokemonBuildData(
+      entry,
+      might
+    );
+
+  const suggestedNature =
+    defaultNatureForStats(
+      data.stats
+    );
+
+  const nature =
+    natureProfile(
+      customization?.natureId
+        ?? suggestedNature?.id
+        ?? "hardy",
+      data.contentLanguage
+    );
+
+  const selectedAbility =
+    (data.abilities ?? [])
+      .find(
+        ability =>
+          ability.id
+          === customization?.abilityId
+      )
+    ??
+    data.ability
+    ??
+    data.abilities?.[0]
+    ??
+    null;
+
+  data.ability =
+    selectedAbility;
+
+  const genderId =
+    customization?.genderId
+    ??
+    defaultGenderForRate(
+      data.genderRate
+    );
+
+  const weaknessStat =
+    customization?.weaknessStat
+    ??
+    data.worst?.name
+    ??
+    "speed";
+
+  const customWeakness =
+    String(
+      customization?.customWeakness
+      ?? ""
+    ).trim();
+
+  const weaknessTag =
+    customWeakness
+    ||
+    statWeaknessText(
+      weaknessStat,
+      data.contentLanguage
+    );
+
+  const requestedMoveIds =
+    Array.isArray(
+      customization?.moveIds
+    )
+      ? customization
+          .moveIds
+          .filter(Boolean)
+          .slice(0, 4)
+      : [];
+
+  if (
+    requestedMoveIds.length
+  ) {
+    const wanted =
+      new Set(
+        requestedMoveIds
+      );
+
+    const selectedMoves =
+      (data.moveChoices ?? [])
+        .filter(
+          move =>
+            wanted.has(
+              move.id
+            )
+        )
+        .sort(
+          (a, b) =>
+            requestedMoveIds
+              .indexOf(a.id)
+            -
+            requestedMoveIds
+              .indexOf(b.id)
+        )
+        .slice(
+          0,
+          4
+        );
+
+    if (
+      selectedMoves.length
+    ) {
+      data.moves =
+        selectedMoves;
+    }
+  }
 
   const review = {
     might,
-    natureId: nature.id,
-    natureLabel: nature.label,
+
+    natureId:
+      nature.id,
+
+    natureLabel:
+      nature.label,
+
     genderId,
-    genderLabel: genderLabel(genderId, data.contentLanguage),
-    weaknessStat: data.worst?.name ?? "speed",
-    weaknessTag: data.weaknessTag,
-    powerStatTag: data.powerStatTag,
-    moveNames: data.moves.map(move => move.name)
+
+    genderLabel:
+      genderLabel(
+        genderId,
+        data.contentLanguage
+      ),
+
+    weaknessStat,
+
+    weaknessTag,
+
+    powerStatTag:
+      data.powerStatTag,
+
+    moveNames:
+      data.moves.map(
+        move => move.name
+      )
   };
 
   const config = {
-    mode: "player-theme",
-    destination: "team",
+    mode:
+      "player-theme",
+
+    destination:
+      "team",
+
     trainerId,
+
     might
   };
 
-  const instanceId = randomId();
-  const flags = moduleMetadata(
-    entry,
-    definition,
-    config,
-    data,
-    review,
-    instanceId
-  );
+  const instanceId =
+    randomId();
 
-  flags.pokemonTheme = true;
-  flags.themeRole = "pokemon";
-  flags.pokemonTeamSlot = Number(slot ?? 0);
+  const flags =
+    moduleMetadata(
+      entry,
+      definition,
+      config,
+      data,
+      review,
+      instanceId
+    );
+
+  flags.pokemonTheme =
+    true;
+
+  flags.themeRole =
+    "pokemon";
+
+  flags.pokemonTeamSlot =
+    Number(
+      slot ?? 0
+    );
 
   return {
-    name: entry.name,
-    type: "themebook",
-    img: definition.portraitPath,
-    system: themeSystem(review, data, entry),
+    name:
+      entry.name,
+
+    type:
+      "themebook",
+
+    img:
+      definition.portraitPath,
+
+    system:
+      themeSystem(
+        review,
+        data,
+        entry
+      ),
+
     flags: {
-      [MODULE_ID]: flags
+      [MODULE_ID]:
+        flags
     }
   };
 }
