@@ -51,6 +51,9 @@
 - [x] Sequencer opcional para áreas animadas e VFX de golpe; JB2A opcional para assets
 - [x] Fallback nativo obrigatório sem módulos externos
 
+## Backlog visual
+- [ ] Recolher Pokémon com efeito cinematográfico de retorno à Pokébola
+
 ## Marco 3 — Pokémon-jogador
 - [ ] Finalizar etapa 4 do criador de Pokémon-jogador
 - [ ] Botão no header para reabrir Trainer/Pokémon-jogador no Criador em modo edição

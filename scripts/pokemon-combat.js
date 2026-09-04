@@ -279,8 +279,7 @@ async function ensureCombatActor(trainer, theme) {
     const saved = combatStateFromTheme(theme);
     if (saved.length) {
       await actor.update({
-        "system.floatingTagsAndStatuses": saved,
-        "system.floatingTagsAndStatusesEditable": true
+        "system.floatingTagsAndStatuses": saved
       });
     }
   }

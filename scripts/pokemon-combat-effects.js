@@ -256,8 +256,7 @@ async function applyEffectsToActor(actor, effects, multiplier, maxRank) {
 
   if (applied.length) {
     await actor.update({
-      "system.floatingTagsAndStatuses": list,
-      "system.floatingTagsAndStatusesEditable": true
+      "system.floatingTagsAndStatuses": list
     });
   }
 

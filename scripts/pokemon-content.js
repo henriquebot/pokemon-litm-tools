@@ -164,7 +164,11 @@ const MOVE_PTBR = {
   "acid-spray": "Spray Ácido",
   "bullet-seed": "Rajada de Sementes",
   "poison-fang": "Presa Venenosa",
-  "toxic-spikes": "Espinhos Tóxicos"
+  "toxic-spikes": "Espinhos Tóxicos",
+  "gunk-shot": "Tiro de Lodo",
+  belch: "Arroto",
+  coil: "Enrolar",
+  "gastro-acid": "Ácido Gástrico"
 };
 
 const MOVE_WORD_PTBR = {

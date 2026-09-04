@@ -446,12 +446,13 @@ async function loadPokemonBuildData(entry, might) {
       const rows = all.filter(detail => detail.version_group?.name === group);
       if (rows.length) return rows;
     }
-    return all;
+    return [];
   }
 
   const moveSources = (pokemon.moves ?? []).map(row => {
     const id = row.move?.name ?? "";
     const details = preferredDetails(row);
+    if (!details.length) return null;
     const methods = [...new Set(details.map(detail => detail.move_learn_method?.name).filter(Boolean))];
     const levels = details
       .filter(detail => detail.move_learn_method?.name === "level-up")
@@ -467,7 +468,7 @@ async function loadPokemonBuildData(entry, might) {
       level,
       rank: level ? rankForLevel(level) : null
     };
-  }).filter(row => row.id && row.url);
+  }).filter(row => row?.id && row.url);
 
   const maxLevel = MIGHT[might]?.maxLevel ?? 45;
   const levelPool = moveSources
@@ -486,7 +487,6 @@ async function loadPokemonBuildData(entry, might) {
     seen.add(row.id);
     if (chosenSources.length >= 36) break;
   }
-  if (!chosenSources.length) chosenSources.push(...moveSources.slice(0, 24));
 
   const detailRows = (await Promise.all(chosenSources.map(async source => {
     try {
@@ -1074,12 +1074,41 @@ function pokemonThemeTitleTag(entry, review, language = 'pt-BR') {
   return nature ? species + ' · ' + nature : species;
 }
 
+function pokemonMoveDisplayName(move, fallback = "") {
+  const local =
+    String(fallback || move?.name || move?.id || "Golpe").trim();
+
+  const english =
+    String(move?.englishName ?? "").trim();
+
+  if (
+    !english
+    || local.localeCompare(
+      english,
+      undefined,
+      { sensitivity: "base" }
+    ) === 0
+  ) {
+    return local;
+  }
+
+  if (local.endsWith("(" + english + ")")) {
+    return local;
+  }
+
+  return local + " (" + english + ")";
+}
+
 function themeSystem(review, data, entry) {
   const language = data.contentLanguage ?? getPokemonContentLanguage();
   const pt = language !== "en";
 
   const moveTags = review.moveNames.map((name, index) =>
-    powerTag(name, false, pt ? `Movimento ${index + 1}` : `Move ${index + 1}`)
+    powerTag(
+      pokemonMoveDisplayName(data.moves?.[index], name),
+      false,
+      pt ? `Movimento ${index + 1}` : `Move ${index + 1}`
+    )
   );
 
   const abilityTag = data.ability?.name
@@ -1092,7 +1121,7 @@ function themeSystem(review, data, entry) {
 
   const futureTags = futureLevelUpMoves(data)
     .map((move, index) => powerTag(
-      move.name,
+      pokemonMoveDisplayName(move, move.name),
       true,
       pt ? `Próximo movimento ${index + 1}` : `Next move ${index + 1}`
     ));
@@ -1168,7 +1197,8 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
     themeTitleTag: pokemonThemeTitleTag(entry, review, data.contentLanguage),
     moves: data.moves.map((move, index) => ({
       id: move.id,
-      name: review.moveNames[index],
+      name: pokemonMoveDisplayName(move, review.moveNames[index]),
+      englishName: move.englishName,
       type: move.type,
       damageClass: move.damageClass,
       power: move.power,
@@ -1188,7 +1218,7 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
     })),
     tagBindings: data.moves.map((move, index) => ({
       tagIndex: index + 1,
-      tagName: review.moveNames[index],
+      tagName: pokemonMoveDisplayName(move, review.moveNames[index]),
       kind: "pokemonMove",
       moveId: move.id,
       type: move.type,
@@ -1237,7 +1267,8 @@ function pokemonBiography(data, review) {
   const profile = formatThemeDescription({ data, review }, language);
   const rows = data.biographyMoves ?? [];
 
-  const nameText = move => `${escapeHTML(move.name)} (${escapeHTML(move.englishName)})`;
+  const nameText = move =>
+    escapeHTML(pokemonMoveDisplayName(move, move.name));
   const rankSections = [
     ["origin", language === "en" ? "Origin · up to Lv. 20" : "Origin · até Nv. 20"],
     ["adventure", language === "en" ? "Adventure · Lv. 21–45" : "Adventure · Nv. 21–45"],
@@ -1265,7 +1296,7 @@ function pokemonBiography(data, review) {
         data-pokemon-effect-id="${escapeHTML(move.id)}"
         data-pokemon-effect-type="${escapeHTML(move.type)}"
         data-pokemon-effect-target="${escapeHTML(move.target ?? "selected-pokemon")}">
-        <h3><i class="fa-solid fa-bolt"></i> ${escapeHTML(displayName)} (${escapeHTML(move.englishName ?? titleCase(move.id))})</h3>
+        <h3><i class="fa-solid fa-bolt"></i> ${escapeHTML(pokemonMoveDisplayName(move, displayName))}</h3>
         <p>${escapeHTML(threat.description)}</p>
       </article>
     `;
@@ -1315,7 +1346,10 @@ function pokemonThreats(data, review, config) {
       language
     );
     return {
-      name: `${review.moveNames[index] ?? move.name} (${move.englishName ?? titleCase(move.id)})`,
+      name: pokemonMoveDisplayName(
+        move,
+        review.moveNames[index] ?? move.name
+      ),
       description: threat.description,
       list: threat.list
     };

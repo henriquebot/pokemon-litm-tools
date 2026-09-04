@@ -110,11 +110,19 @@ function combatTokenForTheme(scene, trainerActor, theme) {
   const instanceId = theme?.getFlag(MODULE_ID, "pokemonInstanceId");
   if (!scene || !trainerActor || !instanceId) return null;
 
-  return scene.tokens.find(token =>
-    isCombatToken(token)
-    && token.getFlag(MODULE_ID, "pokemonInstanceId") === instanceId
-    && token.getFlag(MODULE_ID, "sourceTrainerActorId") === trainerActor.id
-  ) ?? null;
+  return scene.tokens.find(token => {
+    if (token.getFlag(MODULE_ID, "pokemonInstanceId") !== instanceId) {
+      return false;
+    }
+
+    const ownerId =
+      token.getFlag(MODULE_ID, "sourceTrainerActorId")
+      ?? token.getFlag(MODULE_ID, "trainerActorId")
+      ?? token.actor?.getFlag?.(MODULE_ID, "sourceTrainerActorId")
+      ?? null;
+
+    return ownerId === trainerActor.id;
+  }) ?? null;
 }
 function getPokemonTokens(scene, trainerId) {
   return scene?.tokens.filter(t => isManagedToken(t) && t.getFlag(MODULE_ID, "trainerTokenId") === trainerId) ?? [];
