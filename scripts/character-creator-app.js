@@ -19,6 +19,10 @@ import {
   createCharacterThemes
 } from "./character-theme-builder.js";
 
+import {
+  loadPokemonTrainerCustomization
+} from "./pokemon-builder.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -884,6 +888,8 @@ class PokemonCharacterCreatorApp
 
   teamSlot = 0;
 
+  pokemonCustomizations = [];
+
   dreamSelections = [];
 
   archetypeId = null;
@@ -912,12 +918,6 @@ class PokemonCharacterCreatorApp
 
 
   _themesReady() {
-    if (
-      this.mode !== "trainer"
-    ) {
-      return true;
-    }
-
     if (
       !Array.isArray(
         this.themeDrafts
@@ -1007,6 +1007,24 @@ class PokemonCharacterCreatorApp
   }
 
 
+  _pokemonReady() {
+    if (this.mode !== "trainer") return true;
+    if (Number(this.teamSize ?? 0) === 0) return true;
+    if (!this._teamReady()) return false;
+
+    return this.teamSelections.every((assetId, index) => {
+      const row = this.pokemonCustomizations[index];
+      const moves = Array.isArray(row?.moveIds)
+        ? row.moveIds.filter(Boolean)
+        : [];
+
+      return row?.assetId === assetId
+        && moves.length >= 1
+        && moves.length <= 4;
+    });
+  }
+
+
   async _prepareContext(options) {
     const context =
       await super._prepareContext(
@@ -1017,19 +1035,13 @@ class PokemonCharacterCreatorApp
 
     if (
       (
-        this.step === 3
-        &&
-        this.visualSource === "catalog"
+        this.step === 2
+        && this.visualSource === "catalog"
       )
       ||
       (
-        (
-          this.step === 4
-          ||
-          this.step === 5
-        )
-        &&
         this.mode === "trainer"
+        && [3, 4, 5].includes(this.step)
       )
     ) {
       catalog =
@@ -1040,7 +1052,7 @@ class PokemonCharacterCreatorApp
     let items = [];
 
     if (
-      this.step === 3
+      this.step === 2
       &&
       this.visualSource === "catalog"
       &&
@@ -1124,7 +1136,7 @@ class PokemonCharacterCreatorApp
     let teamSlots = [];
 
     if (
-      this.step === 4
+      this.step === 3
       &&
       this.mode === "trainer"
     ) {
@@ -1241,6 +1253,79 @@ class PokemonCharacterCreatorApp
     }
 
 
+    let pokemonProfiles = [];
+
+    if (
+      this.step === 4
+      && this.mode === "trainer"
+      && Number(this.teamSize ?? 0) > 0
+    ) {
+      const byId = new Map(
+        catalog.pokemon.map(entry => [entry.id, entry])
+      );
+
+      pokemonProfiles = (
+        await Promise.all(
+          this.teamSelections.map(async (assetId, index) => {
+            const entry = byId.get(assetId);
+            if (!entry) return null;
+
+            const options = await loadPokemonTrainerCustomization(entry, "origin");
+            let current = this.pokemonCustomizations[index];
+
+            if (!current || current.assetId !== assetId) {
+              current = foundry.utils.deepClone(options.defaults);
+              this.pokemonCustomizations[index] = current;
+            }
+
+            const nature = options.natureOptions.find(row => row.id === current.natureId)
+              ?? options.natureOptions[0]
+              ?? null;
+
+            const ability = options.abilityOptions.find(row => row.id === current.abilityId)
+              ?? options.abilityOptions[0]
+              ?? null;
+
+            const selectedMoves = new Set(
+              Array.isArray(current.moveIds) ? current.moveIds : []
+            );
+
+            return {
+              slot: index,
+              number: index + 1,
+              name: entry.name,
+              preview: entry.preview ?? entry.portrait ?? entry.sheet,
+              natureEffect: nature?.effect ?? "",
+              abilityDescription: ability?.description ?? "",
+              moveCount: selectedMoves.size,
+              customWeakness: current.customWeakness ?? "",
+              natureOptions: options.natureOptions.map(row => ({
+                ...row,
+                selected: row.id === current.natureId
+              })),
+              abilityOptions: options.abilityOptions.map(row => ({
+                ...row,
+                selected: row.id === current.abilityId
+              })),
+              genderOptions: options.genderOptions.map(row => ({
+                ...row,
+                selected: row.id === current.genderId
+              })),
+              weaknessOptions: options.weaknessOptions.map(row => ({
+                ...row,
+                selected: row.id === current.weaknessStat
+              })),
+              moveOptions: options.moveOptions.map(row => ({
+                ...row,
+                selected: selectedMoves.has(row.id)
+              }))
+            };
+          })
+        )
+      ).filter(Boolean);
+    }
+
+
     let dreamItems = [];
 
     if (
@@ -1293,12 +1378,14 @@ class PokemonCharacterCreatorApp
     let selectedArchetype = null;
 
     if (
-      this.mode === "trainer"
-      &&
       (
-        this.step === 6
-        ||
-        this.step === 7
+        this.mode === "trainer"
+        && [6, 7].includes(this.step)
+      )
+      ||
+      (
+        this.mode === "pokemon"
+        && [3, 4].includes(this.step)
       )
     ) {
       const loadedArchetypes =
@@ -1368,9 +1455,11 @@ class PokemonCharacterCreatorApp
     let themeEditorSlots = [];
 
     if (
-      this.step === 7
-      &&
-      selectedArchetype
+      (
+        (this.mode === "trainer" && this.step === 7)
+        || (this.mode === "pokemon" && this.step === 4)
+      )
+      && selectedArchetype
     ) {
       if (
         !Array.isArray(
@@ -1499,42 +1588,42 @@ class PokemonCharacterCreatorApp
     const canNext =
       (
         this.step === 1
-        &&
-        !!this.mode
+        && !!this.mode
       )
       ||
       (
         this.step === 2
-        &&
-        !!this.characterName.trim()
-      )
-      ||
-      (
-        this.step === 3
-        && !!this.mode
+        && !!this.characterName.trim()
         && visualReady
       )
       ||
       (
-        this.step === 4
-        &&
         this.mode === "trainer"
-        &&
-        this._teamReady()
+        && this.step === 3
+        && this._teamReady()
       )
       ||
       (
-        this.step === 5
-        &&
         this.mode === "trainer"
+        && this.step === 4
+        && this._pokemonReady()
       )
       ||
       (
-        this.step === 6
-        &&
         this.mode === "trainer"
-        &&
-        profileReady
+        && this.step === 5
+      )
+      ||
+      (
+        this.mode === "trainer"
+        && this.step === 6
+        && profileReady
+      )
+      ||
+      (
+        this.mode === "pokemon"
+        && this.step === 3
+        && profileReady
       );
 
 
@@ -1543,16 +1632,17 @@ class PokemonCharacterCreatorApp
         this.mode === "pokemon"
         && this.step === 4
         && visualReady
+        && profileReady
+        && this._themesReady()
       )
       ||
       (
         this.mode === "trainer"
-        &&
-        this.step === 7
-        &&
-        this._teamReady()
-        &&
-        this._themesReady()
+        && this.step === 7
+        && this._teamReady()
+        && this._pokemonReady()
+        && profileReady
+        && this._themesReady()
       );
 
 
@@ -1572,9 +1662,13 @@ class PokemonCharacterCreatorApp
         this.step === 2,
 
       stepIsVisual:
-        this.step === 3,
+        this.step === 2,
 
       stepIsTeam:
+        this.mode === "trainer"
+        && this.step === 3,
+
+      stepIsPokemonTeam:
         this.mode === "trainer"
         && this.step === 4,
 
@@ -1583,8 +1677,14 @@ class PokemonCharacterCreatorApp
         && this.step === 5,
 
       stepIsArchetype:
-        this.mode === "trainer"
-        && this.step === 6,
+        (
+          this.mode === "trainer"
+          && this.step === 6
+        )
+        || (
+          this.mode === "pokemon"
+          && this.step === 3
+        ),
 
       stepIsThemes:
         (
@@ -1603,7 +1703,7 @@ class PokemonCharacterCreatorApp
         this.mode === "pokemon",
 
       showTrainerProgress:
-        this.mode !== "pokemon",
+        this.mode === "trainer",
 
       characterName:
         this.characterName,
@@ -1615,6 +1715,11 @@ class PokemonCharacterCreatorApp
       teamItems,
 
       teamSlots,
+
+      pokemonProfiles,
+
+      pokemonReady:
+        this._pokemonReady(),
 
       dreamItems,
 
@@ -1714,12 +1819,11 @@ class PokemonCharacterCreatorApp
 
     if (
       (
-        this.step === 3
-        &&
-        this.visualSource === "catalog"
+        this.step === 2
+        && this.visualSource === "catalog"
       )
       ||
-      this.step === 4
+      this.step === 3
       ||
       this.step === 5
     ) {
@@ -1764,6 +1868,9 @@ class PokemonCharacterCreatorApp
 
             this.teamSlot =
               0;
+
+            this.pokemonCustomizations =
+              [];
 
             this.dreamSelections =
               [];
@@ -1818,7 +1925,7 @@ class PokemonCharacterCreatorApp
 
         if (next) {
           next.disabled =
-            !this.characterName.trim();
+            !(this.characterName.trim() && this._visualReady());
         }
       }
     );
@@ -2023,7 +2130,7 @@ class PokemonCharacterCreatorApp
 
           if (action) {
             action.disabled =
-              false;
+              !this.characterName.trim();
           }
         }
       );
@@ -2111,6 +2218,12 @@ class PokemonCharacterCreatorApp
 
           this.teamSelections =
             this.teamSelections.slice(
+              0,
+              size
+            );
+
+          this.pokemonCustomizations =
+            this.pokemonCustomizations.slice(
               0,
               size
             );
@@ -2214,6 +2327,10 @@ class PokemonCharacterCreatorApp
             index
           ] = null;
 
+          this.pokemonCustomizations[
+            index
+          ] = null;
+
           this.teamSlot =
             index;
 
@@ -2246,6 +2363,16 @@ class PokemonCharacterCreatorApp
             card.dataset.assetId;
 
           if (!id) return;
+
+          if (
+            this.teamSelections[
+              this.teamSlot
+            ] !== id
+          ) {
+            this.pokemonCustomizations[
+              this.teamSlot
+            ] = null;
+          }
 
           this.teamSelections[
             this.teamSlot
@@ -2284,6 +2411,79 @@ class PokemonCharacterCreatorApp
           });
         }
       );
+    }
+
+
+    /* PERSONALIZAR POKEMON */
+
+    const pokemonState = slot =>
+      this.pokemonCustomizations[Number(slot)];
+
+    for (const select of this.element.querySelectorAll("[data-pokemon-nature]")) {
+      select.addEventListener("change", async () => {
+        const row = pokemonState(select.dataset.pokemonNature);
+        if (!row) return;
+        row.natureId = select.value;
+        await this.render({ force: true });
+      });
+    }
+
+    for (const select of this.element.querySelectorAll("[data-pokemon-ability]")) {
+      select.addEventListener("change", async () => {
+        const row = pokemonState(select.dataset.pokemonAbility);
+        if (!row) return;
+        row.abilityId = select.value;
+        await this.render({ force: true });
+      });
+    }
+
+    for (const select of this.element.querySelectorAll("[data-pokemon-gender]")) {
+      select.addEventListener("change", () => {
+        const row = pokemonState(select.dataset.pokemonGender);
+        if (row) row.genderId = select.value;
+      });
+    }
+
+    for (const select of this.element.querySelectorAll("[data-pokemon-weakness]")) {
+      select.addEventListener("change", () => {
+        const row = pokemonState(select.dataset.pokemonWeakness);
+        if (row) row.weaknessStat = select.value;
+      });
+    }
+
+    for (const input of this.element.querySelectorAll("[data-pokemon-custom-weakness]")) {
+      input.addEventListener("input", () => {
+        const row = pokemonState(input.dataset.pokemonCustomWeakness);
+        if (row) row.customWeakness = input.value;
+      });
+    }
+
+    for (const input of this.element.querySelectorAll("[data-pokemon-move]")) {
+      input.addEventListener("change", async () => {
+        const row = pokemonState(input.dataset.pokemonMove);
+        if (!row) return;
+
+        const ids = new Set(Array.isArray(row.moveIds) ? row.moveIds : []);
+        const id = input.dataset.moveId;
+
+        if (input.checked) ids.add(id);
+        else ids.delete(id);
+
+        if (ids.size < 1) {
+          input.checked = true;
+          ui.notifications.warn("Cada Pokémon precisa ter pelo menos 1 golpe.");
+          return;
+        }
+
+        if (ids.size > 4) {
+          input.checked = false;
+          ui.notifications.warn("Cada Pokémon pode ter no máximo 4 golpes.");
+          return;
+        }
+
+        row.moveIds = Array.from(ids);
+        await this.render({ force: true });
+      });
     }
 
 
@@ -2685,34 +2885,39 @@ class PokemonCharacterCreatorApp
 
           if (
             this.step === 2
-            &&
-            !this.characterName.trim()
+            && (
+              !this.characterName.trim()
+              || !this._visualReady()
+            )
           ) {
             return;
           }
 
           if (
-            this.step === 3
-            && !!this.mode
-            && !this._visualReady()
-          ) {
-            return;
-          }
-
-          if (
-            this.step === 4
-            &&
             this.mode === "trainer"
-            &&
-            !this._teamReady()
+            && this.step === 3
+            && !this._teamReady()
           ) {
             return;
           }
 
           if (
-            this.step === 6
-            &&
             this.mode === "trainer"
+            && this.step === 4
+            && !this._pokemonReady()
+          ) {
+            return;
+          }
+
+          if (
+            (
+              this.mode === "trainer"
+              && this.step === 6
+            )
+            || (
+              this.mode === "pokemon"
+              && this.step === 3
+            )
           ) {
             const archetypes =
               await loadCharacterArchetypes();
@@ -2777,11 +2982,9 @@ class PokemonCharacterCreatorApp
             ||
             !this._teamReady()
             ||
-            (
-              this.mode === "trainer"
-              &&
-              !this._themesReady()
-            )
+            !this._pokemonReady()
+            ||
+            !this._themesReady()
           ) {
             return;
           }
@@ -2908,7 +3111,11 @@ class PokemonCharacterCreatorApp
 
               await createPokemonTeamThemes(
                 actor,
-                teamEntries
+                teamEntries,
+                {
+                  customizations:
+                    this.pokemonCustomizations
+                }
               );
             }
 
@@ -2943,21 +3150,17 @@ class PokemonCharacterCreatorApp
             }
 
 
-            if (
-              this.mode === "trainer"
-            ) {
-              await createCharacterThemes(
-                actor,
-                this.themeDrafts,
-                this.archetypeId
-              );
+            await createCharacterThemes(
+              actor,
+              this.themeDrafts,
+              this.archetypeId
+            );
 
-              await actor.setFlag(
-                MODULE_ID,
-                "characterArchetypeVariantId",
-                this.archetypeVariantId
-              );
-            }
+            await actor.setFlag(
+              MODULE_ID,
+              "characterArchetypeVariantId",
+              this.archetypeVariantId
+            );
 
 
             /*

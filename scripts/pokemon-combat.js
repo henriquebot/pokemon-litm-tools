@@ -275,6 +275,12 @@ async function ensureCombatActor(trainer, theme) {
     throw new Error("Não foi possível criar o Combat Actor do Pokémon.");
   }
 
+  if (actor.system?.editMode !== false) {
+    await actor.update({
+      "system.editMode": false
+    });
+  }
+
   if (actorWasNew) {
     const saved = combatStateFromTheme(theme);
     if (saved.length) {

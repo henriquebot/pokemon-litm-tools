@@ -118,7 +118,17 @@ async function ensurePokemonFoundation(trainer) {
   }
 
   if (updates.length) {
-    await trainer.updateEmbeddedDocuments("Item", updates);
+    const liveUpdates = updates.filter(update =>
+      update?._id && trainer.items?.has(update._id)
+    );
+
+    if (liveUpdates.length) {
+      try {
+        await trainer.updateEmbeddedDocuments("Item", liveUpdates);
+      } catch (error) {
+        console.warn("Pokemon LITM Tools | Ignorando atualizacao stale de Theme:", error);
+      }
+    }
   }
 
   async function normalizeRecords(flagName, records) {
@@ -157,10 +167,60 @@ function themeSnapshot(theme) {
 }
 
 async function reindexTeam(trainer) {
-  const themes = getPokemonThemes(trainer);
-  const updates = themes.map((theme, index) => ({_id: theme.id, [`flags.${MODULE_ID}.pokemonTeamSlot`]: index}))
-    .filter((_, index) => Number(themes[index].getFlag(MODULE_ID, "pokemonTeamSlot")) !== index);
-  if (updates.length) await trainer.updateEmbeddedDocuments("Item", updates);
+  const themes = getPokemonThemes(trainer)
+    .filter(theme => theme?.id && trainer.items?.has(theme.id));
+
+  const updates = themes.map((theme, index) => ({
+    _id: theme.id,
+    [`flags.${MODULE_ID}.pokemonTeamSlot`]: index
+  }))
+    .filter((_, index) =>
+      Number(themes[index].getFlag(MODULE_ID, "pokemonTeamSlot")) !== index
+    )
+    .filter(update => trainer.items?.has(update._id));
+
+  if (!updates.length) return;
+
+  try {
+    await trainer.updateEmbeddedDocuments("Item", updates);
+  } catch (error) {
+    console.warn("Pokemon LITM Tools | Reindex ignorou Theme removido durante a operacao:", error);
+  }
+}
+
+function themeOnCurrentScene(trainer, theme) {
+  if (!canvas?.ready || !canvas.scene || !trainer || !theme) return false;
+
+  const instanceId = theme.getFlag(MODULE_ID, "pokemonInstanceId");
+  if (!instanceId) return false;
+
+  return canvas.scene.tokens.some(token => {
+    if (token.getFlag(MODULE_ID, "pokemonInstanceId") !== instanceId) return false;
+
+    const trainerId =
+      token.getFlag(MODULE_ID, "trainerActorId")
+      ?? token.getFlag(MODULE_ID, "sourceTrainerActorId")
+      ?? token.actor?.getFlag?.(MODULE_ID, "sourceTrainerActorId")
+      ?? null;
+
+    return trainerId === trainer.id;
+  });
+}
+
+async function recollectManagedPokemon(trainer, theme) {
+  if (!trainer || !theme) return;
+
+  const api = game.modules.get(MODULE_ID)?.api;
+  if (api?.recollectPokemonTheme) {
+    await api.recollectPokemonTheme(theme);
+    return;
+  }
+
+  if (getPokemonFollowerThemeId(trainer) === theme.id) {
+    await setPokemonFollowerTheme(trainer, null);
+  }
+
+  await removePokemonThemeTokens(trainer, theme.id);
 }
 
 function nextTeamSlot(trainer) {
@@ -772,6 +832,7 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const team = themes.map((theme, index) => ({
       id: theme.id, number: index + 1, name: theme.name, img: themePreview(theme),
       following: followerThemeId === theme.id,
+      onMap: themeOnCurrentScene(trainer, theme),
       instanceId: theme.getFlag(MODULE_ID, "pokemonInstanceId") ?? "",
       pokedexUrl: theme.getFlag(MODULE_ID, "pokedexUrl") ?? getPokemonDbUrl(theme.name)
     }));
@@ -905,8 +966,36 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const actor = this.actor;
       const themeId = input.dataset.followerThemeId;
       if (!actor || !themeId) return;
-      void this._run(() => setPokemonFollowerTheme(actor, input.checked ? themeId : null));
+
+      void this._run(async () => {
+        if (!input.checked) {
+          await setPokemonFollowerTheme(actor, null);
+          return;
+        }
+
+        const previousId = getPokemonFollowerThemeId(actor);
+        if (previousId && previousId !== themeId) {
+          const previousTheme = actor.items.get(previousId);
+          if (previousTheme) {
+            await recollectManagedPokemon(actor, previousTheme);
+          }
+        }
+
+        await setPokemonFollowerTheme(actor, themeId);
+      });
     });
+
+    for (const button of root.querySelectorAll("[data-recollect-team]")) {
+      button.addEventListener("click", event => {
+        event.stopPropagation();
+        const actor = this.actor;
+        const themeId = button.dataset.recollectTeam;
+        const theme = actor?.items?.get(themeId);
+        if (actor && theme) {
+          void this._run(() => recollectManagedPokemon(actor, theme));
+        }
+      });
+    }
 
     for (const button of root.querySelectorAll("[data-send-to-pc]")) button.addEventListener("click", event => {
       event.stopPropagation();

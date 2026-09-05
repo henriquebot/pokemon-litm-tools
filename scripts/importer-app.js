@@ -1707,7 +1707,7 @@ class PokemonImporterApp
 
     position: {
       width:
-        820,
+        1100,
 
       height:
         760

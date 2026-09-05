@@ -11,57 +11,27 @@
 
     <div class="pokemon-wizard-step {{#if stepIsIdentity}}active{{/if}}">
       <span>2</span>
-      Identidade
-    </div>
-
-    <div class="pokemon-wizard-line"></div>
-
-    <div class="pokemon-wizard-step {{#if stepIsVisual}}active{{/if}}">
-      <span>3</span>
-      Visual
+      Identidade e Visual
     </div>
 
     {{#if showTrainerProgress}}
-
       <div class="pokemon-wizard-line"></div>
-
-      <div class="pokemon-wizard-step {{#if stepIsTeam}}active{{/if}}">
-        <span>4</span>
-        Equipe
-      </div>
-
+      <div class="pokemon-wizard-step {{#if stepIsTeam}}active{{/if}}"><span>3</span>Equipe</div>
       <div class="pokemon-wizard-line"></div>
-
-      <div class="pokemon-wizard-step {{#if stepIsDream}}active{{/if}}">
-        <span>5</span>
-        Sonhos
-      </div>
-
+      <div class="pokemon-wizard-step {{#if stepIsPokemonTeam}}active{{/if}}"><span>4</span>Pokémon</div>
       <div class="pokemon-wizard-line"></div>
-
-      <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}">
-        <span>6</span>
-        Perfil
-      </div>
-
+      <div class="pokemon-wizard-step {{#if stepIsDream}}active{{/if}}"><span>5</span>Sonhos</div>
       <div class="pokemon-wizard-line"></div>
-
-      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}">
-        <span>7</span>
-        Temas
-      </div>
-
+      <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>6</span>Perfil</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>7</span>Temas</div>
     {{/if}}
 
     {{#if isPokemon}}
-
       <div class="pokemon-wizard-line"></div>
-
-      <div class="pokemon-wizard-step pokemon-theme-progress {{#if stepIsThemes}}active{{/if}}">
-        <span>4</span>
-        Temas
-      </div>
-
+      <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>3</span>Perfil</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>4</span>Temas</div>
     {{/if}}
 
   </header>
@@ -124,7 +94,7 @@
 
   {{#if stepIsIdentity}}
 
-    <section class="pokemon-wizard-page">
+    <section class="pokemon-wizard-page pokemon-wizard-visual-page">
 
       <h2>
         Quem &eacute; voc&ecirc;?
@@ -191,14 +161,7 @@
 
       </div>
 
-    </section>
-
-  {{/if}}
-
-
-  {{#if stepIsVisual}}
-
-    <section class="pokemon-wizard-page pokemon-wizard-visual-page">
+      <hr class="pokemon-character-step-divider">
 
       <h2>
         Como seu personagem aparece no mapa?
@@ -690,6 +653,106 @@
 
 
 
+  {{#if stepIsPokemonTeam}}
+
+    <section class="pokemon-wizard-page pokemon-team-customization-page">
+
+      <h2>Personalize seus Pokémon</h2>
+
+      <p>
+        Defina Natureza, Habilidade, gênero, fraqueza e de 1 a 4 golpes para cada Pokémon inicial.
+      </p>
+
+      <div class="pokemon-team-customization-list">
+
+        {{#each pokemonProfiles}}
+
+          <article class="pokemon-team-customization-card">
+            <header>
+              <img src="{{preview}}" alt="{{name}}">
+              <div>
+                <small>Pokémon {{number}}</small>
+                <strong>{{name}}</strong>
+              </div>
+            </header>
+
+            <div class="pokemon-team-customization-grid">
+
+              <label>
+                <span>Natureza</span>
+                <select data-pokemon-nature="{{slot}}">
+                  {{#each natureOptions}}
+                    <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                  {{/each}}
+                </select>
+                <small>{{natureEffect}}</small>
+              </label>
+
+              <label>
+                <span>Habilidade</span>
+                <select data-pokemon-ability="{{slot}}">
+                  {{#each abilityOptions}}
+                    <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}{{#if hidden}} · Oculta{{/if}}</option>
+                  {{/each}}
+                </select>
+                <small>{{abilityDescription}}</small>
+              </label>
+
+              <label>
+                <span>Gênero</span>
+                <select data-pokemon-gender="{{slot}}">
+                  {{#each genderOptions}}
+                    <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                  {{/each}}
+                </select>
+              </label>
+
+              <label>
+                <span>Tag de Fraqueza</span>
+                <select data-pokemon-weakness="{{slot}}">
+                  {{#each weaknessOptions}}
+                    <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}} · {{statLabel}} {{value}}</option>
+                  {{/each}}
+                </select>
+              </label>
+
+              <label class="wide">
+                <span>Fraqueza personalizada (opcional)</span>
+                <input type="text" data-pokemon-custom-weakness="{{slot}}" value="{{customWeakness}}" placeholder="Se preencher, substitui a fraqueza sugerida">
+              </label>
+            </div>
+
+            <div class="pokemon-team-moves">
+              <div class="pokemon-team-moves-heading">
+                <strong>Golpes</strong>
+                <span>{{moveCount}} / 4</span>
+              </div>
+
+              <div class="pokemon-team-move-options">
+                {{#each moveOptions}}
+                  <label class="{{#if selected}}selected{{/if}}">
+                    <input type="checkbox" data-pokemon-move="{{../slot}}" data-move-id="{{id}}" {{#if selected}}checked{{/if}}>
+                    <span>
+                      <strong>{{name}}</strong>
+                      <small>{{typeLabel}} · {{methodLabel}}</small>
+                      <small>{{description}}</small>
+                    </span>
+                  </label>
+                {{/each}}
+              </div>
+            </div>
+          </article>
+
+        {{/each}}
+
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+
   {{#if stepIsDream}}
 
     <section class="pokemon-wizard-page pokemon-dream-page">
@@ -786,7 +849,7 @@
     <section class="pokemon-wizard-page pokemon-archetype-page">
 
       <h2>
-        Que tipo de treinador voc&ecirc; quer ser?
+        {{#if isTrainer}}Que tipo de treinador voc&ecirc; quer ser?{{else}}Que perfil combina com seu Pok&eacute;mon?{{/if}}
       </h2>
 
       <p>
@@ -873,48 +936,7 @@
         Construa seus Temas
       </h2>
 
-      {{#if isPokemon}}
 
-        <div class="pokemon-theme-guidance">
-          Vamos definir os padrões de Temas do personagem Pokémon na próxima etapa do desenvolvimento.
-          A estrutura prevista inclui:
-        </div>
-
-        <div class="pokemon-theme-plan-grid">
-
-          <article>
-            <i class="fa-solid fa-tree"></i>
-            <strong>Habitat</strong>
-            <span>Onde esse Pokémon pertence e prospera.</span>
-          </article>
-
-          <article>
-            <i class="fa-solid fa-star"></i>
-            <strong>Abilities</strong>
-            <span>Características especiais da espécie.</span>
-          </article>
-
-          <article>
-            <i class="fa-solid fa-face-smile"></i>
-            <strong>Nature</strong>
-            <span>Temperamento e maneira de agir.</span>
-          </article>
-
-          <article>
-            <i class="fa-solid fa-dna"></i>
-            <strong>Estágio Evolutivo</strong>
-            <span>Potencial, maturidade e evolução.</span>
-          </article>
-
-          <article>
-            <i class="fa-solid fa-bolt"></i>
-            <strong>Move Set</strong>
-            <span>Golpes e técnicas do Pokémon.</span>
-          </article>
-
-        </div>
-
-      {{/if}}
 
       <div class="pokemon-theme-guidance">
         <strong>Como pensar seus Temas:</strong>

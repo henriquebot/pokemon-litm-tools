@@ -168,16 +168,19 @@ const MOVE_PTBR = {
   "gunk-shot": "Tiro de Lodo",
   belch: "Arroto",
   coil: "Enrolar",
-  "gastro-acid": "Ácido Gástrico"
+  "gastro-acid": "Ácido Gástrico",
+  dive: "Mergulho",
+  "giga-impact": "Impacto Giga",
+  brine: "Salmoura"
 };
 
 const MOVE_WORD_PTBR = {
   acid: "Ácido", air: "Ar", aqua: "Água", attack: "Ataque", aura: "Aura", ball: "Bola", beam: "Raio",
   blast: "Explosão", body: "Corpo", bomb: "Bomba", bone: "Osso", brave: "Bravo", bubble: "Bolha", bullet: "Projétil",
-  charge: "Carga", claw: "Garra", combat: "Combate", crunch: "Mastigada", dance: "Dança", double: "Duplo", dragon: "Dragão",
+  charge: "Carga", claw: "Garra", combat: "Combate", crunch: "Mastigada", dance: "Dança", double: "Duplo", dragon: "Dragão", dive: "Mergulho",
   drain: "Dreno", drill: "Broca", edge: "Gume", energy: "Energia", fang: "Presa", fire: "Fogo", flame: "Chama",
-  flash: "Clarão", fury: "Fúria", giga: "Giga", grass: "Planta", gust: "Ventania", head: "Cabeça", horn: "Chifre",
-  hydro: "Hidro", hyper: "Hiper", ice: "Gelo", iron: "Ferro", kick: "Chute", leaf: "Folha", light: "Luz",
+  flash: "Clarão", fury: "Fúria", giga: "Giga", grass: "Planta", gust: "Ventania", head: "Cabeça", horn: "Chifre", impact: "Impacto",
+  hydro: "Hidro", hyper: "Hiper", ice: "Gelo", iron: "Ferro", kick: "Chute", leaf: "Folha", light: "Luz", brine: "Salmoura",
   mega: "Mega", metal: "Metal", moon: "Lua", mud: "Lama", night: "Noite", poison: "Veneno", powder: "Pó",
   power: "Poder", punch: "Soco", quick: "Rápido", rain: "Chuva", razor: "Navalha", rock: "Pedra", sand: "Areia",
   seed: "Semente", shadow: "Sombra", shock: "Choque", skull: "Crânio", sleep: "Sono", sludge: "Lodo", solar: "Solar",

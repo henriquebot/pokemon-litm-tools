@@ -49,6 +49,9 @@
                 </div>
                 <div class="pokemon-manager-card-actions">
                   <button type="button" data-pokedex-url="{{pokedexUrl}}" title="Abrir Pokédex"><i class="fa-solid fa-mobile-screen-button"></i></button>
+                  {{#if onMap}}
+                    <button type="button" data-recollect-team="{{id}}" title="Recolher Pokémon" {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-arrow-right-to-bracket"></i></button>
+                  {{/if}}
                   <button type="button" data-send-to-pc="{{id}}" title="Enviar para o PC" {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-box-archive"></i></button>
                   <button type="button" data-release-team="{{id}}" title="Libertar Pokémon" {{#if ../busy}}disabled{{/if}}><i class="fa-solid fa-dove"></i></button>
                 </div>

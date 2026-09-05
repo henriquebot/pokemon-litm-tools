@@ -1062,21 +1062,26 @@ export function activateTokenOutline() {
   );
 
 
-  Hooks.on(
-    "refreshToken",
-
-    token => {
-      refreshTokenOutline(
-        token
-      );
-    }
-  );
-
-
+  /*
+   * Nao recalculamos filtros durante cada refresh visual do Token.
+   * Esse hook dispara continuamente enquanto o Token se move e causava
+   * atraso perceptivel no mouse e nas teclas. Hover/controle ja atualizam
+   * o contorno; updateToken fica restrito a mudancas que realmente afetam
+   * sua aparencia.
+   */
   Hooks.on(
     "updateToken",
 
-    document => {
+    (document, changes) => {
+      const relevant =
+        changes?.disposition !== undefined
+        || changes?.hidden !== undefined
+        || changes?.texture !== undefined
+        || changes?.width !== undefined
+        || changes?.height !== undefined;
+
+      if (!relevant) return;
+
       const token =
         canvas?.tokens
           ?.get(

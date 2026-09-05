@@ -917,8 +917,6 @@ function onRenderTokenHUD(hud, html) {
   const token = combatTokenFromHud(hud);
   if (!token || (!game.user.isGM && !token.isOwner)) return;
 
-  const actor = token.actor;
-  const moves = (actor?.getFlag(MODULE_ID, "moves") ?? []).slice(0, 4);
   const root = hudRoot(hud, html);
   if (!root || root.querySelector("[data-pokemon-combat-recollect]")) return;
 
@@ -943,28 +941,6 @@ function onRenderTokenHUD(hud, html) {
   });
   column.append(recollect);
 
-  for (const move of moves) {
-    const control = document.createElement("div");
-    control.className = "control-icon pokemon-combat-hud-control pokemon-combat-move-control";
-    control.dataset.pokemonCombatMove = move.id;
-    control.title = String(move.name ?? move.id) + " · usar ou gerar área";
-    control.innerHTML =
-      '<i class="fa-solid fa-bolt"></i>'
-      + '<span class="pokemon-combat-move-letter">'
-      + esc(String(move.name ?? move.id).slice(0, 2).toUpperCase())
-      + "</span>";
-
-    control.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      void openMoveAction(actor, move).catch(error => {
-        console.error("Pokemon LITM Tools | Golpe HUD:", error);
-        ui.notifications.error(error?.message ?? "Não foi possível usar o golpe.");
-      });
-    });
-
-    column.append(control);
-  }
 }
 
 export async function startPokemonChallengeMoveArea(actor, moveId) {

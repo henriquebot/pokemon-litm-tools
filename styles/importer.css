@@ -2734,3 +2734,110 @@ has(
     margin-top: 6px;
   }
 }
+
+
+/* Character Creator · identidade/visual + personalizacao Pokemon */
+.pokemon-character-step-divider {
+  width: 100%;
+  margin: 14px 0;
+  opacity: .35;
+}
+
+.pokemon-team-customization-list {
+  display: grid;
+  gap: 14px;
+}
+
+.pokemon-team-customization-card {
+  padding: 12px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 8px;
+}
+
+.pokemon-team-customization-card > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.pokemon-team-customization-card > header img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.pokemon-team-customization-card > header div {
+  display: flex;
+  flex-direction: column;
+}
+
+.pokemon-team-customization-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.pokemon-team-customization-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pokemon-team-customization-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.pokemon-team-customization-grid small,
+.pokemon-team-move-options small {
+  opacity: .72;
+  line-height: 1.25;
+}
+
+.pokemon-team-moves {
+  margin-top: 12px;
+}
+
+.pokemon-team-moves-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.pokemon-team-move-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.pokemon-team-move-options > label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 6px;
+}
+
+.pokemon-team-move-options > label.selected {
+  outline: 2px solid var(--color-border-highlight);
+  outline-offset: -2px;
+}
+
+.pokemon-team-move-options > label > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .pokemon-team-customization-grid,
+  .pokemon-team-move-options {
+    grid-template-columns: 1fr;
+  }
+}
