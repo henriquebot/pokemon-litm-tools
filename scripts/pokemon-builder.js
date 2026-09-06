@@ -253,17 +253,17 @@ const POKEMON_NATURES = [
   ["brave","Corajoso","Assustado","Destemido"],
   ["bold","Audacioso","Intimidado","Confiante"],
   ["docile","Dócil","Pressionado","Convencido"],
-  ["impish","Travesso (Impish)","Repreendido","Brincalhão"],
-  ["lax","Relaxado (Lax)","Distraído","Despreocupado"],
+  ["impish","Travesso","Repreendido","Brincalhão"],
+  ["lax","Relaxado","Distraído","Despreocupado"],
   ["relaxed","Relaxado","Apressado","Tranquilo"],
   ["modest","Modesto","Exposto","Confiante"],
-  ["mild","Leve","Abalado","Gentil"],
-  ["bashful","Tímido (Bashful)","Envergonhado","À vontade"],
-  ["rash","Erupção cutânea","Cauteloso","Impetuoso"],
+  ["mild","Gentil","Abalado","Gentil"],
+  ["bashful","Tímido","Envergonhado","À vontade"],
+  ["rash","Impulsivo","Cauteloso","Impetuoso"],
   ["quiet","Silencioso","Perturbado","Concentrado"],
-  ["calm","Calma","Agitado","Sereno"],
+  ["calm","Calmo","Agitado","Sereno"],
   ["gentle","Gentil","Hostilizado","Amigável"],
-  ["careful","Cuidado","Surpreendido","Cauteloso"],
+  ["careful","Cuidadoso","Surpreendido","Cauteloso"],
   ["quirky","Peculiar","Confuso","Imprevisível"],
   ["sassy","Atrevido","Contrariado","Desafiador"],
   ["timid","Tímido","Assustado","Convencido"],
@@ -890,7 +890,7 @@ async function reviewBuild(entry, config, data) {
 
   const abilityOptions = (data.abilities ?? []).map(ability => `
     <option value="${escapeHTML(ability.id)}" ${ability.id === data.ability?.id ? "selected" : ""}>
-      ${escapeHTML(ability.name)}${ability.hidden ? " · Hidden Ability" : ""}
+      ${escapeHTML(ability.name)}${ability.hidden ? (language === "en" ? " · Hidden Ability" : " · Habilidade Oculta") : ""}
     </option>
   `).join("");
 
@@ -961,7 +961,7 @@ async function reviewBuild(entry, config, data) {
                 <i class="fa-solid fa-up-right-from-square"></i>
               </a>
             </div>
-            <small>${escapeHTML(typeLabel(move.type, language))} · ${escapeHTML(move.methodLabel)} · ${move.power ? `Power ${move.power}` : "Sem dano direto"}</small>
+            <small>${escapeHTML(typeLabel(move.type, language))} · ${escapeHTML(move.methodLabel)} · ${move.power ? `${language === "en" ? "Power" : "Poder"} ${move.power}` : (language === "en" ? "No direct damage" : "Sem dano direto")}</small>
             <p>${escapeHTML(move.shortDescription)}</p>
             <ul>${consequenceText}</ul>
           </div>
@@ -1018,7 +1018,7 @@ async function reviewBuild(entry, config, data) {
         <div class="pokemon-builder-final-review">
           <p><strong>Rank:</strong> ${escapeHTML(MIGHT[config.might]?.label ?? config.might)}</p>
           <p><strong>Natureza:</strong> ${escapeHTML(review.natureLabel)}</p>
-          <p><strong>Habilidade:</strong> ${escapeHTML(selectedAbility?.name ?? "—")}${selectedAbility?.hidden ? " · Hidden Ability" : ""}</p>
+          <p><strong>Habilidade:</strong> ${escapeHTML(selectedAbility?.name ?? "—")}${selectedAbility?.hidden ? (language === "en" ? " · Hidden Ability" : " · Habilidade Oculta") : ""}</p>
           <p><strong>Tag de Poder sugerida:</strong> ${escapeHTML(review.powerStatTag)}</p>
           <p><strong>Tag de Fraqueza:</strong> ${escapeHTML(review.weaknessTag)}</p>
           <p><strong>Golpes:</strong></p>

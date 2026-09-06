@@ -31,6 +31,10 @@ function pokemonThemeSystem(language = null) {
 
 function newInstanceId() { return foundry.utils.randomID(16); }
 
+function forcedDeletion() {
+  return new foundry.data.operators.ForcedDeletion();
+}
+
 function getManagedActors() {
   return game.actors
     .filter(actor =>
@@ -109,7 +113,7 @@ async function ensurePokemonFoundation(trainer) {
     for (const key of ["pokemonActorId", "combatActorId"]) {
       const actorId = theme.getFlag(MODULE_ID, key);
       if (actorId && !game.actors.get(actorId)) {
-        update[`flags.${MODULE_ID}.-=${key}`] = null;
+        update[`flags.${MODULE_ID}.${key}`] = forcedDeletion();
         changed = true;
       }
     }
@@ -124,7 +128,7 @@ async function ensurePokemonFoundation(trainer) {
 
     if (liveUpdates.length) {
       try {
-        await trainer.updateEmbeddedDocuments("Item", liveUpdates);
+        await trainer.updateEmbeddedDocuments("Item", liveUpdates, {pokemonManagerSync: true});
       } catch (error) {
         console.warn("Pokemon LITM Tools | Ignorando atualizacao stale de Theme:", error);
       }
@@ -182,7 +186,7 @@ async function reindexTeam(trainer) {
   if (!updates.length) return;
 
   try {
-    await trainer.updateEmbeddedDocuments("Item", updates);
+    await trainer.updateEmbeddedDocuments("Item", updates, {pokemonManagerSync: true});
   } catch (error) {
     console.warn("Pokemon LITM Tools | Reindex ignorou Theme removido durante a operacao:", error);
   }
@@ -234,6 +238,11 @@ export async function sendPokemonThemeToPc(trainer, themeId) {
     throw new Error("Pokémon do time não encontrado.");
   }
 
+  // Tira a fotografia do indivíduo antes de qualquer operação que possa
+  // remover o Item da EmbeddedCollection.
+  let snapshot = themeSnapshot(theme);
+  snapshot = snapshotCombatStateIntoData(snapshot);
+
   const combatApi = game.modules.get(MODULE_ID)?.api;
   if (combatApi?.recollectPokemonTheme) {
     try {
@@ -243,12 +252,11 @@ export async function sendPokemonThemeToPc(trainer, themeId) {
     }
   }
 
-  if (getPokemonFollowerThemeId(trainer) === theme.id) {
+  if (getPokemonFollowerThemeId(trainer) === themeId) {
     await setPokemonFollowerTheme(trainer, null);
   }
-  await removePokemonThemeTokens(trainer, theme.id);
+  await removePokemonThemeTokens(trainer, themeId);
 
-  const snapshot = themeSnapshot(theme);
   const records = getPcRecords(trainer);
   records.push({
     id: newInstanceId(),
@@ -256,7 +264,13 @@ export async function sendPokemonThemeToPc(trainer, themeId) {
   });
   await setPcRecords(trainer, records);
 
-  await trainer.deleteEmbeddedDocuments("Item", [theme.id]);
+  if (trainer.items.has(themeId)) {
+    await trainer.deleteEmbeddedDocuments(
+      "Item",
+      [themeId],
+      {pokemonManagerSync: true}
+    );
+  }
   await reindexTeam(trainer);
 }
 
@@ -327,7 +341,8 @@ async function addPcPokemonToTeam(trainer, source, id) {
   const created =
     await trainer.createEmbeddedDocuments(
       "Item",
-      [buildThemeFromPcRecord(record, slot)]
+      [buildThemeFromPcRecord(record, slot)],
+      {pokemonManagerSync: true}
     );
 
   if (!created?.[0]) {
@@ -376,20 +391,24 @@ async function releaseTeamPokemon(trainer, themeId) {
     throw new Error("Pokémon do Time não encontrado.");
   }
 
+  // Preserva os dados antes de recolher/deletar qualquer projeção.
+  let data = themeSnapshot(theme);
+  data = snapshotCombatStateIntoData(data);
+  delete data.flags?.[MODULE_ID]?.pokemonTeamSlot;
+
   const api = game.modules.get(MODULE_ID)?.api;
   if (api?.recollectPokemonTheme) {
     try {
       await api.recollectPokemonTheme(theme);
-    } catch {}
+    } catch (error) {
+      console.warn("Pokemon LITM Tools | Recolher antes de liberar:", error);
+    }
   }
 
-  if (getPokemonFollowerThemeId(trainer) === theme.id) {
+  if (getPokemonFollowerThemeId(trainer) === themeId) {
     await setPokemonFollowerTheme(trainer, null);
   }
-
-  let data = themeSnapshot(theme);
-  data = snapshotCombatStateIntoData(data);
-  delete data.flags?.[MODULE_ID]?.pokemonTeamSlot;
+  await removePokemonThemeTokens(trainer, themeId);
 
   const released = getReleasedRecords(trainer);
   released.push({
@@ -400,7 +419,14 @@ async function releaseTeamPokemon(trainer, themeId) {
 
   await setReleasedRecords(trainer, released);
   await removeCombatProjectionForData(data);
-  await trainer.deleteEmbeddedDocuments("Item", [theme.id]);
+
+  if (trainer.items.has(themeId)) {
+    await trainer.deleteEmbeddedDocuments(
+      "Item",
+      [themeId],
+      {pokemonManagerSync: true}
+    );
+  }
   await reindexTeam(trainer);
 }
 
@@ -447,7 +473,8 @@ async function releasedPokemonToTeam(trainer, recordId) {
   const [record] = released.splice(index, 1);
   const created = await trainer.createEmbeddedDocuments(
     "Item",
-    [buildThemeFromPcRecord(record, slot)]
+    [buildThemeFromPcRecord(record, slot)],
+    {pokemonManagerSync: true}
   );
 
   if (!created?.[0]) {

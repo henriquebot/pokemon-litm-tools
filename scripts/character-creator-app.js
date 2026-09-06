@@ -36,32 +36,28 @@ const DEFAULT_BACKGROUND =
 
 let creatorApp = null;
 
-let archetypeCatalogPromise = null;
+const archetypeCatalogPromises = new Map();
 
+async function loadCharacterArchetypes(mode = "trainer") {
+  const key = mode === "pokemon" ? "pokemon" : "trainer";
+  if (!archetypeCatalogPromises.has(key)) {
+    const file = key === "pokemon"
+      ? "pokemon-character-archetypes.json"
+      : "character-archetypes.json";
 
-async function loadCharacterArchetypes() {
-  if (!archetypeCatalogPromise) {
-    archetypeCatalogPromise =
-      fetch(
-        `modules/${MODULE_ID}/data/character-archetypes.json`
-      )
+    archetypeCatalogPromises.set(
+      key,
+      fetch("modules/" + MODULE_ID + "/data/" + file)
         .then(response => {
           if (!response.ok) {
-            throw new Error(
-              "Nao foi possivel carregar os arquetipos."
-            );
+            throw new Error("Nao foi possivel carregar os arquetipos.");
           }
-
           return response.json();
         })
-        .then(data =>
-          Array.isArray(data?.archetypes)
-            ? data.archetypes
-            : []
-        );
+        .then(data => Array.isArray(data?.archetypes) ? data.archetypes : [])
+    );
   }
-
-  return archetypeCatalogPromise;
+  return archetypeCatalogPromises.get(key);
 }
 
 
@@ -837,7 +833,7 @@ class PokemonCharacterCreatorApp
     ],
 
     position: {
-      width: 880,
+      width: 1180,
       height: 780
     },
 
@@ -869,6 +865,8 @@ class PokemonCharacterCreatorApp
 
   characterName = "";
 
+  characterNameSuggested = false;
+
   ownerId = "";
 
   visualSource = "catalog";
@@ -889,6 +887,8 @@ class PokemonCharacterCreatorApp
   teamSlot = 0;
 
   pokemonCustomizations = [];
+
+  pokemonCustomizationSlot = 0;
 
   dreamSelections = [];
 
@@ -1264,6 +1264,10 @@ class PokemonCharacterCreatorApp
         catalog.pokemon.map(entry => [entry.id, entry])
       );
 
+      if (this.pokemonCustomizationSlot >= this.teamSelections.length) {
+        this.pokemonCustomizationSlot = 0;
+      }
+
       pokemonProfiles = (
         await Promise.all(
           this.teamSelections.map(async (assetId, index) => {
@@ -1293,6 +1297,7 @@ class PokemonCharacterCreatorApp
             return {
               slot: index,
               number: index + 1,
+              active: index === this.pokemonCustomizationSlot,
               name: entry.name,
               preview: entry.preview ?? entry.portrait ?? entry.sheet,
               natureEffect: nature?.effect ?? "",
@@ -1389,7 +1394,7 @@ class PokemonCharacterCreatorApp
       )
     ) {
       const loadedArchetypes =
-        await loadCharacterArchetypes();
+        await loadCharacterArchetypes(this.mode);
 
       archetypes =
         loadedArchetypes.map(
@@ -1860,6 +1865,12 @@ class PokemonCharacterCreatorApp
             this.selectedId =
               null;
 
+            this.characterNameSuggested =
+              false;
+
+            this.pokemonCustomizationSlot =
+              0;
+
             this.teamSize =
               null;
 
@@ -1917,6 +1928,9 @@ class PokemonCharacterCreatorApp
       () => {
         this.characterName =
           nameInput.value;
+
+        this.characterNameSuggested =
+          false;
 
         const next =
           this.element.querySelector(
@@ -2111,6 +2125,22 @@ class PokemonCharacterCreatorApp
             ??
             null;
 
+          const assetName =
+            String(card.dataset.assetName ?? "").trim();
+
+          if (
+            this.mode === "pokemon"
+            && assetName
+            && (
+              !this.characterName.trim()
+              || this.characterNameSuggested
+            )
+          ) {
+            this.characterName = assetName;
+            this.characterNameSuggested = true;
+            if (nameInput) nameInput.value = assetName;
+          }
+
           for (
             const other
             of this.element.querySelectorAll(
@@ -2226,6 +2256,12 @@ class PokemonCharacterCreatorApp
             this.pokemonCustomizations.slice(
               0,
               size
+            );
+
+          this.pokemonCustomizationSlot =
+            Math.min(
+              this.pokemonCustomizationSlot,
+              Math.max(0, size - 1)
             );
 
           while (
@@ -2415,6 +2451,15 @@ class PokemonCharacterCreatorApp
 
 
     /* PERSONALIZAR POKEMON */
+
+    for (const button of this.element.querySelectorAll("[data-pokemon-customization-slot]")) {
+      button.addEventListener("click", async () => {
+        const slot = Number(button.dataset.pokemonCustomizationSlot);
+        if (!Number.isInteger(slot) || slot < 0 || slot >= this.teamSelections.length) return;
+        this.pokemonCustomizationSlot = slot;
+        await this.render({force: true});
+      });
+    }
 
     const pokemonState = slot =>
       this.pokemonCustomizations[Number(slot)];
@@ -2655,7 +2700,7 @@ class PokemonCharacterCreatorApp
           }
 
           const archetypes =
-            await loadCharacterArchetypes();
+            await loadCharacterArchetypes(this.mode);
 
           if (
             select.value === "custom"
@@ -2920,7 +2965,7 @@ class PokemonCharacterCreatorApp
             )
           ) {
             const archetypes =
-              await loadCharacterArchetypes();
+              await loadCharacterArchetypes(this.mode);
 
             const archetype =
               archetypes.find(

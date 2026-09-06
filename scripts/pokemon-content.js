@@ -174,6 +174,75 @@ const MOVE_PTBR = {
   brine: "Salmoura"
 };
 
+const MOVE_PTBR_EXTRA = {
+  "fake-out": "Ataque Surpresa", uproar: "Alvoroço", stockpile: "Armazenar", "spit-up": "Cuspir",
+  swallow: "Engolir", "heat-wave": "Onda de Calor", hail: "Granizo", torment: "Tormento", flatter: "Bajular",
+  "will-o-wisp": "Fogo-Fátuo", memento: "Memento", facade: "Fachada", aeroblast: "Explosão Aérea",
+  "focus-punch": "Soco Focado", "smelling-salts": "Sais Aromáticos", "follow-me": "Siga-me",
+  "nature-power": "Poder da Natureza", charge: "Carga", taunt: "Provocação", "helping-hand": "Mão Amiga",
+  trick: "Truque", "role-play": "Interpretação", wish: "Desejo", assist: "Assistência", ingrain: "Enraizar",
+  superpower: "Superpoder", "magic-coat": "Manto Mágico", recycle: "Reciclar", revenge: "Vingança",
+  "brick-break": "Quebra-Tijolo", yawn: "Bocejo", "knock-off": "Desarme", endeavor: "Esforço",
+  eruption: "Erupção", "skill-swap": "Troca de Habilidade", imprison: "Aprisionar", refresh: "Renovar",
+  grudge: "Rancor Profundo", snatch: "Roubo", "secret-power": "Poder Secreto", dive: "Mergulho",
+  "arm-thrust": "Empurrão de Braço", camouflage: "Camuflagem", "tail-glow": "Brilho da Cauda",
+  "luster-purge": "Purga Luminosa", "mist-ball": "Bola de Névoa", "feather-dance": "Dança das Penas",
+  "teeter-dance": "Dança Cambaleante", "blaze-kick": "Chute Flamejante", "mud-sport": "Jogo de Lama",
+  "ice-ball": "Bola de Gelo", "needle-arm": "Braço de Espinhos", "slack-off": "Relaxar",
+  "hyper-voice": "Hiper Voz", "poison-fang": "Presa Venenosa", "crush-claw": "Garra Esmagadora",
+  "blast-burn": "Explosão Incendiária", "hydro-cannon": "Canhão Hidráulico", "meteor-mash": "Soco Meteoro",
+  astonish: "Assustar", "weather-ball": "Bola Climática", aromatherapy: "Aromaterapia",
+  "fake-tears": "Lágrimas Falsas", "air-cutter": "Cortador de Ar", overheat: "Superaquecimento",
+  "odor-sleuth": "Farejar", "rock-tomb": "Tumba de Pedra", "silver-wind": "Vento Prateado",
+  "metal-sound": "Som Metálico", "grass-whistle": "Assobio de Grama", tickle: "Cócegas",
+  "cosmic-power": "Poder Cósmico", "water-spout": "Jato d'Água", "signal-beam": "Raio Sinalizador",
+  "shadow-punch": "Soco Sombrio", extrasensory: "Extrassensorial", "sky-uppercut": "Gancho Celeste",
+  "sand-tomb": "Tumba de Areia", "sheer-cold": "Frio Absoluto", "muddy-water": "Água Barrenta",
+  "bullet-seed": "Rajada de Sementes", "aerial-ace": "Ás Aéreo", "icicle-spear": "Lança de Gelo",
+  "iron-defense": "Defesa de Ferro", block: "Bloqueio", howl: "Uivo", "dragon-claw": "Garra do Dragão",
+  "frenzy-plant": "Planta Frenética", "bulk-up": "Fortalecimento", bounce: "Salto", "mud-shot": "Tiro de Lama",
+  "poison-tail": "Cauda Venenosa", covet: "Cobiça", "volt-tackle": "Investida Elétrica",
+  "magical-leaf": "Folha Mágica", "water-sport": "Jogo de Água", "calm-mind": "Mente Calma",
+  "leaf-blade": "Lâmina de Folha", "dragon-dance": "Dança do Dragão", "rock-blast": "Rajada de Pedras",
+  "shock-wave": "Onda de Choque", "water-pulse": "Pulso de Água", "doom-desire": "Desejo Fatal",
+  "psycho-boost": "Impulso Psíquico", roost: "Poleiro", gravity: "Gravidade", "miracle-eye": "Olho Milagroso",
+  "wake-up-slap": "Tapa Despertador", "hammer-arm": "Braço Martelo", "gyro-ball": "Bola Giroscópica",
+  "healing-wish": "Desejo de Cura", brine: "Salmoura", "natural-gift": "Dom Natural", feint: "Finta",
+  pluck: "Bicar", tailwind: "Vento de Cauda", acupressure: "Acupressão", "metal-burst": "Explosão Metálica",
+  "u-turn": "Meia-Volta", "close-combat": "Combate Corpo a Corpo", payback: "Revide", assurance: "Garantia",
+  embargo: "Embargo", fling: "Arremesso", "psycho-shift": "Troca Psíquica", "trump-card": "Carta na Manga",
+  "heal-block": "Bloqueio de Cura", "wring-out": "Espremer", "power-trick": "Truque de Poder",
+  "gastro-acid": "Ácido Gástrico", "lucky-chant": "Canto da Sorte", "me-first": "Eu Primeiro",
+  copycat: "Imitação", "power-swap": "Troca de Poder", "guard-swap": "Troca de Defesa", punishment: "Punição",
+  "last-resort": "Último Recurso", "worry-seed": "Semente da Preocupação", "sucker-punch": "Golpe Baixo",
+  "toxic-spikes": "Espinhos Tóxicos", "heart-swap": "Troca de Coração", "aqua-ring": "Anel de Água",
+  "magnet-rise": "Elevação Magnética", "flare-blitz": "Investida Flamejante", "force-palm": "Palma da Força",
+  "aura-sphere": "Esfera de Aura", "rock-polish": "Polimento de Pedra", "poison-jab": "Golpe Venenoso",
+  "dark-pulse": "Pulso Sombrio", "night-slash": "Corte Noturno", "aqua-tail": "Cauda d'Água",
+  "seed-bomb": "Bomba de Sementes", "air-slash": "Corte de Ar", "x-scissor": "Tesoura X",
+  "bug-buzz": "Zumbido de Inseto", "dragon-pulse": "Pulso do Dragão", "dragon-rush": "Investida do Dragão",
+  "power-gem": "Joia de Poder", "drain-punch": "Soco Drenante", "vacuum-wave": "Onda de Vácuo",
+  "focus-blast": "Explosão Focada", "energy-ball": "Bola de Energia", "brave-bird": "Pássaro Bravo",
+  "earth-power": "Poder da Terra", switcheroo: "Troca-Troca", "giga-impact": "Impacto Giga",
+  "nasty-plot": "Plano Ardiloso", "bullet-punch": "Soco Projétil", avalanche: "Avalanche",
+  "ice-shard": "Estilhaço de Gelo", "shadow-claw": "Garra Sombria", "thunder-fang": "Presa Trovejante",
+  "ice-fang": "Presa de Gelo", "fire-fang": "Presa de Fogo", "shadow-sneak": "Furtividade Sombria",
+  "mud-bomb": "Bomba de Lama", "psycho-cut": "Corte Psíquico", "zen-headbutt": "Cabeçada Zen",
+  "mirror-shot": "Tiro Espelhado", "flash-cannon": "Canhão de Luz", "rock-climb": "Escalada em Rocha",
+  defog: "Desembaçar", "trick-room": "Sala de Truques", "draco-meteor": "Meteoro Draco", discharge: "Descarga",
+  "lava-plume": "Pluma de Lava", "leaf-storm": "Tempestade de Folhas", "power-whip": "Chicote Poderoso",
+  "rock-wrecker": "Demolidor de Rocha", "cross-poison": "Veneno Cruzado", "gunk-shot": "Tiro de Lodo",
+  "iron-head": "Cabeça de Ferro", "magnet-bomb": "Bomba Magnética", "stone-edge": "Gume de Pedra",
+  captivate: "Cativar", "stealth-rock": "Pedra Furtiva", "grass-knot": "Nó de Grama", chatter: "Tagarelice",
+  judgment: "Julgamento", "bug-bite": "Mordida de Inseto", "charge-beam": "Raio de Carga",
+  "wood-hammer": "Martelo de Madeira", "aqua-jet": "Jato de Água", "attack-order": "Ordem de Ataque",
+  "defend-order": "Ordem de Defesa", "heal-order": "Ordem de Cura", "head-smash": "Cabeçada Esmagadora",
+  "double-hit": "Golpe Duplo", "roar-of-time": "Rugido do Tempo", "spacial-rend": "Fenda Espacial",
+  "lunar-dance": "Dança Lunar", "crush-grip": "Aperto Esmagador", "magma-storm": "Tempestade de Magma",
+  "dark-void": "Vazio Sombrio", "seed-flare": "Clarão de Sementes", "ominous-wind": "Vento Sinistro",
+  "shadow-force": "Força Sombria"
+};
+
 const MOVE_WORD_PTBR = {
   acid: "Ácido", air: "Ar", aqua: "Água", attack: "Ataque", aura: "Aura", ball: "Bola", beam: "Raio",
   blast: "Explosão", body: "Corpo", bomb: "Bomba", bone: "Osso", brave: "Bravo", bubble: "Bolha", bullet: "Projétil",
@@ -208,6 +277,23 @@ const ABILITY_PTBR = {
   "marvel-scale": "Escama Maravilhosa", adaptability: "Adaptabilidade", anticipation: "Antecipação", "volt-absorb": "Absorção de Voltagem",
   "quick-feet": "Pés Rápidos", "natural-cure": "Cura Natural", "leaf-guard": "Guarda Folha", "magic-guard": "Guarda Mágica",
   "sturdy": "Robustez", "rough-skin": "Pele Áspera", "clear-body": "Corpo Puro", "liquid-ooze": "Lodo Líquido"
+};
+
+const ABILITY_PTBR_EXTRA = {
+  download: "Análise de Dados", "sand-stream": "Tempestade de Areia", truant: "Preguiça", stall: "Atraso",
+  stench: "Fedor", drizzle: "Garoa", "speed-boost": "Impulso de Velocidade", "battle-armor": "Armadura de Batalha",
+  "shadow-tag": "Marca Sombria", "wonder-guard": "Guarda Maravilhosa", "color-change": "Mudança de Cor",
+  "white-smoke": "Fumaça Branca", "motor-drive": "Motor Elétrico", illuminate: "Iluminação",
+  "huge-power": "Poder Imenso", plus: "Mais", minus: "Menos", forecast: "Previsão",
+  "magma-armor": "Armadura de Magma", "water-veil": "Véu de Água", "air-lock": "Bloqueio de Ar",
+  drought: "Seca", "pure-power": "Poder Puro", "tangled-feet": "Pés Emaranhados",
+  steadfast: "Firmeza", "snow-cloak": "Manto de Neve", unburden: "Desimpedido", heatproof: "À Prova de Calor",
+  simple: "Simples", "poison-heal": "Cura Venenosa", normalize: "Normalizar", "iron-fist": "Punho de Ferro",
+  klutz: "Desajeitado", "mold-breaker": "Quebra-Molde", "super-luck": "Super Sorte", aftermath: "Consequência",
+  forewarn: "Pressentir", unaware: "Desatento", filter: "Filtro", "slow-start": "Partida Lenta",
+  scrappy: "Valentão", "storm-drain": "Dreno de Tempestade", "ice-body": "Corpo de Gelo", "solid-rock": "Rocha Sólida",
+  "snow-warning": "Alerta de Neve", "honey-gather": "Coleta de Mel", frisk: "Inspeção", reckless: "Imprudente",
+  multitype: "Multitipo", "flower-gift": "Presente Floral", "bad-dreams": "Pesadelos"
 };
 
 const AILMENT_PTBR = {
@@ -829,13 +915,17 @@ export function moveLabel(id, names = [], language = getPokemonContentLanguage()
 
   const exact = exactLocalizedName(names, "pt-BR");
   if (exact) return exact;
-  if (MOVE_PTBR[id]) return MOVE_PTBR[id];
+  const mapped = MOVE_PTBR_EXTRA[id] ?? MOVE_PTBR[id];
+  if (mapped) return mapped;
 
-  // Nunca mistura palavras PT-BR e ingles no mesmo nome.
+  // Nunca deixa um nome inglês puro escapar no conteúdo PT-BR.
   const words = String(id ?? "").split("-").filter(Boolean);
   const translated = words.map(word => MOVE_WORD_PTBR[word] ?? null);
   if (translated.length && translated.every(Boolean)) return translated.join(" ");
-  return exactLocalizedName(names, "en") || titleCase(id) || "Golpe";
+
+  const english = exactLocalizedName(names, "en") || titleCase(id);
+  console.warn("Pokemon LITM Tools | Golpe sem tradução PT-BR:", id);
+  return english ? `Técnica (${english})` : "Técnica";
 }
 
 export function abilityLabel(id, names = [], language = getPokemonContentLanguage()) {
@@ -843,7 +933,11 @@ export function abilityLabel(id, names = [], language = getPokemonContentLanguag
     return exactLocalizedName(names, "en") || titleCase(id);
   }
   const exact = exactLocalizedName(names, "pt-BR");
-  return exact || ABILITY_PTBR[id] || titleCase(id);
+  const mapped = ABILITY_PTBR_EXTRA[id] ?? ABILITY_PTBR[id];
+  if (exact || mapped) return exact || mapped;
+  const english = exactLocalizedName(names, "en") || titleCase(id);
+  console.warn("Pokemon LITM Tools | Habilidade sem tradução PT-BR:", id);
+  return english ? `Efeito (${english})` : "Habilidade desconhecida";
 }
 
 export async function fetchPokeJson(url) {

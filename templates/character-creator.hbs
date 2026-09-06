@@ -256,6 +256,7 @@
               data-search="{{search}}"
               data-person-type="{{personType}}"
               data-asset-id="{{id}}"
+              data-asset-name="{{name}}"
             >
 
               <div class="pokemon-asset-preview">
@@ -663,86 +664,97 @@
         Defina Natureza, Habilidade, gênero, fraqueza e de 1 a 4 golpes para cada Pokémon inicial.
       </p>
 
+      <nav class="pokemon-team-customization-tabs">
+        {{#each pokemonProfiles}}
+          <button
+            type="button"
+            data-pokemon-customization-slot="{{slot}}"
+            class="{{#if active}}active{{/if}}"
+          >
+            <img src="{{preview}}" alt="{{name}}">
+            <span>Pokémon {{number}}</span>
+            <strong>{{name}}</strong>
+          </button>
+        {{/each}}
+      </nav>
+
       <div class="pokemon-team-customization-list">
 
         {{#each pokemonProfiles}}
+          <article class="pokemon-team-customization-card" {{#unless active}}hidden{{/unless}}>
+              <header>
+                <img src="{{preview}}" alt="{{name}}">
+                <div>
+                  <small>Pokémon {{number}}</small>
+                  <strong>{{name}}</strong>
+                </div>
+              </header>
 
-          <article class="pokemon-team-customization-card">
-            <header>
-              <img src="{{preview}}" alt="{{name}}">
-              <div>
-                <small>Pokémon {{number}}</small>
-                <strong>{{name}}</strong>
-              </div>
-            </header>
+              <div class="pokemon-team-customization-grid">
+                <label>
+                  <span>Natureza</span>
+                  <select data-pokemon-nature="{{slot}}">
+                    {{#each natureOptions}}
+                      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                    {{/each}}
+                  </select>
+                  <small>{{natureEffect}}</small>
+                </label>
 
-            <div class="pokemon-team-customization-grid">
+                <label>
+                  <span>Habilidade</span>
+                  <select data-pokemon-ability="{{slot}}">
+                    {{#each abilityOptions}}
+                      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}{{#if hidden}} · Oculta{{/if}}</option>
+                    {{/each}}
+                  </select>
+                  <small>{{abilityDescription}}</small>
+                </label>
 
-              <label>
-                <span>Natureza</span>
-                <select data-pokemon-nature="{{slot}}">
-                  {{#each natureOptions}}
-                    <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
-                  {{/each}}
-                </select>
-                <small>{{natureEffect}}</small>
-              </label>
+                <label>
+                  <span>Gênero</span>
+                  <select data-pokemon-gender="{{slot}}">
+                    {{#each genderOptions}}
+                      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                    {{/each}}
+                  </select>
+                </label>
 
-              <label>
-                <span>Habilidade</span>
-                <select data-pokemon-ability="{{slot}}">
-                  {{#each abilityOptions}}
-                    <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}{{#if hidden}} · Oculta{{/if}}</option>
-                  {{/each}}
-                </select>
-                <small>{{abilityDescription}}</small>
-              </label>
+                <label>
+                  <span>Tag de Fraqueza</span>
+                  <select data-pokemon-weakness="{{slot}}">
+                    {{#each weaknessOptions}}
+                      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}} · {{statLabel}} {{value}}</option>
+                    {{/each}}
+                  </select>
+                </label>
 
-              <label>
-                <span>Gênero</span>
-                <select data-pokemon-gender="{{slot}}">
-                  {{#each genderOptions}}
-                    <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
-                  {{/each}}
-                </select>
-              </label>
-
-              <label>
-                <span>Tag de Fraqueza</span>
-                <select data-pokemon-weakness="{{slot}}">
-                  {{#each weaknessOptions}}
-                    <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}} · {{statLabel}} {{value}}</option>
-                  {{/each}}
-                </select>
-              </label>
-
-              <label class="wide">
-                <span>Fraqueza personalizada (opcional)</span>
-                <input type="text" data-pokemon-custom-weakness="{{slot}}" value="{{customWeakness}}" placeholder="Se preencher, substitui a fraqueza sugerida">
-              </label>
-            </div>
-
-            <div class="pokemon-team-moves">
-              <div class="pokemon-team-moves-heading">
-                <strong>Golpes</strong>
-                <span>{{moveCount}} / 4</span>
+                <label class="wide">
+                  <span>Fraqueza personalizada (opcional)</span>
+                  <input type="text" data-pokemon-custom-weakness="{{slot}}" value="{{customWeakness}}" placeholder="Se preencher, substitui a fraqueza sugerida">
+                </label>
               </div>
 
-              <div class="pokemon-team-move-options">
-                {{#each moveOptions}}
-                  <label class="{{#if selected}}selected{{/if}}">
-                    <input type="checkbox" data-pokemon-move="{{../slot}}" data-move-id="{{id}}" {{#if selected}}checked{{/if}}>
-                    <span>
-                      <strong>{{name}}</strong>
-                      <small>{{typeLabel}} · {{methodLabel}}</small>
-                      <small>{{description}}</small>
-                    </span>
-                  </label>
-                {{/each}}
+              <div class="pokemon-team-moves">
+                <div class="pokemon-team-moves-heading">
+                  <strong>Golpes</strong>
+                  <span>{{moveCount}} / 4</span>
+                </div>
+
+                <div class="pokemon-team-move-options">
+                  {{#each moveOptions}}
+                    <label class="{{#if selected}}selected{{/if}}">
+                      <input type="checkbox" data-pokemon-move="{{../slot}}" data-move-id="{{id}}" {{#if selected}}checked{{/if}}>
+                      <span>
+                        <strong>{{name}}</strong>
+                        <small>{{typeLabel}} · {{methodLabel}}</small>
+                        <small>{{description}}</small>
+                      </span>
+                    </label>
+                  {{/each}}
+                </div>
               </div>
-            </div>
           </article>
-
         {{/each}}
 
       </div>

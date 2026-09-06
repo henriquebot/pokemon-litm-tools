@@ -72,7 +72,10 @@ export async function migratePokemonFollowerState(actor) {
   if (raw === undefined) current = legacyFollowerThemeId(actor) ?? "";
   const update = {};
   if (raw === undefined || raw !== current) update[`flags.${MODULE_ID}.${FOLLOWER_FLAG}`] = current;
-  if (actor.getFlag(MODULE_ID, LEGACY_ORDER_FLAG) !== undefined) update[`flags.${MODULE_ID}.-=${LEGACY_ORDER_FLAG}`] = null;
+  if (actor.getFlag(MODULE_ID, LEGACY_ORDER_FLAG) !== undefined) {
+    update[`flags.${MODULE_ID}.${LEGACY_ORDER_FLAG}`] =
+      new foundry.data.operators.ForcedDeletion();
+  }
   if (Object.keys(update).length) await actor.update(update, {pokemonFollowerSync: true});
   return current || null;
 }
@@ -211,7 +214,9 @@ function createData(trainer, theme) {
 }
 
 async function deleteIds(scene, ids) {
-  const clean = [...new Set(ids.filter(Boolean))];
+  const clean = [...new Set(
+    ids.filter(id => id && scene?.tokens?.has(id))
+  )];
   if (clean.length) await scene.deleteEmbeddedDocuments("Token", clean, {pokemonFollowerSync: true});
 }
 
@@ -326,10 +331,11 @@ async function reconcileTrainer(trainer, {place = false} = {}) {
     update.disposition = disposition;
   }
 
+  // O token pode ter sido recolhido enquanto esta fila aguardava.
+  if (!scene.tokens.get(follower.id)) return;
+
   await scene.updateEmbeddedDocuments("Token", [update], {
     follower_updates: [],
-    forced: true,
-    teleport: place && !isCombatToken(follower),
     animate: false,
     pokemonFollowerSync: true
   });
@@ -347,29 +353,33 @@ function queueReconcile(trainer, options = {}) {
   return next;
 }
 
-function reconcileActorTokens(actor, options = {}) {
-  if (!isAuthority() || !canvas?.ready || !canvas.scene) return;
-  for (const trainer of canvas.scene.tokens.filter(t =>
-    !isManagedToken(t)
-    && !isCombatToken(t)
-    && t.actor?.id === actor.id
-    && t.actor?.getFlag(MODULE_ID, "combatProjection") !== true
-  )) {
-    void queueReconcile(trainer, options);
-  }
+async function reconcileActorTokens(actor, options = {}) {
+  if (!isAuthority() || !canvas?.ready || !canvas.scene) return [];
+  const jobs = canvas.scene.tokens
+    .filter(t =>
+      !isManagedToken(t)
+      && !isCombatToken(t)
+      && t.actor?.id === actor.id
+      && t.actor?.getFlag(MODULE_ID, "combatProjection") !== true
+    )
+    .map(trainer => queueReconcile(trainer, options));
+  return Promise.all(jobs);
 }
 
-export function refreshPokemonFollowersForActor(actor, options = {}) { reconcileActorTokens(actor, options); }
+export function refreshPokemonFollowersForActor(actor, options = {}) {
+  return reconcileActorTokens(actor, options);
+}
 
 export async function setPokemonFollowerTheme(actor, themeId) {
   if (!actor || actor.type !== "litm-character") throw new Error("Treinador não encontrado.");
   const id = themeId ? String(themeId) : "";
   if (id && !getPokemonThemes(actor).some(t => t.id === id)) throw new Error("Pokémon da equipe não encontrado.");
   await actor.update({
-    [`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: id,
-    [`flags.${MODULE_ID}.-=${LEGACY_ORDER_FLAG}`]: null
+    [`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: id
   }, {pokemonFollowerSync: true});
-  if (isAuthority()) reconcileActorTokens(actor, {place: Boolean(id)});
+  if (isAuthority()) {
+    await reconcileActorTokens(actor, {place: Boolean(id)});
+  }
   return id || null;
 }
 
@@ -500,13 +510,24 @@ function changedFlag(changes, name) {
 
 function onUpdateActor(actor, changes, options) {
   if (!isAuthority() || actor?.type !== "litm-character") return;
-  if (changedFlag(changes, FOLLOWER_FLAG) || changedFlag(changes, LEGACY_ORDER_FLAG)) reconcileActorTokens(actor, {place: true});
+  if (options?.pokemonFollowerSync) return;
+  if (changedFlag(changes, FOLLOWER_FLAG) || changedFlag(changes, LEGACY_ORDER_FLAG)) {
+    void reconcileActorTokens(actor, {place: true});
+  }
 }
 
 function isPokemonTheme(item) {
   return item?.type === "themebook" && item.getFlag(MODULE_ID, "pokemonTheme") === true && item.parent?.documentName === "Actor";
 }
-function onThemeChanged(item) { if (isAuthority() && isPokemonTheme(item)) reconcileActorTokens(item.parent); }
+function onThemeChanged(item, ...args) {
+  const operation = args.find(value =>
+    value && typeof value === "object" && value.pokemonManagerSync !== undefined
+  );
+  if (operation?.pokemonManagerSync) return;
+  if (isAuthority() && isPokemonTheme(item)) {
+    void reconcileActorTokens(item.parent);
+  }
+}
 
 function hudRoot(app, html) {
   return [html, html?.[0], app?.element, app?.element?.[0]].find(x => x instanceof HTMLElement) ?? null;
