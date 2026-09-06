@@ -46,7 +46,7 @@
 - [x] Aplicação e empilhamento de Status conforme o modelo do LitM
 - [ ] Expiração automática de Status por próxima ação / confronto
 - [x] Recuo, cura, dreno, queimadura, veneno, sono, paralisia e hesitação disponíveis via effects
-- [x] Áreas Pokémon como Regions v14 com cor por tipo e targeting dos Tokens dentro
+- [x] Áreas Pokémon como Regions v14 com cor por tipo e leitura dos Tokens dentro, sem alterar os targets do jogador
 - [x] Challenge Bio com botão Área para apresentar ameaça antes da reação dos jogadores
 - [x] Sequencer opcional para áreas animadas e VFX de golpe; JB2A opcional para assets
 - [x] Fallback nativo obrigatório sem módulos externos
@@ -54,8 +54,13 @@
 ## Backlog visual
 - [ ] Recolher Pokémon com efeito cinematográfico de retorno à Pokébola
 
+## Backlog — Configurações do módulo
+- [ ] Fazer uma auditoria completa de regras, automações e comportamentos atualmente fixos para decidir o que deve virar opção configurável do módulo, com defaults sensatos e escopo correto (mundo ou cliente). Revisar especialmente combate (ex.: exigir Rolagem Detalhada ao usar Tag de Golpe), targeting, consequências do Narrador, visibilidade, aplicação automática de efeitos, followers, VFX/áreas, interface e comportamentos padrão.
+
 ## Marco 3 — Pokémon-jogador
-- [ ] Finalizar etapa 4 do criador de Pokémon-jogador
+- [ ] Validar no Foundry a etapa de Golpes do Pokémon-jogador com seleção de 1–4 golpes
+- [ ] Validar Tags de Poder estruturadas de Golpe e identificação pelo VFX
+- [ ] Validar botão VFX no card de rolagem com targets congelados
 - [ ] Botão no header para reabrir Trainer/Pokémon-jogador no Criador em modo edição
 - [ ] Quest dos Themes Pokémon baseada em Nature, relação e evolução
 - [ ] Regras e ativação de Mega Evolução, Z-Move, Dynamax, Gigantamax, Terastalização, Reversão Primal e Ultra Burst

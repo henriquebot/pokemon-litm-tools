@@ -293,7 +293,7 @@ const ABILITY_PTBR_EXTRA = {
   forewarn: "Pressentir", unaware: "Desatento", filter: "Filtro", "slow-start": "Partida Lenta",
   scrappy: "Valentão", "storm-drain": "Dreno de Tempestade", "ice-body": "Corpo de Gelo", "solid-rock": "Rocha Sólida",
   "snow-warning": "Alerta de Neve", "honey-gather": "Coleta de Mel", frisk: "Inspeção", reckless: "Imprudente",
-  multitype: "Multitipo", "flower-gift": "Presente Floral", "bad-dreams": "Pesadelos"
+  multitype: "Multitipo", "flower-gift": "Presente Floral", "bad-dreams": "Pesadelos", competitive: "Competitivo", "friend-guard": "Guarda Amiga", infiltrator: "Infiltrador"
 };
 
 const AILMENT_PTBR = {
@@ -672,7 +672,10 @@ const ABILITY_EFFECT_PTBR = {
   download: "Analisa as defesas do adversário ao entrar em confronto e fortalece o atributo ofensivo mais vantajoso.",
   "iron-fist": "Golpes executados com os punhos recebem força adicional.",
   "leaf-guard": "Sob luz solar intensa, sua proteção natural impede novas condições negativas.",
-  scrappy: "Consegue atingir normalmente até adversários que, por sua natureza, seriam imunes a golpes Normais ou Lutadores."
+  scrappy: "Consegue atingir normalmente até adversários que, por sua natureza, seriam imunes a golpes Normais ou Lutadores.",
+  competitive: "Quando seus atributos são reduzidos por um adversário, reage fortalecendo bastante seu poder especial.",
+  "friend-guard": "Protege aliados próximos e reduz o impacto de ataques direcionados a eles.",
+  infiltrator: "Consegue atravessar ou ignorar barreiras e proteções que normalmente bloqueariam seus golpes."
 };
 
 const ABILITY_THREAT_RULES = {

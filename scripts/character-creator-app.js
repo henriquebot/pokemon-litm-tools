@@ -906,7 +906,7 @@ class PokemonCharacterCreatorApp
 
 
   get totalSteps() {
-    return this.mode === "pokemon" ? 4 : 7;
+    return this.mode === "pokemon" ? 5 : 7;
   }
 
 
@@ -1029,6 +1029,35 @@ class PokemonCharacterCreatorApp
   }
 
 
+  _pokemonPlayerMovesReady() {
+    if (
+      this.mode !== "pokemon"
+    ) {
+      return true;
+    }
+
+    if (
+      this.visualSource !== "catalog"
+    ) {
+      return true;
+    }
+
+    const moves =
+      Array.isArray(
+        this.pokemonPlayerMoveIds
+      )
+        ? this.pokemonPlayerMoveIds
+            .filter(Boolean)
+        : [];
+
+    return (
+      moves.length >= 1
+      &&
+      moves.length <= 4
+    );
+  }
+
+
   async _prepareContext(options) {
     const context =
       await super._prepareContext(
@@ -1046,6 +1075,12 @@ class PokemonCharacterCreatorApp
       (
         this.mode === "trainer"
         && [4, 5, 6].includes(this.step)
+      )
+      ||
+      (
+        this.mode === "pokemon"
+        && this.step === 4
+        && this.visualSource === "catalog"
       )
     ) {
       catalog =
@@ -1382,6 +1417,67 @@ class PokemonCharacterCreatorApp
     }
 
 
+    let pokemonPlayerMoveOptions = [];
+
+    if (
+      this.mode === "pokemon"
+      &&
+      this.step === 4
+      &&
+      this.visualSource === "catalog"
+    ) {
+      const entry =
+        catalog?.pokemon?.find(
+          item =>
+            item.id
+            ===
+            this.selectedId
+        )
+        ?? null;
+
+      if (entry) {
+        const options =
+          await loadPokemonTrainerCustomization(
+            entry,
+            "origin"
+          );
+
+        if (
+          !Array.isArray(
+            this.pokemonPlayerMoveIds
+          )
+          ||
+          !this.pokemonPlayerMoveIds.length
+        ) {
+          this.pokemonPlayerMoveIds =
+            (
+              options.defaults?.moveIds
+              ?? []
+            )
+              .filter(Boolean)
+              .slice(0, 4);
+        }
+
+        const selectedMoves =
+          new Set(
+            this.pokemonPlayerMoveIds
+          );
+
+        pokemonPlayerMoveOptions =
+          options.moveOptions.map(
+            row => ({
+              ...row,
+
+              selected:
+                selectedMoves.has(
+                  row.id
+                )
+            })
+          );
+      }
+    }
+
+
     let archetypes = [];
 
     let selectedArchetype = null;
@@ -1394,7 +1490,7 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "pokemon"
-        && [3, 4].includes(this.step)
+        && [3, 5].includes(this.step)
       )
     ) {
       const loadedArchetypes =
@@ -1466,7 +1562,7 @@ class PokemonCharacterCreatorApp
     if (
       (
         (this.mode === "trainer" && this.step === 7)
-        || (this.mode === "pokemon" && this.step === 4)
+        || (this.mode === "pokemon" && this.step === 5)
       )
       && selectedArchetype
     ) {
@@ -1633,15 +1729,22 @@ class PokemonCharacterCreatorApp
         this.mode === "pokemon"
         && this.step === 3
         && profileReady
+      )
+      ||
+      (
+        this.mode === "pokemon"
+        && this.step === 4
+        && this._pokemonPlayerMovesReady()
       );
 
 
     const canFinish =
       (
         this.mode === "pokemon"
-        && this.step === 4
+        && this.step === 5
         && visualReady
         && profileReady
+        && this._pokemonPlayerMovesReady()
         && this._themesReady()
       )
       ||
@@ -1695,6 +1798,10 @@ class PokemonCharacterCreatorApp
           && this.step === 3
         ),
 
+      stepIsPokemonMoves:
+        this.mode === "pokemon"
+        && this.step === 4,
+
       stepIsThemes:
         (
           this.mode === "trainer"
@@ -1702,7 +1809,7 @@ class PokemonCharacterCreatorApp
         )
         || (
           this.mode === "pokemon"
-          && this.step === 4
+          && this.step === 5
         ),
 
       isTrainer:
@@ -1732,6 +1839,14 @@ class PokemonCharacterCreatorApp
 
       pokemonReady:
         this._pokemonReady(),
+
+      pokemonPlayerMoveOptions,
+
+      pokemonPlayerMoveCount:
+        this.pokemonPlayerMoveIds.length,
+
+      pokemonPlayerMovesReady:
+        this._pokemonPlayerMovesReady(),
 
       dreamItems,
 
@@ -1891,6 +2006,9 @@ class PokemonCharacterCreatorApp
             this.pokemonCustomizations =
               [];
 
+            this.pokemonPlayerMoveIds =
+              [];
+
             this.dreamSelections =
               [];
 
@@ -1997,6 +2115,15 @@ class PokemonCharacterCreatorApp
               .visualSource;
 
           if (!source) return;
+
+          if (
+            this.mode === "pokemon"
+            &&
+            this.visualSource !== source
+          ) {
+            this.pokemonPlayerMoveIds =
+              [];
+          }
 
           this.visualSource =
             source;
@@ -2142,10 +2269,23 @@ class PokemonCharacterCreatorApp
       card.addEventListener(
         "click",
         () => {
-          this.selectedId =
+          const nextSelectedId =
             card.dataset.assetId
             ??
             null;
+
+          if (
+            this.mode === "pokemon"
+            &&
+            this.selectedId
+              !== nextSelectedId
+          ) {
+            this.pokemonPlayerMoveIds =
+              [];
+          }
+
+          this.selectedId =
+            nextSelectedId;
 
           const assetName =
             String(card.dataset.assetName ?? "").trim();
@@ -2551,6 +2691,72 @@ class PokemonCharacterCreatorApp
         row.moveIds = Array.from(ids);
         await this.render({ force: true });
       });
+    }
+
+
+    /* GOLPES DO POKEMON-JOGADOR */
+
+    for (
+      const input
+      of this.element.querySelectorAll(
+        "[data-pokemon-player-move]"
+      )
+    ) {
+      input.addEventListener(
+        "change",
+        async () => {
+          const id =
+            input.dataset.moveId;
+
+          if (!id) return;
+
+          const selected =
+            new Set(
+              Array.isArray(
+                this.pokemonPlayerMoveIds
+              )
+                ? this.pokemonPlayerMoveIds
+                : []
+            );
+
+          if (input.checked) {
+            selected.add(id);
+          } else {
+            selected.delete(id);
+          }
+
+          if (
+            selected.size < 1
+          ) {
+            input.checked = true;
+
+            ui.notifications.warn(
+              "Escolha pelo menos 1 golpe."
+            );
+
+            return;
+          }
+
+          if (
+            selected.size > 4
+          ) {
+            input.checked = false;
+
+            ui.notifications.warn(
+              "Escolha no maximo 4 golpes."
+            );
+
+            return;
+          }
+
+          this.pokemonPlayerMoveIds =
+            Array.from(selected);
+
+          await this.render({
+            force: true
+          });
+        }
+      );
     }
 
 
@@ -2977,6 +3183,16 @@ class PokemonCharacterCreatorApp
           }
 
           if (
+            this.mode === "pokemon"
+            &&
+            this.step === 4
+            &&
+            !this._pokemonPlayerMovesReady()
+          ) {
+            return;
+          }
+
+          if (
             (
               this.mode === "trainer"
               && this.step === 3
@@ -3050,6 +3266,8 @@ class PokemonCharacterCreatorApp
             !this._teamReady()
             ||
             !this._pokemonReady()
+            ||
+            !this._pokemonPlayerMovesReady()
             ||
             !this._themesReady()
           ) {
@@ -3217,10 +3435,57 @@ class PokemonCharacterCreatorApp
             }
 
 
+            let pokemonPlayerMoves =
+              [];
+
+            if (
+              this.mode === "pokemon"
+              &&
+              this.visualSource === "catalog"
+            ) {
+              const catalog =
+                await loadPokemonAssetCatalog();
+
+              const entry =
+                catalog.pokemon.find(
+                  item =>
+                    item.id
+                    ===
+                    this.selectedId
+                );
+
+              if (entry) {
+                const options =
+                  await loadPokemonTrainerCustomization(
+                    entry,
+                    "origin"
+                  );
+
+                const selected =
+                  new Set(
+                    this.pokemonPlayerMoveIds
+                  );
+
+                pokemonPlayerMoves =
+                  options.moveOptions
+                    .filter(
+                      move =>
+                        selected.has(
+                          move.id
+                        )
+                    )
+                    .slice(0, 4);
+              }
+            }
+
             await createCharacterThemes(
               actor,
               this.themeDrafts,
-              this.archetypeId
+              this.archetypeId,
+              {
+                pokemonMoves:
+                  pokemonPlayerMoves
+              }
             );
 
             await actor.setFlag(

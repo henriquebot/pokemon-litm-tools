@@ -1315,7 +1315,7 @@ function pokemonBiography(data, review) {
 
   return `
     <h2>${language === "en" ? "Actions / Effects" : "Ações / Efeitos"}</h2>
-    <p><em>${language === "en" ? "Prepared for future visual-effect buttons." : "Área preparada para os futuros botões de efeitos visuais."}</em></p>
+    <p><em>${language === "en" ? "Use the sheet buttons to present the move, area and structured effects." : "Use os botões da ficha para apresentar o golpe, a área e seus efeitos estruturados."}</em></p>
     <div class="pokemon-biography-effects" data-pokemon-effect-actions="true">
       ${actionRows}
       ${abilityRow}
@@ -1786,7 +1786,50 @@ export async function loadPokemonTrainerCustomization(
               move.methodLabel,
 
             description:
-              move.shortDescription
+              move.shortDescription,
+
+            englishName:
+              move.englishName,
+
+            type:
+              move.type,
+
+            damageClass:
+              move.damageClass,
+
+            power:
+              move.power,
+
+            accuracy:
+              move.accuracy,
+
+            target:
+              move.target,
+
+            meta:
+              foundry.utils.deepClone(
+                move.meta ?? {}
+              ),
+
+            statChanges:
+              foundry.utils.deepClone(
+                move.statChanges
+                ?? []
+              ),
+
+            effects:
+              foundry.utils.deepClone(
+                move.effects
+                ??
+                buildMoveEffects(
+                  move,
+                  might,
+                  data.contentLanguage
+                )
+              ),
+
+            vfx:
+              `${move.type}-move`
           })
         )
   };

@@ -31,7 +31,9 @@
       <div class="pokemon-wizard-line"></div>
       <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>3</span>Perfil</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>4</span>Temas</div>
+      <div class="pokemon-wizard-step {{#if stepIsPokemonMoves}}active{{/if}}"><span>4</span>Golpes</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>5</span>Temas</div>
     {{/if}}
 
   </header>
@@ -961,6 +963,90 @@
   {{/if}}
 
 
+  {{#if stepIsPokemonMoves}}
+
+    <section class="pokemon-wizard-page pokemon-builder-moves-page pokemon-player-moves-page">
+
+      <div class="pokemon-builder-moves-heading">
+
+        <div>
+          <h2>
+            Escolha seus golpes
+          </h2>
+
+          <p>
+            Selecione de 1 a 4 golpes que seu Pok&eacute;mon conhece no in&iacute;cio da aventura.
+          </p>
+        </div>
+
+        {{#if visualCatalog}}
+          <strong>
+            {{pokemonPlayerMoveCount}} / 4
+          </strong>
+        {{/if}}
+
+      </div>
+
+
+      {{#if visualUpload}}
+
+        <div class="pokemon-theme-guidance">
+          A imagem personalizada n&atilde;o possui uma esp&eacute;cie vinculada ao banco de dados.
+          Os golpes poder&atilde;o ser adicionados manualmente depois da cria&ccedil;&atilde;o.
+        </div>
+
+      {{else}}
+
+        <div class="pokemon-builder-move-list">
+
+          {{#each pokemonPlayerMoveOptions}}
+
+            <label
+              class="pokemon-builder-move-card{{#if selected}} selected{{/if}}"
+            >
+
+              <input
+                type="checkbox"
+                data-pokemon-player-move
+                data-move-id="{{id}}"
+                {{#if selected}}checked{{/if}}
+              >
+
+              <span class="pokemon-builder-move-main">
+
+                <span class="pokemon-builder-move-title">
+                  <strong>
+                    {{name}}
+                  </strong>
+
+                  <span>
+                    {{typeLabel}}
+                  </span>
+                </span>
+
+                <p>
+                  {{description}}
+                </p>
+
+                <small>
+                  {{methodLabel}}
+                </small>
+
+              </span>
+
+            </label>
+
+          {{/each}}
+
+        </div>
+
+      {{/if}}
+
+    </section>
+
+  {{/if}}
+
+
   {{#if stepIsThemes}}
 
     <section class="pokemon-wizard-page pokemon-themes-page">
@@ -977,6 +1063,15 @@
         Tags de Fraqueza representam limita&ccedil;&otilde;es que podem complicar suas a&ccedil;&otilde;es.
         A Quest &eacute; a pergunta que move aquele Tema.
       </div>
+
+      {{#if isPokemon}}
+        {{#if pokemonPlayerMoveCount}}
+          <div class="pokemon-player-moves-theme-note">
+            <i class="fa-solid fa-bolt"></i>
+            Os {{pokemonPlayerMoveCount}} golpes escolhidos ser&atilde;o adicionados automaticamente como Tags de Poder estruturadas do personagem.
+          </div>
+        {{/if}}
+      {{/if}}
 
       {{#if selectedArchetype}}
 

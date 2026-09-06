@@ -40,7 +40,8 @@ function buildTag(name) {
 export async function createCharacterThemes(
   actor,
   drafts,
-  archetypeId = null
+  archetypeId = null,
+  options = {}
 ) {
   if (
     !actor
@@ -101,6 +102,83 @@ export async function createCharacterThemes(
   }
 
 
+  const pokemonMoves =
+    (
+      Array.isArray(
+        options?.pokemonMoves
+      )
+        ? options.pokemonMoves
+        : []
+    )
+      .filter(
+        move =>
+          move?.id
+          &&
+          move?.name
+      )
+      .slice(0, 4)
+      .map(
+        move => ({
+          id:
+            cleanText(move.id),
+
+          name:
+            cleanText(move.name),
+
+          englishName:
+            cleanText(
+              move.englishName
+            ),
+
+          type:
+            cleanText(
+              move.type
+              || "normal"
+            ),
+
+          damageClass:
+            cleanText(
+              move.damageClass
+            ),
+
+          power:
+            Number(
+              move.power ?? 0
+            ),
+
+          accuracy:
+            move.accuracy
+            ?? null,
+
+          target:
+            cleanText(
+              move.target
+            ),
+
+          description:
+            cleanText(
+              move.description
+            ),
+
+          vfx:
+            cleanText(
+              move.vfx
+              ||
+              `${move.type || "normal"}-move`
+            ),
+
+          effects:
+            foundry.utils.deepClone(
+              Array.isArray(
+                move.effects
+              )
+                ? move.effects
+                : []
+            )
+        })
+      );
+
+
   const data =
     drafts
       .map(
@@ -116,6 +194,50 @@ export async function createCharacterThemes(
               .map(cleanText)
               .filter(Boolean)
               .map(buildTag);
+
+          const movePowerTags =
+            index === 0
+              ? pokemonMoves.map(
+                  move =>
+                    buildTag(
+                      move.name
+                    )
+                )
+              : [];
+
+          const pokemonMoveBindings =
+            index === 0
+              ? pokemonMoves.map(
+                  (
+                    move,
+                    moveIndex
+                  ) => ({
+                    tagIndex:
+                      powerTags.length
+                      + moveIndex,
+
+                    tagName:
+                      move.name,
+
+                    kind:
+                      "pokemonMove",
+
+                    moveId:
+                      move.id,
+
+                    type:
+                      move.type,
+
+                    vfx:
+                      move.vfx,
+
+                    effects:
+                      foundry.utils.deepClone(
+                        move.effects
+                      )
+                  })
+                )
+              : [];
 
           const weaknessTags =
             (
@@ -158,8 +280,10 @@ export async function createCharacterThemes(
               tabCategory:
                 "main",
 
-              powertags:
-                powerTags,
+              powertags: [
+                ...powerTags,
+                ...movePowerTags
+              ],
 
               weaknesstags:
                 weaknessTags,
@@ -181,7 +305,10 @@ export async function createCharacterThemes(
                 archetypeId,
 
                 themeRole:
-                  "character"
+                  "character",
+
+                pokemonMoveBindings:
+                  pokemonMoveBindings
               }
             }
           };
@@ -202,6 +329,12 @@ export async function createCharacterThemes(
     MODULE_ID,
     "characterArchetypeId",
     archetypeId
+  );
+
+  await actor.setFlag(
+    MODULE_ID,
+    "characterPokemonMoves",
+    pokemonMoves
   );
 
   return created;
