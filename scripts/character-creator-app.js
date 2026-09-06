@@ -892,6 +892,8 @@ class PokemonCharacterCreatorApp
 
   pokemonCustomizationSlot = 0;
 
+  pokemonPlayerMoveIds = [];
+
   dreamSelections = [];
 
   archetypeId = null;
