@@ -8,12 +8,62 @@ const ACTIVE_FLAG = "pokemonFollowerActive";
 const LEGACY_TOKEN_FLAG = "pokemonFollower";
 const FOLLOWING_FLAG = "following";
 const queues = new Map();
+const suspendedActorIds = new Set();
 let warned = false;
 
 function isAuthority() {
   if (!game.user?.isGM) return false;
   const gm = game.users.filter(u => u.active && u.isGM).sort((a, b) => a.id.localeCompare(b.id))[0];
   return gm?.id === game.user.id;
+}
+
+function queueKey(trainer) {
+  return trainer?.parent?.id && trainer?.id
+    ? `${trainer.parent.id}:${trainer.id}`
+    : null;
+}
+
+function followerSyncSuspended(actor) {
+  return !!actor?.id && suspendedActorIds.has(actor.id);
+}
+
+async function waitForActorQueues(actor) {
+  if (!actor || !canvas?.ready || !canvas.scene) return;
+
+  const jobs = canvas.scene.tokens
+    .filter(token =>
+      !isManagedToken(token)
+      && !isCombatToken(token)
+      && token.actor?.id === actor.id
+    )
+    .map(token => queues.get(queueKey(token)))
+    .filter(Boolean);
+
+  if (jobs.length) {
+    await Promise.all(
+      jobs.map(job => job.catch(() => {}))
+    );
+  }
+}
+
+export async function withPokemonFollowerSuspended(actor, callback) {
+  if (!actor || typeof callback !== "function") {
+    throw new Error("Treinador ou operação inválida.");
+  }
+
+  const actorId = actor.id;
+  suspendedActorIds.add(actorId);
+
+  try {
+    await waitForActorQueues(actor);
+    return await callback();
+  } finally {
+    suspendedActorIds.delete(actorId);
+
+    if (isAuthority()) {
+      await reconcileActorTokens(actor, { place: false });
+    }
+  }
 }
 
 function canFollow() {
@@ -223,6 +273,7 @@ async function deleteIds(scene, ids) {
 async function reconcileTrainer(trainer, {place = false} = {}) {
   if (
     !isAuthority()
+    || followerSyncSuspended(trainer?.actor)
     || !trainer?.parent
     || isManagedToken(trainer)
     || isCombatToken(trainer)
@@ -342,7 +393,7 @@ async function reconcileTrainer(trainer, {place = false} = {}) {
 }
 
 function queueReconcile(trainer, options = {}) {
-  const key = trainer?.parent?.id && trainer?.id ? `${trainer.parent.id}:${trainer.id}` : null;
+  const key = queueKey(trainer);
   if (!key) return Promise.resolve();
   const prev = queues.get(key) ?? Promise.resolve();
   const next = prev.catch(() => {}).then(() => reconcileTrainer(trainer, options)).catch(error => {
@@ -354,7 +405,12 @@ function queueReconcile(trainer, options = {}) {
 }
 
 async function reconcileActorTokens(actor, options = {}) {
-  if (!isAuthority() || !canvas?.ready || !canvas.scene) return [];
+  if (
+    !isAuthority()
+    || followerSyncSuspended(actor)
+    || !canvas?.ready
+    || !canvas.scene
+  ) return [];
   const jobs = canvas.scene.tokens
     .filter(t =>
       !isManagedToken(t)
@@ -377,7 +433,7 @@ export async function setPokemonFollowerTheme(actor, themeId) {
   await actor.update({
     [`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: id
   }, {pokemonFollowerSync: true});
-  if (isAuthority()) {
+  if (isAuthority() && !followerSyncSuspended(actor)) {
     await reconcileActorTokens(actor, {place: Boolean(id)});
   }
   return id || null;

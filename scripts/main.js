@@ -46,6 +46,7 @@ import {
 import {
   activatePokemonCombatEffects,
   startPokemonChallengeMoveArea,
+  cleanupPokemonInstance,
   deletePokemonCombatProjection
 } from "./pokemon-combat-effects.js";
 
@@ -88,6 +89,7 @@ Hooks.once("init", () => {
     deployPokemonTheme,
     recollectPokemonTheme,
     startPokemonChallengeMoveArea,
+    cleanupPokemonInstance,
     deletePokemonCombatProjection
   };
 });

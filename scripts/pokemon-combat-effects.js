@@ -1,7 +1,9 @@
 import {
   getPokemonThemes,
   getPokemonFollowerThemeId,
-  setPokemonFollowerTheme
+  setPokemonFollowerTheme,
+  removePokemonThemeTokens,
+  withPokemonFollowerSuspended
 } from "./pokemon-follower.js";
 
 import {
@@ -537,22 +539,29 @@ async function applyMoveDirect(payload) {
   return { report };
 }
 
-async function deleteCombatProjectionDirect(payload) {
-  if (!isAuthority()) throw new Error("Somente o GM ativo pode limpar Combat Actors.");
-
-  const instanceId = String(payload.instanceId ?? "");
-  if (!instanceId) return false;
+async function deletePokemonInstanceDocuments(instanceId) {
+  const id = String(instanceId ?? "");
+  if (!id) return false;
 
   for (const scene of game.scenes) {
     const ids = scene.tokens
-      .filter(token => token.getFlag(MODULE_ID, "pokemonInstanceId") === instanceId)
+      .filter(token =>
+        token.getFlag(MODULE_ID, "pokemonInstanceId") === id
+      )
       .map(token => token.id);
-    if (ids.length) await scene.deleteEmbeddedDocuments("Token", ids);
+
+    if (ids.length) {
+      await scene.deleteEmbeddedDocuments(
+        "Token",
+        ids,
+        { pokemonFollowerSync: true }
+      );
+    }
   }
 
   const actors = game.actors.filter(actor =>
     actor.getFlag(MODULE_ID, "combatProjection") === true
-    && actor.getFlag(MODULE_ID, "pokemonInstanceId") === instanceId
+    && actor.getFlag(MODULE_ID, "pokemonInstanceId") === id
   );
 
   for (const actor of actors) {
@@ -560,6 +569,55 @@ async function deleteCombatProjectionDirect(payload) {
   }
 
   return true;
+}
+
+async function cleanupPokemonInstanceDirect(payload) {
+  if (!isAuthority()) {
+    throw new Error("Somente o GM ativo pode limpar Pokémon.");
+  }
+
+  const trainer = game.actors.get(payload.trainerActorId);
+  const themeId = String(payload.themeId ?? "");
+  const instanceId = String(payload.instanceId ?? "");
+
+  if (!trainer || !instanceId) {
+    throw new Error("Treinador ou Pokémon não encontrado.");
+  }
+
+  return withPokemonFollowerSuspended(
+    trainer,
+    async () => {
+      if (
+        themeId
+        && getPokemonFollowerThemeId(trainer) === themeId
+      ) {
+        await setPokemonFollowerTheme(trainer, null);
+      }
+
+      if (themeId) {
+        await removePokemonThemeTokens(
+          trainer,
+          themeId
+        );
+      }
+
+      await deletePokemonInstanceDocuments(
+        instanceId
+      );
+
+      return true;
+    }
+  );
+}
+
+async function deleteCombatProjectionDirect(payload) {
+  if (!isAuthority()) {
+    throw new Error("Somente o GM ativo pode limpar Combat Actors.");
+  }
+
+  return deletePokemonInstanceDocuments(
+    payload.instanceId
+  );
 }
 
 function socketResponse(message) {
@@ -581,6 +639,7 @@ async function socketRequest(message) {
     if (message.action === "create-area") result = await createAreaDirect(message.payload);
     else if (message.action === "apply-move") result = await applyMoveDirect(message.payload);
     else if (message.action === "delete-combat") result = await deleteCombatProjectionDirect(message.payload);
+    else if (message.action === "cleanup-instance") result = await cleanupPokemonInstanceDirect(message.payload);
     else return;
 
     game.socket.emit(SOCKET_NAME, {
@@ -633,6 +692,7 @@ function requestAuthority(action, payload) {
     if (action === "create-area") return createAreaDirect(payload);
     if (action === "apply-move") return applyMoveDirect(payload);
     if (action === "delete-combat") return deleteCombatProjectionDirect(payload);
+    if (action === "cleanup-instance") return cleanupPokemonInstanceDirect(payload);
   }
 
   const requestId = randomId();
@@ -952,6 +1012,23 @@ export async function startPokemonChallengeMoveArea(actor, moveId) {
   if (!move) throw new Error("Golpe não encontrado no Challenge.");
 
   await placeMoveArea(actor, move, "challenge");
+}
+
+export async function cleanupPokemonInstance(
+  trainerActorId,
+  themeId,
+  instanceId
+) {
+  if (!trainerActorId || !instanceId) return false;
+
+  return requestAuthority(
+    "cleanup-instance",
+    {
+      trainerActorId,
+      themeId,
+      instanceId
+    }
+  );
 }
 
 export async function deletePokemonCombatProjection(instanceId) {
