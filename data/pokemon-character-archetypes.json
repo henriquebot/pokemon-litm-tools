@@ -167,6 +167,116 @@
       ]
     },
     {
+      "id": "pokemon-sem-memorias",
+      "name": "Sem Memórias",
+      "description": "Você despertou sem saber quem era, de onde veio ou por que está aqui. Sua jornada gira em torno de identidade, pistas e um passado que insiste em voltar.",
+      "themes": [
+        {
+          "name": "Fragmentos Perdidos",
+          "powerTags": [
+            "Reconhecer algo sem saber de onde",
+            "Lembranças em flashes",
+            "Seguir pistas sobre meu passado"
+          ],
+          "weaknessTags": [
+            "Não sei em quem confiar"
+          ],
+          "quest": "Quem eu era antes de tudo isso?"
+        },
+        {
+          "name": "Instintos que Restaram",
+          "powerTags": [
+            "Meu corpo se lembra",
+            "Reagir antes de pensar",
+            "Confiar nos sentidos"
+          ],
+          "weaknessTags": [
+            "Não entendo meus próprios impulsos"
+          ],
+          "quest": "O que meus instintos dizem sobre quem eu sou?"
+        },
+        {
+          "name": "Quem Sou Eu?",
+          "powerTags": [
+            "Reinventar a mim mesmo",
+            "Questionar certezas",
+            "Escolher quem quero ser"
+          ],
+          "weaknessTags": [
+            "Crise de identidade"
+          ],
+          "quest": "Sou definido pelo passado ou pelas minhas escolhas?"
+        },
+        {
+          "name": "Ecos do Passado",
+          "powerTags": [
+            "Reconhecer pessoas ou lugares",
+            "Sonhos reveladores",
+            "Sentir quando algo é familiar"
+          ],
+          "weaknessTags": [
+            "O passado pode me assustar"
+          ],
+          "quest": "Estou preparado para descobrir a verdade?"
+        }
+      ]
+    },
+    {
+      "id": "pokemon-humano-transformado",
+      "name": "Humano Transformado em Pokémon",
+      "description": "Você tinha uma vida humana e agora vive em um corpo Pokémon. Sua jornada gira em torno de adaptação, identidade e decidir se deseja recuperar o que perdeu.",
+      "themes": [
+        {
+          "name": "Mente Humana",
+          "powerTags": [
+            "Pensar como uma pessoa",
+            "Conhecimentos da vida humana",
+            "Entender costumes humanos"
+          ],
+          "weaknessTags": [
+            "Ainda penso como se tivesse mãos"
+          ],
+          "quest": "Quanto da minha antiga vida ainda define quem sou?"
+        },
+        {
+          "name": "Corpo Pokémon",
+          "powerTags": [
+            "Descobrir minhas novas capacidades",
+            "Aprender a usar este corpo",
+            "Sentidos Pokémon"
+          ],
+          "weaknessTags": [
+            "Ainda não conheço meus próprios limites"
+          ],
+          "quest": "Como faço deste corpo realmente meu?"
+        },
+        {
+          "name": "Duas Vidas",
+          "powerTags": [
+            "Ver os dois lados",
+            "Entender humanos e Pokémon",
+            "Experiência de outra vida"
+          ],
+          "weaknessTags": [
+            "Não pertenço completamente a nenhum dos dois mundos"
+          ],
+          "quest": "Onde é meu verdadeiro lugar?"
+        },
+        {
+          "name": "Quero Voltar?",
+          "powerTags": [
+            "Lembrar por quem vale a pena lutar",
+            "Não esquecer meu objetivo",
+            "Enfrentar o impossível para encontrar respostas"
+          ],
+          "weaknessTags": [
+            "Dividido entre passado e presente"
+          ],
+          "quest": "Se eu puder voltar a ser humano, ainda vou querer?"
+        }
+      ]
+    },
+    {
       "id": "pokemon-custom",
       "name": "Personalizado",
       "description": "Monte livremente seus Temas usando sugestões dos perfis de Personagem Pokémon.",

@@ -867,6 +867,8 @@ class PokemonCharacterCreatorApp
 
   characterNameSuggested = false;
 
+  pronoun = "";
+
   ownerId = "";
 
   visualSource = "catalog";
@@ -1041,7 +1043,7 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "trainer"
-        && [3, 4, 5].includes(this.step)
+        && [4, 5, 6].includes(this.step)
       )
     ) {
       catalog =
@@ -1136,7 +1138,7 @@ class PokemonCharacterCreatorApp
     let teamSlots = [];
 
     if (
-      this.step === 3
+      this.step === 4
       &&
       this.mode === "trainer"
     ) {
@@ -1256,7 +1258,7 @@ class PokemonCharacterCreatorApp
     let pokemonProfiles = [];
 
     if (
-      this.step === 4
+      this.step === 5
       && this.mode === "trainer"
       && Number(this.teamSize ?? 0) > 0
     ) {
@@ -1334,7 +1336,7 @@ class PokemonCharacterCreatorApp
     let dreamItems = [];
 
     if (
-      this.step === 5
+      this.step === 6
       &&
       this.mode === "trainer"
     ) {
@@ -1385,7 +1387,7 @@ class PokemonCharacterCreatorApp
     if (
       (
         this.mode === "trainer"
-        && [6, 7].includes(this.step)
+        && [3, 7].includes(this.step)
       )
       ||
       (
@@ -1605,24 +1607,24 @@ class PokemonCharacterCreatorApp
       (
         this.mode === "trainer"
         && this.step === 3
-        && this._teamReady()
+        && profileReady
       )
       ||
       (
         this.mode === "trainer"
         && this.step === 4
-        && this._pokemonReady()
+        && this._teamReady()
       )
       ||
       (
         this.mode === "trainer"
         && this.step === 5
+        && this._pokemonReady()
       )
       ||
       (
         this.mode === "trainer"
         && this.step === 6
-        && profileReady
       )
       ||
       (
@@ -1671,20 +1673,20 @@ class PokemonCharacterCreatorApp
 
       stepIsTeam:
         this.mode === "trainer"
-        && this.step === 3,
+        && this.step === 4,
 
       stepIsPokemonTeam:
         this.mode === "trainer"
-        && this.step === 4,
+        && this.step === 5,
 
       stepIsDream:
         this.mode === "trainer"
-        && this.step === 5,
+        && this.step === 6,
 
       stepIsArchetype:
         (
           this.mode === "trainer"
-          && this.step === 6
+          && this.step === 3
         )
         || (
           this.mode === "pokemon"
@@ -1712,6 +1714,9 @@ class PokemonCharacterCreatorApp
 
       characterName:
         this.characterName,
+
+      pronoun:
+        this.pronoun,
 
       users,
 
@@ -1828,9 +1833,10 @@ class PokemonCharacterCreatorApp
         && this.visualSource === "catalog"
       )
       ||
-      this.step === 3
-      ||
-      this.step === 5
+      (
+        this.mode === "trainer"
+        && [4, 6].includes(this.step)
+      )
     ) {
       refreshPokemonAssetPreviews(
         this.element,
@@ -1941,6 +1947,20 @@ class PokemonCharacterCreatorApp
           next.disabled =
             !(this.characterName.trim() && this._visualReady());
         }
+      }
+    );
+
+
+    const pronounInput =
+      this.element.querySelector(
+        "[data-role='character-pronoun']"
+      );
+
+    pronounInput?.addEventListener(
+      "input",
+      () => {
+        this.pronoun =
+          pronounInput.value;
       }
     );
 
@@ -2940,7 +2960,7 @@ class PokemonCharacterCreatorApp
 
           if (
             this.mode === "trainer"
-            && this.step === 3
+            && this.step === 4
             && !this._teamReady()
           ) {
             return;
@@ -2948,7 +2968,7 @@ class PokemonCharacterCreatorApp
 
           if (
             this.mode === "trainer"
-            && this.step === 4
+            && this.step === 5
             && !this._pokemonReady()
           ) {
             return;
@@ -2957,7 +2977,7 @@ class PokemonCharacterCreatorApp
           if (
             (
               this.mode === "trainer"
-              && this.step === 6
+              && this.step === 3
             )
             || (
               this.mode === "pokemon"
@@ -3199,6 +3219,12 @@ class PokemonCharacterCreatorApp
               actor,
               this.themeDrafts,
               this.archetypeId
+            );
+
+            await actor.setFlag(
+              MODULE_ID,
+              "characterPronoun",
+              this.pronoun.trim()
             );
 
             await actor.setFlag(

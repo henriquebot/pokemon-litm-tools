@@ -16,13 +16,13 @@
 
     {{#if showTrainerProgress}}
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsTeam}}active{{/if}}"><span>3</span>Equipe</div>
+      <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>3</span>Perfil</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsPokemonTeam}}active{{/if}}"><span>4</span>Pokémon</div>
+      <div class="pokemon-wizard-step {{#if stepIsTeam}}active{{/if}}"><span>4</span>Equipe</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsDream}}active{{/if}}"><span>5</span>Sonhos</div>
+      <div class="pokemon-wizard-step {{#if stepIsPokemonTeam}}active{{/if}}"><span>5</span>Pokémon</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>6</span>Perfil</div>
+      <div class="pokemon-wizard-step {{#if stepIsDream}}active{{/if}}"><span>6</span>Sonhos</div>
       <div class="pokemon-wizard-line"></div>
       <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>7</span>Temas</div>
     {{/if}}
@@ -121,6 +121,27 @@
               value="{{characterName}}"
               placeholder="Ex.: Ethan"
               autofocus
+            >
+
+          </div>
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Pronome
+          </label>
+
+          <div class="form-fields">
+
+            <input
+              type="text"
+              data-role="character-pronoun"
+              value="{{pronoun}}"
+              placeholder="Opcional"
+              autocomplete="off"
             >
 
           </div>
