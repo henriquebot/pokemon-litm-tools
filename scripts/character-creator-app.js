@@ -1109,7 +1109,7 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "trainer"
-        && [4, 5, 6].includes(this.step)
+        && [5, 6, 7].includes(this.step)
       )
       ||
       (
@@ -1210,7 +1210,7 @@ class PokemonCharacterCreatorApp
     let teamSlots = [];
 
     if (
-      this.step === 4
+      this.step === 5
       &&
       this.mode === "trainer"
     ) {
@@ -1330,7 +1330,7 @@ class PokemonCharacterCreatorApp
     let pokemonProfiles = [];
 
     if (
-      this.step === 5
+      this.step === 6
       && this.mode === "trainer"
       && Number(this.teamSize ?? 0) > 0
     ) {
@@ -1408,7 +1408,7 @@ class PokemonCharacterCreatorApp
     let dreamItems = [];
 
     if (
-      this.step === 6
+      this.step === 7
       &&
       this.mode === "trainer"
     ) {
@@ -1619,15 +1619,9 @@ class PokemonCharacterCreatorApp
     let selectedArchetype = null;
 
     if (
-      (
-        this.mode === "trainer"
-        && [3, 7].includes(this.step)
-      )
-      ||
-      (
-        this.mode === "pokemon"
-        && [3, 4].includes(this.step)
-      )
+      this.mode
+      &&
+      this.step >= 3
     ) {
       const loadedArchetypes =
         await loadCharacterArchetypes(this.mode);
@@ -1697,7 +1691,7 @@ class PokemonCharacterCreatorApp
 
     if (
       (
-        (this.mode === "trainer" && this.step === 7)
+        (this.mode === "trainer" && this.step === 4)
         || (this.mode === "pokemon" && this.step === 4)
       )
       && selectedArchetype
@@ -1858,18 +1852,19 @@ class PokemonCharacterCreatorApp
       (
         this.mode === "trainer"
         && this.step === 4
-        && this._teamReady()
+        && this._themesReady()
       )
       ||
       (
         this.mode === "trainer"
         && this.step === 5
-        && this._pokemonReady()
+        && this._teamReady()
       )
       ||
       (
         this.mode === "trainer"
         && this.step === 6
+        && this._pokemonReady()
       )
       ||
       (
@@ -1932,15 +1927,15 @@ class PokemonCharacterCreatorApp
 
       stepIsTeam:
         this.mode === "trainer"
-        && this.step === 4,
+        && this.step === 5,
 
       stepIsPokemonTeam:
         this.mode === "trainer"
-        && this.step === 5,
+        && this.step === 6,
 
       stepIsDream:
         this.mode === "trainer"
-        && this.step === 6,
+        && this.step === 7,
 
       stepIsArchetype:
         (
@@ -1955,7 +1950,7 @@ class PokemonCharacterCreatorApp
       stepIsThemes:
         (
           this.mode === "trainer"
-          && this.step === 7
+          && this.step === 4
         )
         || (
           this.mode === "pokemon"
@@ -2149,7 +2144,7 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "trainer"
-        && [4, 6].includes(this.step)
+        && [5, 7].includes(this.step)
       )
     ) {
       refreshPokemonAssetPreviews(
@@ -3431,7 +3426,7 @@ class PokemonCharacterCreatorApp
           if (
             this.mode === "trainer"
             && this.step === 4
-            && !this._teamReady()
+            && !this._themesReady()
           ) {
             return;
           }
@@ -3439,6 +3434,14 @@ class PokemonCharacterCreatorApp
           if (
             this.mode === "trainer"
             && this.step === 5
+            && !this._teamReady()
+          ) {
+            return;
+          }
+
+          if (
+            this.mode === "trainer"
+            && this.step === 6
             && !this._pokemonReady()
           ) {
             return;

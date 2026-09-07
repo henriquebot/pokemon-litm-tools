@@ -164,6 +164,26 @@ function normalizePokemonMoves(rows) {
 }
 
 
+function pokemonMoveDisplayName(move) {
+  const local = cleanText(move?.name || move?.id || "Golpe");
+  const english = cleanText(move?.englishName);
+
+  if (
+    !english
+    || local.localeCompare(
+      english,
+      undefined,
+      { sensitivity: "base" }
+    ) === 0
+    || local.endsWith("(" + english + ")")
+  ) {
+    return local;
+  }
+
+  return local + " (" + english + ")";
+}
+
+
 function profileThemeData(
   draft,
   index,
@@ -407,7 +427,7 @@ function pokemonMovesTheme(
       moves.length
         ? moves.map(
             move =>
-              move.name
+              pokemonMoveDisplayName(move)
           )
         : [
             "Golpes a definir"
@@ -447,7 +467,13 @@ function pokemonMovesTheme(
           index,
 
         tagName:
-          move.name,
+          pokemonMoveDisplayName(move),
+
+        englishName:
+          move.englishName,
+
+        pokemonDbUrl:
+          move.pokemonDbUrl,
 
         kind:
           "pokemonMove",

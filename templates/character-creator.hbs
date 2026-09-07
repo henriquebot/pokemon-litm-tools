@@ -18,13 +18,13 @@
       <div class="pokemon-wizard-line"></div>
       <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>3</span>Perfil</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsTeam}}active{{/if}}"><span>4</span>Equipe</div>
+      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>4</span>Temas</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsPokemonTeam}}active{{/if}}"><span>5</span>Pokémon</div>
+      <div class="pokemon-wizard-step {{#if stepIsTeam}}active{{/if}}"><span>5</span>Equipe</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsDream}}active{{/if}}"><span>6</span>Sonhos</div>
+      <div class="pokemon-wizard-step {{#if stepIsPokemonTeam}}active{{/if}}"><span>6</span>Pokémon</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>7</span>Temas</div>
+      <div class="pokemon-wizard-step {{#if stepIsDream}}active{{/if}}"><span>7</span>Time dos Sonhos</div>
     {{/if}}
 
     {{#if isPokemon}}
@@ -100,13 +100,10 @@
 
     <section class="pokemon-wizard-page pokemon-wizard-visual-page">
 
-      <h2>
-        Quem &eacute; voc&ecirc;?
-      </h2>
-
-      <p>
-        D&ecirc; um nome ao personagem e escolha quem vai control&aacute;-lo.
-      </p>
+      <div class="pokemon-character-section-heading">
+        <h2>Quem &eacute; voc&ecirc;?</h2>
+        <p>D&ecirc; um nome ao personagem e escolha quem vai control&aacute;-lo.</p>
+      </div>
 
 
       <div class="pokemon-character-fields pokemon-character-fields-compact">
@@ -188,13 +185,10 @@
 
       <hr class="pokemon-character-step-divider">
 
-      <h2>
-        Como seu personagem aparece no mapa?
-      </h2>
-
-      <p>
-        Escolha um visual pronto ou envie sua pr&oacute;pria imagem.
-      </p>
+      <div class="pokemon-character-section-heading">
+        <h2>Como seu personagem aparece no mapa?</h2>
+        <p>Escolha um visual pronto ou envie sua pr&oacute;pria imagem.</p>
+      </div>
 
 
       <nav class="pokemon-importer-tabs pokemon-visual-source-tabs">
@@ -223,12 +217,12 @@
 
       {{#if visualCatalog}}
 
-        <div class="pokemon-visual-help">
-          Escolha uma imagem abaixo. O m&oacute;dulo prepara automaticamente o retrato e o token.
-        </div>
+        <div class="pokemon-character-catalog-tools">
+          <div class="pokemon-visual-help">
+            Escolha uma imagem abaixo. O m&oacute;dulo prepara automaticamente o retrato e o token.
+          </div>
 
-
-        <div class="pokemon-importer-toolbar pokemon-character-visual-toolbar">
+          <div class="pokemon-importer-toolbar pokemon-character-visual-toolbar">
 
           <input
             type="search"
@@ -267,6 +261,7 @@
             Zoom
           </button>
 
+          </div>
         </div>
 
 

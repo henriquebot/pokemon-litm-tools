@@ -518,127 +518,163 @@ const MOVE_EFFECT_RULES = {
   }
 };
 
-function databaseMoveEffectPt(move, displayName) {
-  const text = String(
-    move?.shortEffectEn
-    ?? move?.flavorEn
-    ?? ""
-  )
-    .replace(/\$effect_chance/g, "")
+function cleanDatabaseEffect(value, effectChance = 0) {
+  return String(value ?? "")
+    .replace(
+      /\$effect_chance/g,
+      Number(effectChance) > 0
+        ? String(Number(effectChance)) + "%"
+        : "uma chance"
+    )
+    .replace(/\[([^\]]+)\]\{[^}]+\}/g, "$1")
+    .replace(/\{[^}]+\}/g, "")
+    .replace(/[\n\f]+/g, " ")
     .replace(/\s+/g, " ")
-    .trim()
-    .toLocaleLowerCase();
+    .trim();
+}
+
+
+function databaseMoveEffectPt(move, displayName) {
+  const directPt = cleanDatabaseEffect(
+    move?.effectTextPt
+    || move?.shortEffectPt
+    || "",
+    move?.effectChance
+  );
+
+  if (directPt) return directPt;
+
+  const english = cleanDatabaseEffect(
+    move?.effectTextEn
+    || move?.shortEffectEn
+    || move?.flavorEn
+    || "",
+    move?.effectChance
+  );
+
+  const text = english.toLocaleLowerCase();
 
   const knownDescriptions = {
     return:
       "Quanto maior a amizade e o vínculo com seu treinador ou companheiros, maior é a força deste golpe.",
-
     frustration:
       "Quanto menor a amizade e o vínculo com seu treinador, maior é a força deste golpe.",
-
     "natural-gift":
       "Consome a Berry segurada pelo Pokémon. O tipo e o poder do golpe dependem da Berry utilizada.",
-
     synthesis:
       "Recupera as próprias forças. A quantidade recuperada muda conforme as condições climáticas.",
-
     "hidden-power":
       "Libera um poder oculto cujo tipo depende das características internas do Pokémon.",
-
     flail:
       "Fica mais poderoso quanto mais ferido e próximo de cair estiver o usuário.",
-
     reversal:
       "Fica mais poderoso quanto mais ferido e próximo de cair estiver o usuário.",
-
     facade:
       "Fica muito mais poderoso quando o usuário está queimado, paralisado ou envenenado.",
-
     "gyro-ball":
       "Fica mais poderoso quanto mais lento o usuário for em comparação ao alvo.",
-
     "electro-ball":
-      "Fica mais poderoso quanto mais rápido o usuário for em comparação ao alvo."
+      "Fica mais poderoso quanto mais rápido o usuário for em comparação ao alvo.",
+    "focus-punch":
+      "O usuário se concentra antes de atacar. Se sofrer dano antes de executar o golpe, a concentração é quebrada e o golpe falha.",
+    "magic-coat":
+      "Cria uma barreira que devolve ao responsável vários movimentos de efeito que seriam usados contra o usuário.",
+    "light-screen":
+      "Cria uma tela de luz no lado do usuário que reduz o dano causado por ataques especiais durante alguns turnos.",
+    teleport:
+      "Permite abandonar um confronto contra Pokémon selvagens; em batalhas entre treinadores, pode retirar o usuário e substituí-lo por outro Pokémon.",
+    "guard-swap":
+      "Troca com o alvo as alterações acumuladas de Defesa e Defesa Especial.",
+    reflect:
+      "Cria uma barreira no lado do usuário que reduz o dano causado por ataques físicos durante alguns turnos.",
+    protect:
+      "Protege o usuário da maioria dos golpes naquele momento; usar repetidamente torna a proteção menos confiável.",
+    detect:
+      "Protege o usuário da maioria dos golpes naquele momento; usar repetidamente torna a proteção menos confiável.",
+    "power-swap":
+      "Troca com o alvo as alterações acumuladas de Ataque e Ataque Especial.",
+    "heart-swap":
+      "Troca com o alvo todas as alterações acumuladas de atributos.",
+    haze:
+      "Remove as alterações de atributos de todos os Pokémon envolvidos no confronto.",
+    "psych-up":
+      "Copia para o usuário as alterações de atributos acumuladas pelo alvo.",
+    "baton-pass":
+      "Retira o usuário do confronto e transfere ao substituto várias alterações e efeitos que estavam ativos sobre ele.",
+    "u-turn":
+      "Causa dano e, em seguida, permite retirar o usuário do confronto e substituí-lo por outro Pokémon.",
+    "volt-switch":
+      "Causa dano e, em seguida, permite retirar o usuário do confronto e substituí-lo por outro Pokémon.",
+    "parting-shot":
+      "Reduz o Ataque e o Ataque Especial do alvo e, em seguida, permite retirar o usuário do confronto.",
+    substitute:
+      "Consome parte da vitalidade do usuário para criar um substituto que recebe ataques e vários efeitos em seu lugar.",
+    rest:
+      "O usuário adormece, recupera completamente suas forças e remove outras condições negativas.",
+    "belly-drum":
+      "Sacrifica grande parte da vitalidade do usuário para elevar seu Ataque ao máximo.",
+    "pain-split":
+      "Soma a vitalidade atual do usuário e do alvo e divide o total igualmente entre os dois.",
+    "perish-song":
+      "Marca os Pokémon que ouvirem a canção; se permanecerem em batalha até a contagem terminar, são derrotados.",
+    "destiny-bond":
+      "Se o usuário for derrotado por um ataque antes de agir novamente, o responsável por derrotá-lo também cai.",
+    encore:
+      "Força o alvo a repetir por algum tempo o último movimento que utilizou.",
+    disable:
+      "Impede temporariamente que o alvo utilize o último movimento que executou.",
+    taunt:
+      "Provoca o alvo e o impede temporariamente de utilizar movimentos que não causam dano direto.",
+    torment:
+      "Impede o alvo de repetir o mesmo movimento em ações consecutivas."
   };
 
-  if (
-    knownDescriptions[
-      move?.id
-    ]
-  ) {
-    return knownDescriptions[
-      move.id
-    ];
+  if (knownDescriptions[move?.id]) {
+    return knownDescriptions[move.id];
   }
 
   if (!text) return "";
 
-  if (
-    /changes? the target'?s ability to insomnia/.test(text)
-  ) {
+  if (/changes? the target'?s ability to insomnia/.test(text)) {
     return "Substitui a Habilidade do alvo por Insônia, impedindo que ele adormeça enquanto o efeito permanecer.";
   }
-
-  if (
-    /suppresses? the target'?s ability/.test(text)
-  ) {
+  if (/suppresses? the target'?s ability/.test(text)) {
     return "Suprime temporariamente a Habilidade do alvo e impede que seus efeitos funcionem.";
   }
-
-  if (
-    /swaps?.*abilit/.test(text)
-  ) {
+  if (/swaps?.*abilit/.test(text)) {
     return "Troca as Habilidades do usuário e do alvo enquanto o efeito permanecer.";
   }
-
-  if (
-    /copies?.*target'?s ability/.test(text)
-  ) {
+  if (/copies?.*target'?s ability/.test(text)) {
     return "Copia temporariamente a Habilidade do alvo.";
   }
-
-  if (
-    /prevents?.*status moves/.test(text)
-  ) {
+  if (/prevents?.*status moves/.test(text)) {
     return "Impede temporariamente o alvo de utilizar movimentos que não causam dano direto.";
   }
-
-  if (
-    /same move twice in a row/.test(text)
-  ) {
+  if (/same move twice in a row/.test(text)) {
     return "Impede o alvo de repetir o mesmo movimento em ações consecutivas.";
   }
-
-  if (
-    /repeat.*last move/.test(text)
-  ) {
+  if (/repeat.*last move/.test(text)) {
     return "Força o alvo a continuar repetindo o último movimento utilizado.";
   }
-
-  if (
-    /changes? the weather to rain|summons? rain/.test(text)
-  ) {
+  if (/changes? the weather to rain|summons? rain/.test(text)) {
     return "Invoca chuva e altera as condições do campo de batalha.";
   }
-
-  if (
-    /sunlight|sunny/.test(text)
-    && /weather|intensif|summon|changes/.test(text)
-  ) {
+  if (/sunlight|sunny/.test(text) && /weather|intensif|summon|changes/.test(text)) {
     return "Intensifica a luz solar e altera as condições do campo de batalha.";
   }
-
-  if (
-    /terrain/.test(text)
-    && /grass/.test(text)
-  ) {
+  if (/terrain/.test(text) && /grass/.test(text)) {
     return "Transforma o terreno em um Campo de Grama e modifica como certas técnicas interagem com o campo.";
   }
+  if (/switches the user out|user switches out/.test(text)) {
+    return String(displayName) + " produz seu efeito e então permite retirar o usuário do confronto.";
+  }
 
-  if (
-    /switches the user out|user switches out/.test(text)
-  ) {
-    return String(displayName) + " permite atacar ou produzir seu efeito e então retirar o usuário do confronto.";
+  // Um efeito real do banco nunca vira uma descricao generica silenciosa.
+  // Quando ainda nao houver adaptacao PT-BR, mostramos o texto mecanico
+  // oficial em ingles, claramente identificado, em vez de inventar regra.
+  const regularOnly = /^(inflicts|deals) (regular |normal )?damage\.?$/.test(text);
+  if (english && !regularOnly) {
+    return "Efeito oficial (inglês): " + english;
   }
 
   return "";
@@ -1162,10 +1198,90 @@ function moveDescriptionPt(move, displayName) {
 
 export function moveShortDescription(move, displayName, language = getPokemonContentLanguage()) {
   if (language === "en") {
-    const text = String(move.shortEffectEn ?? move.flavorEn ?? "").replace(/\$effect_chance/g, String(move.effectChance || "its")).replace(/\s+/g, " ").trim();
+    const text = cleanDatabaseEffect(
+      move.effectTextEn
+      || move.shortEffectEn
+      || move.flavorEn
+      || "",
+      move.effectChance
+    );
     if (text) return text;
   }
   return moveDescriptionPt(move, displayName);
+}
+
+
+export async function loadPokemonMoveProfile(
+  moveId,
+  {
+    url = null,
+    language = getPokemonContentLanguage(),
+    might = "adventure"
+  } = {}
+) {
+  const id = String(moveId ?? "").trim().toLocaleLowerCase();
+  if (!id) throw new Error("Golpe sem ID canonico.");
+
+  const detail = await fetchPokeJson(
+    url || "https://pokeapi.co/api/v2/move/" + encodeURIComponent(id) + "/"
+  );
+
+  const effectPt = (detail.effect_entries ?? []).find(entry =>
+    ["pt-BR", "pt"].includes(entry.language?.name)
+  ) ?? null;
+  const effectEn = (detail.effect_entries ?? []).find(entry =>
+    entry.language?.name === "en"
+  ) ?? null;
+  const flavorEn = (detail.flavor_text_entries ?? []).find(entry =>
+    entry.language?.name === "en"
+  ) ?? null;
+  const meta = detail.meta ?? {};
+
+  const move = {
+    id: detail.name,
+    name: moveLabel(detail.name, detail.names, language),
+    englishName: moveEnglishLabel(detail.name, detail.names),
+    type: detail.type?.name ?? "normal",
+    damageClass: detail.damage_class?.name ?? "status",
+    power: Number(detail.power ?? 0),
+    accuracy: detail.accuracy == null ? null : Number(detail.accuracy),
+    target: detail.target?.name ?? "selected-pokemon",
+    effectChance: Number(detail.effect_chance ?? 0),
+    effectTextPt: String(effectPt?.effect ?? "").trim(),
+    shortEffectPt: String(effectPt?.short_effect ?? "").trim(),
+    effectTextEn: String(effectEn?.effect ?? "").trim(),
+    shortEffectEn: String(effectEn?.short_effect ?? "").trim(),
+    flavorEn: String(flavorEn?.flavor_text ?? "")
+      .replace(/[\n\f]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+    statChanges: (detail.stat_changes ?? []).map(change => ({
+      change: Number(change.change ?? 0),
+      stat: change.stat?.name ?? ""
+    })).filter(change => !!change.stat),
+    meta: {
+      ailment: meta.ailment?.name ?? "none",
+      ailmentChance: Number(meta.ailment_chance ?? 0),
+      category: meta.category?.name ?? "",
+      criticalRate: Number(meta.crit_rate ?? 0),
+      drain: Number(meta.drain ?? 0),
+      flinchChance: Number(meta.flinch_chance ?? 0),
+      healing: Number(meta.healing ?? 0),
+      minHits: Number(meta.min_hits ?? 0),
+      maxHits: Number(meta.max_hits ?? 0),
+      minTurns: Number(meta.min_turns ?? 0),
+      maxTurns: Number(meta.max_turns ?? 0),
+      statChance: Number(meta.stat_chance ?? 0)
+    },
+    pokemonDbUrl:
+      "https://pokemondb.net/move/" + encodeURIComponent(detail.name)
+  };
+
+  move.shortDescription = moveShortDescription(move, move.name, language);
+  move.description = move.shortDescription;
+  move.effects = buildMoveEffects(move, might, language);
+  move.vfx = String(move.type ?? "normal") + "-move";
+  return move;
 }
 
 

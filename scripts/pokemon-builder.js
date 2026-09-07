@@ -492,7 +492,10 @@ async function loadPokemonBuildData(entry, might) {
     try {
       const detail = await fetchPokeJson(source.url);
       const meta = detail.meta ?? {};
-      const effectEn = detail.effect_entries?.find(entry => entry.language?.name === "en");
+      const effectPt = (detail.effect_entries ?? []).find(entry =>
+        ["pt-BR", "pt"].includes(entry.language?.name)
+      ) ?? null;
+      const effectEn = detail.effect_entries?.find(entry => entry.language?.name === "en") ?? null;
       const flavorEn = detail.flavor_text_entries?.find(entry => entry.language?.name === "en");
       const methodInfo = learnMethodInfo(source.methods, source.level, language);
 
@@ -511,8 +514,12 @@ async function loadPokemonBuildData(entry, might) {
         methodLabel: methodInfo.label,
         target: detail.target?.name ?? "selected-pokemon",
         effectChance: Number(detail.effect_chance ?? 0),
+        effectTextPt: String(effectPt?.effect ?? "").replace(/\s+/g, " ").trim(),
+        shortEffectPt: String(effectPt?.short_effect ?? "").replace(/\s+/g, " ").trim(),
+        effectTextEn: String(effectEn?.effect ?? "").replace(/\s+/g, " ").trim(),
         shortEffectEn: String(effectEn?.short_effect ?? "").replace(/\s+/g, " ").trim(),
         flavorEn: String(flavorEn?.flavor_text ?? "").replace(/[\n\f]+/g, " ").replace(/\s+/g, " ").trim(),
+        pokemonDbUrl: "https://pokemondb.net/move/" + encodeURIComponent(detail.name),
         statChanges: (detail.stat_changes ?? []).map(change => ({
           change: Number(change.change ?? 0),
           stat: change.stat?.name ?? ""
@@ -1205,6 +1212,12 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
       accuracy: move.accuracy,
       learnedAt: move.level,
       target: move.target,
+      description: move.shortDescription ?? move.description ?? "",
+      pokemonDbUrl: move.pokemonDbUrl ?? ("https://pokemondb.net/move/" + encodeURIComponent(move.id)),
+      effectTextPt: move.effectTextPt ?? "",
+      shortEffectPt: move.shortEffectPt ?? "",
+      effectTextEn: move.effectTextEn ?? "",
+      shortEffectEn: move.shortEffectEn ?? "",
       meta: foundry.utils.deepClone(move.meta ?? {}),
       statChanges: foundry.utils.deepClone(move.statChanges ?? []),
       effects: foundry.utils.deepClone(
@@ -1296,8 +1309,11 @@ function pokemonBiography(data, review) {
         data-pokemon-effect-id="${escapeHTML(move.id)}"
         data-pokemon-effect-type="${escapeHTML(move.type)}"
         data-pokemon-effect-target="${escapeHTML(move.target ?? "selected-pokemon")}">
-        <h3><i class="fa-solid fa-bolt"></i> ${escapeHTML(pokemonMoveDisplayName(move, displayName))}</h3>
-        <p>${escapeHTML(threat.description)}</p>
+        <div class="pokemon-biography-effect-main">
+          <h3><i class="fa-solid fa-bolt"></i> ${escapeHTML(pokemonMoveDisplayName(move, displayName))}</h3>
+          <p>${escapeHTML(threat.description)}</p>
+        </div>
+        <div class="pokemon-biography-effect-actions" data-pokemon-biography-actions="true"></div>
       </article>
     `;
   }).join("");
@@ -1809,6 +1825,18 @@ export async function loadPokemonTrainerCustomization(
 
             description:
               move.shortDescription,
+
+            effectTextPt:
+              move.effectTextPt ?? "",
+
+            shortEffectPt:
+              move.shortEffectPt ?? "",
+
+            effectTextEn:
+              move.effectTextEn ?? "",
+
+            shortEffectEn:
+              move.shortEffectEn ?? "",
 
             pokemonDbUrl:
               "https://pokemondb.net/move/"

@@ -11,7 +11,8 @@ import {
 } from "./pokemon-combat.js";
 
 import {
-  buildMoveEffects
+  buildMoveEffects,
+  loadPokemonMoveProfile
 } from "./pokemon-content.js";
 
 const MODULE_ID = "pokemon-litm-tools";
@@ -46,7 +47,7 @@ const JB2A_PATHS = {
   electric: ["jb2a.lightning_bolt", "jb2a.chain_lightning"],
   poison: ["jb2a.poison_spray"],
   psychic: ["jb2a.energy_beam"],
-  grass: ["jb2a.energy_beam.green", "jb2a.energy_beam", "jb2a.entangle"],
+  grass: ["jb2a.energy_beam", "jb2a.entangle"],
   water: ["jb2a.water_bolt"],
   fighting: ["jb2a.unarmed_strike"],
   normal: ["jb2a.bullet.01"]
@@ -97,49 +98,227 @@ function sourceThemeForCombatActor(actor) {
   return game.actors.get(trainerId)?.items?.get(themeId) ?? null;
 }
 
-function pokemonMovesForActor(actor) {
-  const direct =
-    actor?.getFlag?.(
-      MODULE_ID,
-      "moves"
-    );
-
-  if (
-    Array.isArray(direct)
-    &&
-    direct.length
-  ) {
-    return direct;
-  }
-
-  const characterMoves =
-    actor?.getFlag?.(
-      MODULE_ID,
-      "characterPokemonMoves"
-    );
-
-  if (
-    Array.isArray(characterMoves)
-    &&
-    characterMoves.length
-  ) {
-    return characterMoves;
-  }
-
-  return [];
+function moveIdentity(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 
-function moveForActor(
-  actor,
-  moveId
-) {
+function currentTagName(tag) {
+  return String(
+    tag?.name
+    ?? tag?.label
+    ?? ""
+  ).trim();
+}
+
+
+function canonicalMoveFromTag(label) {
+  const value = String(label ?? "").trim();
+  const match = value.match(/\(([^()]+)\)\s*$/);
+  const englishName = String(match?.[1] ?? "").trim();
+
+  return {
+    label: value,
+    englishName,
+    moveId: englishName ? moveIdentity(englishName) : null
+  };
+}
+
+
+function movesFromPokemonItem(item) {
+  const flags = item?.flags?.[MODULE_ID] ?? {};
+  const cached = Array.isArray(flags.moves)
+    ? flags.moves
+    : [];
+  const bindings = Array.isArray(flags.pokemonMoveBindings)
+    ? flags.pokemonMoveBindings
+    : Array.isArray(flags.tagBindings)
+      ? flags.tagBindings
+      : [];
+
+  if (!bindings.length) return cached;
+
+  const tags = Array.isArray(item?.system?.powertags)
+    ? item.system.powertags
+    : [];
+
+  const rows = [];
+
+  for (const binding of bindings) {
+    if (binding?.kind !== "pokemonMove") continue;
+
+    const index = Number(binding.tagIndex);
+    const tag = Number.isInteger(index) ? tags[index] : null;
+    const name = currentTagName(tag) || String(binding.tagName ?? "").trim();
+    if (!name) continue;
+
+    const parsed = canonicalMoveFromTag(name);
+    const originalName = String(binding.tagName ?? "").trim();
+    const changed = originalName
+      ? moveIdentity(name) !== moveIdentity(originalName)
+      : false;
+
+    const id = parsed.moveId
+      || (!changed ? String(binding.moveId ?? "").trim() : "");
+
+    if (!id) {
+      rows.push({
+        id: "",
+        name,
+        englishName: "",
+        type: "normal",
+        effects: [],
+        unresolved: true
+      });
+      continue;
+    }
+
+    const base = cached.find(move => move?.id === id)
+      ?? cached.find(move => move?.id === binding.moveId)
+      ?? {};
+
+    rows.push({
+      ...foundry.utils.deepClone(base),
+      id,
+      name,
+      englishName: parsed.englishName || base.englishName || binding.englishName || "",
+      type: base.type || binding.type || "normal",
+      vfx: base.vfx || binding.vfx || ((base.type || binding.type || "normal") + "-move"),
+      effects: foundry.utils.deepClone(base.effects || binding.effects || []),
+      _needsEnrichment:
+        !base.id
+        || base.id !== id
+        || !base.description
+    });
+  }
+
+  return rows;
+}
+
+
+function dedupeMoves(rows) {
+  const result = [];
+  const seen = new Set();
+
+  for (const move of rows ?? []) {
+    const key = move?.id
+      ? "id:" + move.id
+      : "name:" + moveIdentity(move?.name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(move);
+  }
+
+  return result;
+}
+
+
+function pokemonMovesForActor(actor) {
+  if (!actor) return [];
+
+  const itemMoves = [];
+  let hasPlayerMoveTheme = false;
+
+  for (const item of actor.items ?? []) {
+    const role = item.getFlag?.(MODULE_ID, "themeRole")
+      ?? item.flags?.[MODULE_ID]?.themeRole;
+    if (role === "pokemon-moves") hasPlayerMoveTheme = true;
+
+    const rows = movesFromPokemonItem(item);
+    if (rows.length) itemMoves.push(...rows);
+  }
+
+  if (hasPlayerMoveTheme) {
+    return dedupeMoves(itemMoves);
+  }
+
+  const collected = [...itemMoves];
+  const direct = actor.getFlag?.(MODULE_ID, "moves");
+  const characterMoves = actor.getFlag?.(MODULE_ID, "characterPokemonMoves");
+
+  if (Array.isArray(direct)) collected.push(...direct);
+  if (Array.isArray(characterMoves)) collected.push(...characterMoves);
+
+  return dedupeMoves(collected);
+}
+
+
+const resolvedMoveCache = new Map();
+
+async function enrichMoveForActor(actor, move) {
+  if (!move?.id) return move;
+
+  if (
+    !move._needsEnrichment
+    && move.type
+    && Array.isArray(move.effects)
+    && move.description
+  ) {
+    return move;
+  }
+
+  const language = actor?.getFlag?.(MODULE_ID, "contentLanguage") ?? "pt-BR";
+  const might = actor?.getFlag?.(MODULE_ID, "might") ?? "origin";
+  const key = [move.id, language, might].join("|");
+
+  if (!resolvedMoveCache.has(key)) {
+    resolvedMoveCache.set(
+      key,
+      loadPokemonMoveProfile(
+        move.id,
+        { language, might }
+      ).catch(error => {
+        resolvedMoveCache.delete(key);
+        console.warn("Pokemon LITM Tools | Move dinamico:", move.id, error);
+        return null;
+      })
+    );
+  }
+
+  const detail = await resolvedMoveCache.get(key);
+  if (!detail) return move;
+
+  return {
+    ...detail,
+    ...move,
+    type: detail.type ?? move.type ?? "normal",
+    damageClass: detail.damageClass ?? move.damageClass,
+    power: detail.power ?? move.power,
+    accuracy: detail.accuracy ?? move.accuracy,
+    target: detail.target ?? move.target,
+    description: detail.description ?? detail.shortDescription ?? move.description ?? "",
+    pokemonDbUrl: detail.pokemonDbUrl ?? move.pokemonDbUrl,
+    meta: foundry.utils.deepClone(detail.meta ?? move.meta ?? {}),
+    statChanges: foundry.utils.deepClone(detail.statChanges ?? move.statChanges ?? []),
+    effects: foundry.utils.deepClone(detail.effects ?? move.effects ?? []),
+    _needsEnrichment: false
+  };
+}
+
+
+async function resolvedPokemonMovesForActor(actor) {
+  return Promise.all(
+    pokemonMovesForActor(actor).map(move => enrichMoveForActor(actor, move))
+  );
+}
+
+
+function moveForActor(actor, moveId) {
   return pokemonMovesForActor(actor)
-    .find(
-      move =>
-        move?.id === moveId
-    )
+    .find(move => move?.id === moveId)
     ?? null;
+}
+
+
+async function resolveMoveForActor(actor, moveId) {
+  const move = moveForActor(actor, moveId);
+  return move ? enrichMoveForActor(actor, move) : null;
 }
 
 function effectsForMove(actor, move) {
@@ -313,7 +492,12 @@ function databasePath(candidates) {
   if (!sequenceAvailable()) return null;
   for (const path of candidates ?? []) {
     try {
-      if (globalThis.Sequencer?.Database?.getEntry?.(path)) return path;
+      if (
+        globalThis.Sequencer?.Database?.getEntry?.(
+          path,
+          { softFail: true }
+        )
+      ) return path;
     } catch {}
   }
   return null;
@@ -608,7 +792,7 @@ async function createAreaDirect(payload) {
 
   const scene = game.scenes.get(payload.sceneId);
   const sourceActor = game.actors.get(payload.sourceActorId);
-  const move = moveForActor(sourceActor, payload.moveId);
+  const move = await resolveMoveForActor(sourceActor, payload.moveId);
   if (!scene || !sourceActor || !move) {
     throw new Error("Origem ou golpe da Área Pokémon não encontrado.");
   }
@@ -686,7 +870,7 @@ async function applyMoveDirect(payload) {
 
   const scene = game.scenes.get(payload.sceneId);
   const sourceActor = game.actors.get(payload.sourceActorId);
-  const move = moveForActor(sourceActor, payload.moveId);
+  const move = await resolveMoveForActor(sourceActor, payload.moveId);
   if (!scene || !sourceActor || !move) {
     throw new Error("Pokémon ou golpe não encontrado.");
   }
@@ -745,6 +929,67 @@ async function applyMoveDirect(payload) {
 
   return { report };
 }
+
+
+async function applyMoveEffectDirect(payload) {
+  if (!isAuthority()) {
+    throw new Error("Somente o GM ativo pode aplicar efeitos Pokémon.");
+  }
+
+  const scene = game.scenes.get(payload.sceneId);
+  const sourceActor = game.actors.get(payload.sourceActorId);
+  const sourceToken = scene?.tokens?.get(payload.sourceTokenId) ?? null;
+  const move = await resolveMoveForActor(sourceActor, payload.moveId);
+
+  if (!scene || !sourceActor || !move) {
+    throw new Error("Origem ou golpe nao encontrado.");
+  }
+
+  const effects = effectsForMove(sourceActor, move);
+  const effectIndex = Number(payload.effectIndex);
+  const effect = Number.isInteger(effectIndex)
+    ? effects[effectIndex]
+    : null;
+
+  if (!effect) throw new Error("Efeito do golpe nao encontrado.");
+
+  const targetKind = String(effect.target ?? "target").toLowerCase();
+  if (targetKind === "scene") {
+    return { sceneEffect: true, name: effect.name };
+  }
+
+  const report = [];
+
+  if (targetKind === "self") {
+    const targetActor = sourceToken?.actor ?? sourceActor;
+    const applied = await applyEffectsToActor(targetActor, [effect], 1, 3);
+    report.push({ actorId: targetActor.id, applied });
+    return { report };
+  }
+
+  const targetTokens = (payload.targetTokenIds ?? [])
+    .map(id => scene.tokens.get(id))
+    .filter(Boolean);
+
+  if (!targetTokens.length) {
+    throw new Error("A rolagem nao possui alvo para este efeito.");
+  }
+
+  for (const token of targetTokens) {
+    if (!token.actor) continue;
+    const multiplier = multiplierFor(token.actor, move.type);
+    const applied = await applyEffectsToActor(token.actor, [effect], multiplier, 3);
+    report.push({
+      actorId: token.actor.id,
+      tokenId: token.id,
+      multiplier,
+      applied
+    });
+  }
+
+  return { report };
+}
+
 
 async function deletePokemonInstanceDocuments(instanceId) {
   const id = String(instanceId ?? "");
@@ -845,6 +1090,7 @@ async function socketRequest(message) {
     let result;
     if (message.action === "create-area") result = await createAreaDirect(message.payload);
     else if (message.action === "apply-move") result = await applyMoveDirect(message.payload);
+    else if (message.action === "apply-effect") result = await applyMoveEffectDirect(message.payload);
     else if (message.action === "delete-combat") result = await deleteCombatProjectionDirect(message.payload);
     else if (message.action === "cleanup-instance") result = await cleanupPokemonInstanceDirect(message.payload);
     else return;
@@ -906,6 +1152,7 @@ function requestAuthority(action, payload) {
   if (gm.id === game.user.id) {
     if (action === "create-area") return createAreaDirect(payload);
     if (action === "apply-move") return applyMoveDirect(payload);
+    if (action === "apply-effect") return applyMoveEffectDirect(payload);
     if (action === "delete-combat") return deleteCombatProjectionDirect(payload);
     if (action === "cleanup-instance") return cleanupPokemonInstanceDirect(payload);
   }
@@ -944,12 +1191,12 @@ function placementPoint(event) {
   return global ?? { x: 0, y: 0 };
 }
 
-async function placeMoveArea(sourceActor, move, mode) {
+async function placeMoveArea(sourceActor, move, mode, sourceTokenOverride = null) {
   if (!canvas?.ready || !canvas?.stage || !canvas.scene) {
     throw new Error("O canvas não está pronto.");
   }
 
-  const sourceToken = sourceTokenForActor(sourceActor);
+  const sourceToken = sourceTokenOverride ?? sourceTokenForActor(sourceActor);
   if (!sourceToken) {
     throw new Error("Coloque o Pokémon na cena antes de gerar a área.");
   }
@@ -1273,6 +1520,55 @@ function sheetActor(app) {
   }
 
   return null;
+}
+
+
+async function applyMoveEffectAction(
+  sourceActor,
+  move,
+  effectIndex,
+  explicitTargetIds = null,
+  sourceTokenOverride = null
+) {
+  if (!canvas?.scene) {
+    throw new Error("Abra uma cena antes de aplicar o efeito.");
+  }
+
+  const sourceToken = sourceTokenOverride ?? sourceTokenForActor(sourceActor);
+  if (!sourceToken) {
+    throw new Error("Token do Pokemon nao encontrado na cena.");
+  }
+
+  const effects = effectsForMove(sourceActor, move);
+  const effect = effects[Number(effectIndex)];
+  if (!effect) throw new Error("Efeito nao encontrado.");
+
+  const targetKind = String(effect.target ?? "target").toLowerCase();
+  if (targetKind === "scene") {
+    ui.notifications.info(
+      "Este efeito altera o campo. Use a Area como referencia visual e resolva a mudanca na cena."
+    );
+    return;
+  }
+
+  const targetIds = targetKind === "self"
+    ? [sourceToken.id]
+    : (Array.isArray(explicitTargetIds)
+        ? explicitTargetIds
+        : targetDocuments().map(token => token.id));
+
+  if (!targetIds.length) {
+    throw new Error("Marque pelo menos um alvo antes de aplicar o efeito.");
+  }
+
+  return requestAuthority("apply-effect", {
+    sceneId: canvas.scene.id,
+    sourceActorId: sourceActor.id,
+    sourceTokenId: sourceToken.id,
+    moveId: move.id,
+    effectIndex: Number(effectIndex),
+    targetTokenIds: targetIds
+  });
 }
 
 
@@ -1605,258 +1901,129 @@ async function playActorMoveVfx(
 }
 
 
-function addChallengeBiographyActions(
-  actor,
-  root
-) {
+function ensureBiographyMoveCardLayout(card) {
+  let main = card.querySelector(":scope > .pokemon-biography-effect-main");
+
+  if (!main) {
+    main = document.createElement("div");
+    main.className = "pokemon-biography-effect-main";
+
+    const heading = card.querySelector(":scope > h3");
+    const description = card.querySelector(":scope > p");
+
+    if (heading) main.append(heading);
+    if (description) main.append(description);
+    card.prepend(main);
+  }
+
+  let controls = card.querySelector(":scope > .pokemon-biography-effect-actions");
+  if (!controls) {
+    controls = document.createElement("div");
+    controls.className = "pokemon-biography-effect-actions";
+    controls.dataset.pokemonBiographyActions = "true";
+    card.append(controls);
+  }
+
+  controls.dataset.pokemonBiographyActions = "true";
+  return { main, controls };
+}
+
+
+function addChallengeBiographyActions(actor, root) {
   if (!root || !actor) return;
 
-  const effectsRoot =
-    root.querySelector(
-      "[data-pokemon-effect-actions='true']"
-    );
-
-  const pokedexUrl =
-    actor.getFlag?.(
-      MODULE_ID,
-      "pokedexUrl"
-    );
+  const effectsRoot = root.querySelector("[data-pokemon-effect-actions='true']");
+  const pokedexUrl = actor.getFlag?.(MODULE_ID, "pokedexUrl");
 
   if (
     effectsRoot
-    &&
-    pokedexUrl
-    &&
-    !root.querySelector(
-      "[data-pokemon-challenge-pokedex]"
-    )
+    && pokedexUrl
+    && !root.querySelector("[data-pokemon-challenge-pokedex]")
   ) {
-    const toolbar =
-      document.createElement(
-        "div"
-      );
+    const toolbar = document.createElement("div");
+    toolbar.className = "pokemon-biography-toolbar";
 
-    toolbar.className =
-      "pokemon-biography-toolbar";
-
-    const button =
-      document.createElement(
-        "button"
-      );
-
-    button.type =
-      "button";
-
-    button.dataset.pokemonChallengePokedex =
-      "true";
-
-    button.innerHTML =
-      '<i class="fa-solid fa-mobile-screen-button"></i> Pokédex';
-
-    button.addEventListener(
-      "click",
-      event => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        window.open(
-          pokedexUrl,
-          "_blank",
-          "noopener,noreferrer"
-        );
-      }
-    );
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.pokemonChallengePokedex = "true";
+    button.innerHTML = '<i class="fa-solid fa-mobile-screen-button"></i> Pokédex';
+    button.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      window.open(pokedexUrl, "_blank", "noopener,noreferrer");
+    });
 
     toolbar.append(button);
     effectsRoot.before(toolbar);
   }
 
-  if (!game.user.isGM) return;
+  for (const card of root.querySelectorAll(
+    ".pokemon-biography-effect[data-pokemon-effect-kind='move']"
+  )) {
+    const { controls } = ensureBiographyMoveCardLayout(card);
+    controls.replaceChildren();
 
-  for (
-    const card
-    of root.querySelectorAll(
-      ".pokemon-biography-effect[data-pokemon-effect-kind='move']"
-    )
-  ) {
-    if (
-      card.querySelector(
-        "[data-pokemon-biography-actions]"
-      )
-    ) {
-      continue;
-    }
+    if (!game.user.isGM) continue;
 
-    const moveId =
-      card.dataset
-        .pokemonEffectId;
-
-    const move =
-      moveForActor(
-        actor,
-        moveId
-      );
-
+    const moveId = card.dataset.pokemonEffectId;
+    const move = moveForActor(actor, moveId);
     if (!move) continue;
 
-    const controls =
-      document.createElement(
-        "div"
-      );
+    const vfxRow = document.createElement("div");
+    vfxRow.className = "pokemon-biography-vfx-actions";
 
-    controls.className =
-      "pokemon-biography-effect-actions";
+    const tokenButton = document.createElement("button");
+    tokenButton.type = "button";
+    tokenButton.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Token';
+    tokenButton.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      void playActorMoveVfx(actor, move).catch(error => {
+        ui.notifications.error(error?.message ?? "Nao foi possivel executar o VFX.");
+      });
+    });
 
-    controls.dataset.pokemonBiographyActions =
-      "true";
+    const areaButton = document.createElement("button");
+    areaButton.type = "button";
+    areaButton.innerHTML = '<i class="fa-solid fa-circle-nodes"></i> Área';
+    areaButton.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      void placeMoveArea(actor, move, "challenge").catch(error => {
+        ui.notifications.error(error?.message ?? "Nao foi possivel criar a Area.");
+      });
+    });
 
+    vfxRow.append(tokenButton, areaButton);
+    controls.append(vfxRow);
 
-    const tokenButton =
-      document.createElement(
-        "button"
-      );
+    const effects = effectsForMove(actor, move);
+    if (effects.length) {
+      const mechanics = document.createElement("div");
+      mechanics.className = "pokemon-biography-mechanical-actions";
 
-    tokenButton.type =
-      "button";
-
-    tokenButton.innerHTML =
-      '<i class="fa-solid fa-wand-magic-sparkles"></i> Token';
-
-    tokenButton.addEventListener(
-      "click",
-      event => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        void playActorMoveVfx(
-          actor,
-          move
-        )
-          .catch(error => {
-            ui.notifications.error(
-              error?.message
-              ??
-              "Nao foi possivel executar o VFX."
-            );
+      effects.forEach((effect, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.pokemonEffectIndex = String(index);
+        const suffix = effect?.kind === "tag"
+          ? ""
+          : "-" + Number(effect?.level ?? 1);
+        button.innerHTML = '<i class="fa-solid fa-burst"></i> '
+          + esc(String(effect?.name ?? "efeito") + suffix);
+        button.addEventListener("click", event => {
+          event.preventDefault();
+          event.stopPropagation();
+          void applyChallengeEffect(actor, move, effect).catch(error => {
+            console.error("Pokemon LITM Tools | Challenge effect:", error);
+            ui.notifications.error(error?.message ?? "Nao foi possivel aplicar o efeito.");
           });
-      }
-    );
+        });
+        mechanics.append(button);
+      });
 
-    controls.append(
-      tokenButton
-    );
-
-
-    const areaButton =
-      document.createElement(
-        "button"
-      );
-
-    areaButton.type =
-      "button";
-
-    areaButton.innerHTML =
-      '<i class="fa-solid fa-circle-nodes"></i> Área';
-
-    areaButton.addEventListener(
-      "click",
-      event => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        void placeMoveArea(
-          actor,
-          move,
-          "challenge"
-        )
-          .catch(error => {
-            ui.notifications.error(
-              error?.message
-              ??
-              "Nao foi possivel criar a Area."
-            );
-          });
-      }
-    );
-
-    controls.append(
-      areaButton
-    );
-
-
-    const effects =
-      effectsForMove(
-        actor,
-        move
-      );
-
-    effects.forEach(
-      (effect, index) => {
-        const button =
-          document.createElement(
-            "button"
-          );
-
-        button.type =
-          "button";
-
-        button.dataset.pokemonEffectIndex =
-          String(index);
-
-        const suffix =
-          effect?.kind === "tag"
-            ? ""
-            : "-"
-              + Number(
-                effect?.level
-                ?? 1
-              );
-
-        button.innerHTML =
-          '<i class="fa-solid fa-burst"></i> '
-          + esc(
-            String(
-              effect?.name
-              ?? "efeito"
-            )
-            + suffix
-          );
-
-        button.addEventListener(
-          "click",
-          event => {
-            event.preventDefault();
-            event.stopPropagation();
-
-            void applyChallengeEffect(
-              actor,
-              move,
-              effect
-            )
-              .catch(error => {
-                console.error(
-                  "Pokemon LITM Tools | Challenge effect:",
-                  error
-                );
-
-                ui.notifications.error(
-                  error?.message
-                  ??
-                  "Nao foi possivel aplicar o efeito."
-                );
-              });
-          }
-        );
-
-        controls.append(
-          button
-        );
-      }
-    );
-
-    card.append(
-      controls
-    );
+      controls.append(mechanics);
+    }
   }
 }
 
@@ -1922,112 +2089,175 @@ function renamePokemonChallengeBiographyTab(
 }
 
 
-function onRenderPokemonActorSheet(
-  app,
-  html
-) {
-  const actor =
-    sheetActor(app);
+function findOtherPanel(root) {
+  const navItems = Array.from(root.querySelectorAll(
+    "nav [data-tab], .tabs [data-tab], [role='tab'][data-tab]"
+  ));
 
-  if (
-    !actor
-    ||
-    actor.type !== "litm-npc"
-    ||
-    actor.getFlag?.(
-      MODULE_ID,
-      "pokemonBuilder"
-    ) !== true
-  ) {
-    return;
-  }
-
-  const root =
-    sheetRoot(
-      app,
-      html
-    );
-
-  if (!root) return;
-
-  renamePokemonChallengeBiographyTab(
-    root
+  const nav = navItems.find(element =>
+    String(element.textContent ?? "").trim().toLocaleLowerCase() === "other"
   );
 
-  addChallengeBiographyActions(
-    actor,
-    root
-  );
+  const tabId = nav?.dataset?.tab || "other";
+  const candidates = Array.from(root.querySelectorAll(
+    "[data-tab='" + CSS.escape(tabId) + "']"
+  ));
 
-  decorateStructuredStatusMarkup(
-    root
+  return candidates.find(element =>
+    element !== nav
+    && !element.closest("nav")
+    && !element.matches("button,a,[role='tab']")
+  ) ?? null;
+}
+
+
+function isPokemonPlayerActor(actor) {
+  if (actor?.type !== "litm-character") return false;
+
+  if (actor.getFlag?.(MODULE_ID, "kind") === "pokemon") return true;
+
+  return Array.from(actor.items ?? []).some(item =>
+    item.getFlag?.(MODULE_ID, "themeRole") === "pokemon-moves"
   );
 }
 
 
-function pokemonMovesForMessageActor(
+function actionButton(label, icon, handler) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.innerHTML = '<i class="fa-solid ' + icon + '"></i> ' + esc(label);
+  button.addEventListener("click", event => {
+    event.preventDefault();
+    event.stopPropagation();
+    void Promise.resolve(handler()).catch(error => {
+      console.error("Pokemon LITM Tools | Acao Pokemon:", error);
+      ui.notifications.error(error?.message ?? "Nao foi possivel executar a acao.");
+    });
+  });
+  return button;
+}
+
+
+async function addPokemonCharacterOtherActions(actor, root) {
+  const panel = findOtherPanel(root);
+  if (!panel) return;
+
+  const old = panel.querySelector("[data-pokemon-character-actions]");
+  if (old) old.remove();
+
+  const section = document.createElement("section");
+  section.className = "pokemon-character-other-actions";
+  section.dataset.pokemonCharacterActions = "true";
+  section.innerHTML =
+    '<header><div><h2>Ações Pokémon</h2>'
+    + '<p>VFX e efeitos acompanham as Tags atuais do Theme de Golpes.</p></div></header>';
+
+  const list = document.createElement("div");
+  list.className = "pokemon-character-action-list";
+  section.append(list);
+  panel.append(section);
+
+  const moves = await resolvedPokemonMovesForActor(actor);
+  if (!section.isConnected) return;
+
+  if (!moves.length) {
+    list.innerHTML = '<p class="hint">Nenhum golpe reconhecido. Para um golpe novo, use Nome em PT-BR (nome oficial em inglês).</p>';
+    return;
+  }
+
+  for (const move of moves) {
+    const card = document.createElement("article");
+    card.className = "pokemon-character-action-card";
+
+    const main = document.createElement("div");
+    main.className = "pokemon-character-action-main";
+
+    const heading = document.createElement("h3");
+    heading.textContent = move.name || move.englishName || move.id || "Golpe";
+    main.append(heading);
+
+    const description = document.createElement("p");
+    description.textContent = move.description || move.shortDescription || "";
+    main.append(description);
+
+    if (move.pokemonDbUrl) {
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "pokemon-pokedex-link";
+      link.innerHTML = '<i class="fa-solid fa-mobile-screen-button"></i> PokémonDB';
+      link.addEventListener("click", event => {
+        event.preventDefault();
+        window.open(move.pokemonDbUrl, "_blank", "noopener,noreferrer");
+      });
+      main.append(link);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "pokemon-character-action-buttons";
+
+    if (move.unresolved || !move.id) {
+      const hint = document.createElement("small");
+      hint.className = "pokemon-move-unresolved";
+      hint.textContent =
+        "Para reconhecer este golpe, use: Nome em PT-BR (nome oficial em inglês).";
+      actions.append(hint);
+      card.append(main, actions);
+      list.append(card);
+      continue;
+    }
+
+    actions.append(
+      actionButton("Token", "fa-wand-magic-sparkles", () => playActorMoveVfx(actor, move)),
+      actionButton("Área", "fa-circle-nodes", () => placeMoveArea(actor, move, "player"))
+    );
+
+    const effects = effectsForMove(actor, move);
+    effects.forEach((effect, index) => {
+      const suffix = effect?.kind === "tag" ? "" : "-" + Number(effect?.level ?? 1);
+      actions.append(
+        actionButton(
+          String(effect?.name ?? "efeito") + suffix,
+          effect?.kind === "tag" ? "fa-tag" : "fa-burst",
+          () => applyMoveEffectAction(actor, move, index)
+        )
+      );
+    });
+
+    card.append(main, actions);
+    list.append(card);
+  }
+}
+
+
+function onRenderPokemonActorSheet(app, html) {
+  const actor = sheetActor(app);
+  if (!actor) return;
+
+  const root = sheetRoot(app, html);
+  if (!root) return;
+
+  const challenge =
+    actor.type === "litm-npc"
+    && actor.getFlag?.(MODULE_ID, "pokemonBuilder") === true;
+
+  if (challenge) {
+    renamePokemonChallengeBiographyTab(root);
+    addChallengeBiographyActions(actor, root);
+    decorateStructuredStatusMarkup(root);
+    return;
+  }
+
+  if (isPokemonPlayerActor(actor)) {
+    void addPokemonCharacterOtherActions(actor, root);
+  }
+}
+
+
+async function pokemonMovesForMessageActor(
   actor
 ) {
   if (!actor) return [];
-
-  const collected = [];
-
-  const own =
-    actor.getFlag?.(
-      MODULE_ID,
-      "characterPokemonMoves"
-    );
-
-  if (
-    Array.isArray(own)
-  ) {
-    collected.push(...own);
-  }
-
-  for (
-    const item
-    of actor.items ?? []
-  ) {
-    const moves =
-      item.getFlag?.(
-        MODULE_ID,
-        "moves"
-      );
-
-    if (
-      Array.isArray(moves)
-    ) {
-      collected.push(
-        ...moves
-      );
-    }
-  }
-
-  const seen =
-    new Set();
-
-  return collected.filter(
-    move => {
-      const key =
-        [
-          move?.id,
-          move?.name,
-          move?.type
-        ]
-          .join("|");
-
-      if (
-        !move?.id
-        ||
-        seen.has(key)
-      ) {
-        return false;
-      }
-
-      seen.add(key);
-      return true;
-    }
-  );
+  return resolvedPokemonMovesForActor(actor);
 }
 
 
@@ -2046,56 +2276,37 @@ function normalizeMoveSearch(
 }
 
 
-function moveFromChatMessage(
+async function moveFromChatMessage(
   message,
   actor
 ) {
-  const spend =
-    message.getFlag?.(
-      "mist-engine-fvtt",
-      "detailedSpend"
-    );
+  const spend = message.getFlag?.(
+    "mist-engine-fvtt",
+    "detailedSpend"
+  );
 
-  if (!spend) return null;
+  const haystack = normalizeMoveSearch(
+    JSON.stringify(spend ?? {})
+    + " "
+    + String(message.content ?? "")
+  );
 
-  const haystack =
-    normalizeMoveSearch(
-      JSON.stringify(spend)
-      + " "
-      + String(
-        message.content
-        ?? ""
-      )
-    );
+  if (!haystack.trim()) return null;
 
-  const matches =
-    pokemonMovesForMessageActor(
-      actor
-    )
-      .filter(
-        move => {
-          const candidates =
-            [
-              move?.name,
-              move?.englishName,
-              move?.id
-            ]
-              .map(
-                normalizeMoveSearch
-              )
-              .filter(
-                value =>
-                  value.length >= 3
-              );
+  const moves = await pokemonMovesForMessageActor(actor);
+  const matches = moves.filter(move => {
+    if (!move?.id) return false;
 
-          return candidates.some(
-            value =>
-              haystack.includes(
-                value
-              )
-          );
-        }
-      );
+    const candidates = [
+      move?.name,
+      move?.englishName,
+      move?.id
+    ]
+      .map(normalizeMoveSearch)
+      .filter(value => value.length >= 3);
+
+    return candidates.some(value => haystack.includes(value));
+  });
 
   return matches.length === 1
     ? matches[0]
@@ -2140,18 +2351,32 @@ function sourceTokenForMessageActor(
         const combatActor =
           token.actor;
 
-        return (
+        const sameTrainer =
           combatActor?.getFlag?.(
             MODULE_ID,
             "sourceTrainerActorId"
-          )
-            === actor?.id
-          &&
-          !!moveForActor(
-            combatActor,
-            move?.id
-          )
-        );
+          ) === actor?.id;
+
+        if (!sameTrainer) return false;
+
+        if (moveForActor(combatActor, move?.id)) {
+          return true;
+        }
+
+        const sourceThemeId =
+          combatActor?.getFlag?.(
+            MODULE_ID,
+            "sourceThemeId"
+          );
+
+        const sourceTheme =
+          sourceThemeId
+            ? actor?.items?.get?.(sourceThemeId)
+            : null;
+
+        return !!sourceTheme
+          && movesFromPokemonItem(sourceTheme)
+            .some(row => row?.id === move?.id);
       }
     )
     ?? null;
@@ -2191,172 +2416,110 @@ function onPreCreateChatMessage(
 }
 
 
-function onRenderPokemonChatMessage(
+async function onRenderPokemonChatMessage(
   message,
   html
 ) {
-  const actorId =
-    message?.speaker?.actor;
-
-  const actor =
-    game.actors.get(
-      actorId
-    );
-
+  const actorId = message?.speaker?.actor;
+  const actor = game.actors.get(actorId);
   if (!actor) return;
 
-  if (
-    !game.user.isGM
-    &&
-    !actor.isOwner
-  ) {
-    return;
-  }
+  if (!game.user.isGM && !actor.isOwner) return;
 
-  const move =
-    moveFromChatMessage(
-      message,
-      actor
-    );
-
+  const move = await moveFromChatMessage(message, actor);
   if (!move) return;
 
-  const root =
-    html instanceof HTMLElement
-      ? html
-      : html?.[0] instanceof HTMLElement
-        ? html[0]
-        : null;
+  const root = html instanceof HTMLElement
+    ? html
+    : html?.[0] instanceof HTMLElement
+      ? html[0]
+      : null;
 
-  if (
-    !root
-    ||
-    root.querySelector(
-      "[data-pokemon-chat-vfx]"
-    )
-  ) {
-    return;
-  }
+  if (!root || root.querySelector("[data-pokemon-chat-actions]")) return;
 
-  const row =
-    document.createElement(
-      "div"
-    );
+  const sceneId = message.getFlag?.(MODULE_ID, "rollSceneId");
+  const frozenTargetIds = message.getFlag?.(MODULE_ID, "rollTargetTokenIds") ?? [];
 
-  row.className =
-    "pokemon-chat-vfx-row";
+  const panel = document.createElement("div");
+  panel.className = "pokemon-chat-move-actions";
+  panel.dataset.pokemonChatActions = "true";
 
-  const button =
-    document.createElement(
-      "button"
-    );
+  const heading = document.createElement("div");
+  heading.className = "pokemon-chat-move-header";
+  heading.innerHTML = '<i class="fa-solid fa-bolt"></i><strong>'
+    + esc(move.name ?? move.id)
+    + '</strong>';
+  panel.append(heading);
 
-  button.type =
-    "button";
+  const buttons = document.createElement("div");
+  buttons.className = "pokemon-chat-move-buttons";
+  panel.append(buttons);
 
-  button.dataset.pokemonChatVfx =
-    "true";
+  const requireRollScene = () => {
+    if (sceneId && sceneId !== canvas?.scene?.id) {
+      throw new Error("Abra a cena onde a rolagem foi feita para usar esta acao.");
+    }
+  };
 
-  button.innerHTML =
-    '<i class="fa-solid fa-wand-magic-sparkles"></i> VFX · '
-    + esc(
-      move.name
-      ?? move.id
-    );
+  const sourceToken = () => {
+    requireRollScene();
+    const token = sourceTokenForMessageActor(actor, move);
+    if (!token) throw new Error("Token do Pokemon nao encontrado na cena.");
+    return token.document ?? token;
+  };
 
-  button.addEventListener(
-    "click",
-    event => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const sceneId =
-        message.getFlag?.(
-          MODULE_ID,
-          "rollSceneId"
-        );
-
-      if (
-        sceneId
-        &&
-        sceneId
-          !== canvas?.scene?.id
-      ) {
-        ui.notifications.warn(
-          "Abra a cena onde a rolagem foi feita para executar o VFX."
-        );
-
-        return;
-      }
-
-      const sourceToken =
-        sourceTokenForMessageActor(
-          actor,
-          move
-        );
-
-      if (!sourceToken) {
-        ui.notifications.warn(
-          "Token do Pokemon nao encontrado na cena."
-        );
-
-        return;
-      }
-
-      const targetIds =
-        message.getFlag?.(
-          MODULE_ID,
-          "rollTargetTokenIds"
-        )
-        ?? [];
-
-      const selfTarget =
-        [
-          "self",
-          "user",
-          "users-field"
-        ]
-          .includes(
-            String(
-              move?.target
-              ?? ""
-            )
-              .toLowerCase()
-          );
-
-      const resolvedTargetIds =
-        selfTarget
-          ? [sourceToken.id]
-          : targetIds;
-
-      if (
-        !resolvedTargetIds.length
-      ) {
-        ui.notifications.warn(
-          "A rolagem nao tinha alvo marcado."
-        );
-
-        return;
-      }
-
-      void broadcastMoveVfx(
+  buttons.append(
+    actionButton("VFX Token", "fa-wand-magic-sparkles", async () => {
+      const token = sourceToken();
+      const selfTarget = ["self", "user", "users-field"]
+        .includes(String(move?.target ?? "").toLowerCase());
+      const ids = selfTarget ? [token.id] : frozenTargetIds;
+      if (!ids.length) throw new Error("A rolagem nao tinha alvo marcado.");
+      await broadcastMoveVfx(
         canvas.scene.id,
-        sourceToken.id,
-        resolvedTargetIds,
+        token.id,
+        ids,
         move.type ?? "normal"
       );
-    }
+    }),
+    actionButton("VFX Área", "fa-circle-nodes", async () => {
+      const token = sourceToken();
+      await placeMoveArea(actor, move, "player", token);
+    })
   );
 
-  row.append(button);
+  const effects = effectsForMove(actor, move);
+  if (effects.length) {
+    const effectRow = document.createElement("div");
+    effectRow.className = "pokemon-chat-move-effects";
 
-  const content =
-    root.querySelector(
-      ".message-content"
-    )
-    ?? root;
+    effects.forEach((effect, index) => {
+      const suffix = effect?.kind === "tag"
+        ? ""
+        : "-" + Number(effect?.level ?? 1);
+      effectRow.append(
+        actionButton(
+          "Aplicar " + String(effect?.name ?? "efeito") + suffix,
+          effect?.kind === "tag" ? "fa-tag" : "fa-burst",
+          async () => {
+            const token = sourceToken();
+            await applyMoveEffectAction(
+              actor,
+              move,
+              index,
+              frozenTargetIds,
+              token
+            );
+          }
+        )
+      );
+    });
 
-  content.append(row);
+    panel.append(effectRow);
+  }
+
+  const content = root.querySelector(".message-content") ?? root;
+  content.append(panel);
 }
 
 
@@ -2431,4 +2594,18 @@ export function activatePokemonCombatEffects() {
     "renderChatMessageHTML",
     onRenderPokemonChatMessage
   );
+
+  Hooks.on("updateItem", item => {
+    const actor = item?.parent;
+    if (!actor || actor.documentName !== "Actor") return;
+
+    const flags = item.flags?.[MODULE_ID] ?? {};
+    if (
+      flags.themeRole === "pokemon-moves"
+      || Array.isArray(flags.tagBindings)
+      || Array.isArray(flags.pokemonMoveBindings)
+    ) {
+      actor.sheet?.render?.(false);
+    }
+  });
 }
