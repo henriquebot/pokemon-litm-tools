@@ -833,8 +833,8 @@ class PokemonCharacterCreatorApp
     ],
 
     position: {
-      width: 1180,
-      height: 780
+      width: 1500,
+      height: 900
     },
 
     window: {
@@ -880,7 +880,7 @@ class PokemonCharacterCreatorApp
   customPreviewUrl = null;
 
   previewZoomed =
-    true;
+    false;
 
   teamSize = null;
 
@@ -894,6 +894,8 @@ class PokemonCharacterCreatorApp
 
   pokemonPlayerMoveIds = [];
 
+  pokemonPlayerCustomization = null;
+
   dreamSelections = [];
 
   archetypeId = null;
@@ -906,7 +908,7 @@ class PokemonCharacterCreatorApp
 
 
   get totalSteps() {
-    return this.mode === "pokemon" ? 5 : 7;
+    return this.mode === "pokemon" ? 6 : 7;
   }
 
 
@@ -922,12 +924,18 @@ class PokemonCharacterCreatorApp
 
 
   _themesReady() {
+    const expected =
+      this.mode === "pokemon"
+        ? 2
+        : 4;
+
     if (
       !Array.isArray(
         this.themeDrafts
       )
       ||
-      this.themeDrafts.length !== 4
+      this.themeDrafts.length
+        !== expected
     ) {
       return false;
     }
@@ -980,6 +988,7 @@ class PokemonCharacterCreatorApp
     );
   }
 
+
   _teamReady() {
     if (
       this.mode !== "trainer"
@@ -1026,6 +1035,32 @@ class PokemonCharacterCreatorApp
         && moves.length >= 1
         && moves.length <= 4;
     });
+  }
+
+
+  _pokemonPlayerProfileReady() {
+    if (
+      this.mode !== "pokemon"
+    ) {
+      return true;
+    }
+
+    if (
+      this.visualSource !== "catalog"
+    ) {
+      return true;
+    }
+
+    const row =
+      this.pokemonPlayerCustomization;
+
+    return (
+      row?.assetId === this.selectedId
+      &&
+      !!row?.natureId
+      &&
+      !!row?.abilityId
+    );
   }
 
 
@@ -1079,7 +1114,7 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "pokemon"
-        && this.step === 4
+        && [5, 6].includes(this.step)
         && this.visualSource === "catalog"
       )
     ) {
@@ -1417,12 +1452,14 @@ class PokemonCharacterCreatorApp
     }
 
 
+    let pokemonPlayerProfile = null;
+
     let pokemonPlayerMoveOptions = [];
 
     if (
       this.mode === "pokemon"
       &&
-      this.step === 4
+      [5, 6].includes(this.step)
       &&
       this.visualSource === "catalog"
     ) {
@@ -1443,6 +1480,18 @@ class PokemonCharacterCreatorApp
           );
 
         if (
+          !this.pokemonPlayerCustomization
+          ||
+          this.pokemonPlayerCustomization.assetId
+            !== entry.id
+        ) {
+          this.pokemonPlayerCustomization =
+            foundry.utils.deepClone(
+              options.defaults
+            );
+        }
+
+        if (
           !Array.isArray(
             this.pokemonPlayerMoveIds
           )
@@ -1457,6 +1506,93 @@ class PokemonCharacterCreatorApp
               .filter(Boolean)
               .slice(0, 4);
         }
+
+        const current =
+          this.pokemonPlayerCustomization;
+
+        const nature =
+          options.natureOptions.find(
+            row =>
+              row.id
+              === current.natureId
+          )
+          ?? options.natureOptions[0]
+          ?? null;
+
+        const ability =
+          options.abilityOptions.find(
+            row =>
+              row.id
+              === current.abilityId
+          )
+          ?? options.abilityOptions[0]
+          ?? null;
+
+        const weakness =
+          options.weaknessOptions.find(
+            row =>
+              row.id
+              === current.weaknessStat
+          )
+          ?? null;
+
+        pokemonPlayerProfile = {
+          name:
+            entry.name,
+
+          preview:
+            entry.preview
+            ?? entry.portrait
+            ?? entry.sheet,
+
+          pokedexUrl:
+            getPokemonDbUrl(entry),
+
+          natureEffect:
+            nature?.effect
+            ?? "",
+
+          abilityDescription:
+            ability?.description
+            ?? "",
+
+          weaknessTag:
+            current.customWeakness
+            || weakness?.label
+            || "",
+
+          nature:
+            nature
+              ? foundry.utils.deepClone(nature)
+              : null,
+
+          ability:
+            ability
+              ? foundry.utils.deepClone(ability)
+              : null,
+
+          natureOptions:
+            options.natureOptions.map(
+              row => ({
+                ...row,
+
+                selected:
+                  row.id
+                  === current.natureId
+              })
+            ),
+
+          abilityOptions:
+            options.abilityOptions.map(
+              row => ({
+                ...row,
+
+                selected:
+                  row.id
+                  === current.abilityId
+              })
+            )
+        };
 
         const selectedMoves =
           new Set(
@@ -1490,7 +1626,7 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "pokemon"
-        && [3, 5].includes(this.step)
+        && [3, 4].includes(this.step)
       )
     ) {
       const loadedArchetypes =
@@ -1562,23 +1698,31 @@ class PokemonCharacterCreatorApp
     if (
       (
         (this.mode === "trainer" && this.step === 7)
-        || (this.mode === "pokemon" && this.step === 5)
+        || (this.mode === "pokemon" && this.step === 4)
       )
       && selectedArchetype
     ) {
+      const requiredThemeCount =
+        this.mode === "pokemon"
+          ? 2
+          : 4;
+
       if (
         !Array.isArray(
           this.themeDrafts
         )
         ||
-        this.themeDrafts.length !== 4
+        this.themeDrafts.length !== requiredThemeCount
       ) {
         if (
           selectedArchetype.allPresets
         ) {
           this.themeDrafts =
             Array.from(
-              { length: 4 },
+              {
+                length:
+                  requiredThemeCount
+              },
               () =>
                 makeThemeDraft(
                   {},
@@ -1589,7 +1733,10 @@ class PokemonCharacterCreatorApp
         } else {
           this.themeDrafts =
             selectedArchetype.themes
-              .slice(0, 4)
+              .slice(
+                0,
+                requiredThemeCount
+              )
               .map(
                 (theme, index) =>
                   makeThemeDraft(
@@ -1734,18 +1881,25 @@ class PokemonCharacterCreatorApp
       (
         this.mode === "pokemon"
         && this.step === 4
-        && this._pokemonPlayerMovesReady()
+        && this._themesReady()
+      )
+      ||
+      (
+        this.mode === "pokemon"
+        && this.step === 5
+        && this._pokemonPlayerProfileReady()
       );
 
 
     const canFinish =
       (
         this.mode === "pokemon"
-        && this.step === 5
+        && this.step === 6
         && visualReady
         && profileReady
-        && this._pokemonPlayerMovesReady()
         && this._themesReady()
+        && this._pokemonPlayerProfileReady()
+        && this._pokemonPlayerMovesReady()
       )
       ||
       (
@@ -1798,10 +1952,6 @@ class PokemonCharacterCreatorApp
           && this.step === 3
         ),
 
-      stepIsPokemonMoves:
-        this.mode === "pokemon"
-        && this.step === 4,
-
       stepIsThemes:
         (
           this.mode === "trainer"
@@ -1809,8 +1959,16 @@ class PokemonCharacterCreatorApp
         )
         || (
           this.mode === "pokemon"
-          && this.step === 5
+          && this.step === 4
         ),
+
+      stepIsPokemonProfile:
+        this.mode === "pokemon"
+        && this.step === 5,
+
+      stepIsPokemonMoves:
+        this.mode === "pokemon"
+        && this.step === 6,
 
       isTrainer:
         this.mode === "trainer",
@@ -1839,6 +1997,11 @@ class PokemonCharacterCreatorApp
 
       pokemonReady:
         this._pokemonReady(),
+
+      pokemonPlayerProfile,
+
+      pokemonPlayerProfileReady:
+        this._pokemonPlayerProfileReady(),
 
       pokemonPlayerMoveOptions,
 
@@ -1918,6 +2081,9 @@ class PokemonCharacterCreatorApp
       previewZoomed:
         this.previewZoomed,
 
+      isFinalStep:
+        this.step === this.totalSteps,
+
       canBack:
         this.step > 1,
 
@@ -1942,6 +2108,37 @@ class PokemonCharacterCreatorApp
       context,
       options
     );
+
+    if (
+      typeof this.setPosition
+        === "function"
+    ) {
+      const responsiveWidth =
+        Math.max(
+          320,
+          Math.min(
+            1600,
+            window.innerWidth - 32
+          )
+        );
+
+      const responsiveHeight =
+        Math.max(
+          420,
+          Math.min(
+            980,
+            window.innerHeight - 32
+          )
+        );
+
+      this.setPosition({
+        width:
+          responsiveWidth,
+
+        height:
+          responsiveHeight
+      });
+    }
 
 
     if (
@@ -2008,6 +2205,9 @@ class PokemonCharacterCreatorApp
 
             this.pokemonPlayerMoveIds =
               [];
+
+            this.pokemonPlayerCustomization =
+              null;
 
             this.dreamSelections =
               [];
@@ -2123,6 +2323,9 @@ class PokemonCharacterCreatorApp
           ) {
             this.pokemonPlayerMoveIds =
               [];
+
+            this.pokemonPlayerCustomization =
+              null;
           }
 
           this.visualSource =
@@ -2282,6 +2485,9 @@ class PokemonCharacterCreatorApp
           ) {
             this.pokemonPlayerMoveIds =
               [];
+
+            this.pokemonPlayerCustomization =
+              null;
           }
 
           this.selectedId =
@@ -2508,6 +2714,7 @@ class PokemonCharacterCreatorApp
       button.addEventListener(
         "click",
         async event => {
+          event.preventDefault();
           event.stopPropagation();
 
           const index =
@@ -2692,6 +2899,57 @@ class PokemonCharacterCreatorApp
         await this.render({ force: true });
       });
     }
+
+
+    /* NATUREZA E HABILIDADE DO POKEMON-JOGADOR */
+
+    const playerNature =
+      this.element.querySelector(
+        "[data-pokemon-player-nature]"
+      );
+
+    playerNature?.addEventListener(
+      "change",
+      async () => {
+        if (
+          !this.pokemonPlayerCustomization
+        ) {
+          return;
+        }
+
+        this.pokemonPlayerCustomization
+          .natureId =
+            playerNature.value;
+
+        await this.render({
+          force: true
+        });
+      }
+    );
+
+    const playerAbility =
+      this.element.querySelector(
+        "[data-pokemon-player-ability]"
+      );
+
+    playerAbility?.addEventListener(
+      "change",
+      async () => {
+        if (
+          !this.pokemonPlayerCustomization
+        ) {
+          return;
+        }
+
+        this.pokemonPlayerCustomization
+          .abilityId =
+            playerAbility.value;
+
+        await this.render({
+          force: true
+        });
+      }
+    );
 
 
     /* GOLPES DO POKEMON-JOGADOR */
@@ -2894,13 +3152,17 @@ class PokemonCharacterCreatorApp
 
     const refreshThemeFinish =
       () => {
-        const finish =
+        const action =
           this.element.querySelector(
             "[data-action='wizardFinish']"
+          )
+          ??
+          this.element.querySelector(
+            "[data-action='wizardNext']"
           );
 
-        if (finish) {
-          finish.disabled =
+        if (action) {
+          action.disabled =
             !this._themesReady();
         }
       };
@@ -3187,7 +3449,17 @@ class PokemonCharacterCreatorApp
             &&
             this.step === 4
             &&
-            !this._pokemonPlayerMovesReady()
+            !this._themesReady()
+          ) {
+            return;
+          }
+
+          if (
+            this.mode === "pokemon"
+            &&
+            this.step === 5
+            &&
+            !this._pokemonPlayerProfileReady()
           ) {
             return;
           }
@@ -3266,6 +3538,8 @@ class PokemonCharacterCreatorApp
             !this._teamReady()
             ||
             !this._pokemonReady()
+            ||
+            !this._pokemonPlayerProfileReady()
             ||
             !this._pokemonPlayerMovesReady()
             ||
@@ -3435,6 +3709,9 @@ class PokemonCharacterCreatorApp
             }
 
 
+            let pokemonPlayerProfile =
+              null;
+
             let pokemonPlayerMoves =
               [];
 
@@ -3455,11 +3732,84 @@ class PokemonCharacterCreatorApp
                 );
 
               if (entry) {
-                const options =
+                const customizationOptions =
                   await loadPokemonTrainerCustomization(
                     entry,
                     "origin"
                   );
+
+                const current =
+                  (
+                    this.pokemonPlayerCustomization
+                    &&
+                    this.pokemonPlayerCustomization.assetId
+                      === entry.id
+                  )
+                    ? this.pokemonPlayerCustomization
+                    : foundry.utils.deepClone(
+                        customizationOptions.defaults
+                      );
+
+                const nature =
+                  customizationOptions
+                    .natureOptions
+                    .find(
+                      row =>
+                        row.id
+                        === current.natureId
+                    )
+                  ?? customizationOptions
+                    .natureOptions[0]
+                  ?? null;
+
+                const ability =
+                  customizationOptions
+                    .abilityOptions
+                    .find(
+                      row =>
+                        row.id
+                        === current.abilityId
+                    )
+                  ?? customizationOptions
+                    .abilityOptions[0]
+                  ?? null;
+
+                const weakness =
+                  customizationOptions
+                    .weaknessOptions
+                    .find(
+                      row =>
+                        row.id
+                        === current.weaknessStat
+                    )
+                  ?? null;
+
+                pokemonPlayerProfile = {
+                  speciesName:
+                    entry.name,
+
+                  pokedexUrl:
+                    getPokemonDbUrl(entry),
+
+                  nature:
+                    nature
+                      ? foundry.utils.deepClone(
+                          nature
+                        )
+                      : null,
+
+                  ability:
+                    ability
+                      ? foundry.utils.deepClone(
+                          ability
+                        )
+                      : null,
+
+                  weaknessTag:
+                    current.customWeakness
+                    || weakness?.label
+                    || ""
+                };
 
                 const selected =
                   new Set(
@@ -3467,7 +3817,8 @@ class PokemonCharacterCreatorApp
                   );
 
                 pokemonPlayerMoves =
-                  options.moveOptions
+                  customizationOptions
+                    .moveOptions
                     .filter(
                       move =>
                         selected.has(
@@ -3483,6 +3834,12 @@ class PokemonCharacterCreatorApp
               this.themeDrafts,
               this.archetypeId,
               {
+                pokemonMode:
+                  this.mode === "pokemon",
+
+                pokemonProfile:
+                  pokemonPlayerProfile,
+
                 pokemonMoves:
                   pokemonPlayerMoves
               }

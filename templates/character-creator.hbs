@@ -31,9 +31,11 @@
       <div class="pokemon-wizard-line"></div>
       <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>3</span>Perfil</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsPokemonMoves}}active{{/if}}"><span>4</span>Golpes</div>
+      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>4</span>Temas de Perfil</div>
       <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>5</span>Temas</div>
+      <div class="pokemon-wizard-step {{#if stepIsPokemonProfile}}active{{/if}}"><span>5</span>Natureza &amp; Habilidade</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsPokemonMoves}}active{{/if}}"><span>6</span>Golpes</div>
     {{/if}}
 
   </header>
@@ -107,7 +109,7 @@
       </p>
 
 
-      <div class="pokemon-character-fields">
+      <div class="pokemon-character-fields pokemon-character-fields-compact">
 
         <div class="form-group">
 
@@ -527,10 +529,11 @@
 
             {{#each teamSlots}}
 
-              <button
-                type="button"
+              <div
                 class="pokemon-team-slot{{#if active}} active{{/if}}{{#if filled}} filled{{/if}}"
                 data-team-slot="{{index}}"
+                role="button"
+                tabindex="0"
               >
 
                 <span class="pokemon-team-slot-number">
@@ -549,13 +552,15 @@
                     {{name}}
                   </strong>
 
-                  <span
+                  <button
+                    type="button"
                     class="pokemon-team-remove"
                     data-team-remove="{{index}}"
-                    title="Remover"
+                    title="Remover Pok&eacute;mon"
+                    aria-label="Remover Pok&eacute;mon"
                   >
                     &times;
-                  </span>
+                  </button>
 
                 {{else}}
 
@@ -567,7 +572,7 @@
 
                 {{/if}}
 
-              </button>
+              </div>
 
             {{/each}}
 
@@ -963,6 +968,109 @@
   {{/if}}
 
 
+  {{#if stepIsPokemonProfile}}
+
+    <section class="pokemon-wizard-page pokemon-player-profile-page">
+
+      <h2>Natureza e Habilidade</h2>
+
+      <p>
+        Escolha como a Natureza do Pok&eacute;mon afeta seus atributos e qual Habilidade ele possui.
+      </p>
+
+      {{#if visualUpload}}
+
+        <div class="pokemon-theme-guidance">
+          Este visual personalizado n&atilde;o possui uma esp&eacute;cie ligada ao banco de dados.
+          O Tema de Natureza &amp; Habilidade ser&aacute; criado como rascunho para edi&ccedil;&atilde;o manual.
+        </div>
+
+      {{else}}
+
+        {{#if pokemonPlayerProfile}}
+
+          <article class="pokemon-player-profile-card">
+
+            <header>
+
+              <img
+                src="{{pokemonPlayerProfile.preview}}"
+                alt="{{pokemonPlayerProfile.name}}"
+              >
+
+              <div>
+                <small>Terceiro Tema</small>
+                <strong>{{pokemonPlayerProfile.name}}</strong>
+
+                <button
+                  type="button"
+                  class="pokemon-pokedex-link"
+                  data-pokedex-url="{{pokemonPlayerProfile.pokedexUrl}}"
+                >
+                  <i class="fa-solid fa-mobile-screen-button"></i>
+                  Pok&eacute;dex
+                </button>
+              </div>
+
+            </header>
+
+            <div class="pokemon-player-profile-grid">
+
+              <label>
+                <span>Natureza</span>
+
+                <select data-pokemon-player-nature>
+                  {{#each pokemonPlayerProfile.natureOptions}}
+                    <option
+                      value="{{id}}"
+                      {{#if selected}}selected{{/if}}
+                    >
+                      {{label}}
+                    </option>
+                  {{/each}}
+                </select>
+
+                <small class="pokemon-player-mechanical-effect">
+                  {{pokemonPlayerProfile.natureEffect}}
+                </small>
+              </label>
+
+              <label>
+                <span>Habilidade</span>
+
+                <select data-pokemon-player-ability>
+                  {{#each pokemonPlayerProfile.abilityOptions}}
+                    <option
+                      value="{{id}}"
+                      {{#if selected}}selected{{/if}}
+                    >
+                      {{name}}{{#if hidden}} &middot; Oculta{{/if}}
+                    </option>
+                  {{/each}}
+                </select>
+
+                <small class="pokemon-player-mechanical-effect">
+                  {{pokemonPlayerProfile.abilityDescription}}
+                </small>
+              </label>
+
+            </div>
+
+          </article>
+
+          <div class="pokemon-theme-guidance">
+            O terceiro Theme ser&aacute; criado automaticamente com Natureza, atributo favorecido, Habilidade e a limita&ccedil;&atilde;o causada pela Natureza.
+          </div>
+
+        {{/if}}
+
+      {{/if}}
+
+    </section>
+
+  {{/if}}
+
+
   {{#if stepIsPokemonMoves}}
 
     <section class="pokemon-wizard-page pokemon-builder-moves-page pokemon-player-moves-page">
@@ -1025,12 +1133,25 @@
                 </span>
 
                 <p>
+                  <strong>Efeito:</strong>
                   {{description}}
                 </p>
 
-                <small>
-                  {{methodLabel}}
-                </small>
+                <span class="pokemon-player-move-meta">
+                  <small>{{methodLabel}}</small>
+
+                  {{#if pokemonDbUrl}}
+                    <button
+                      type="button"
+                      class="pokemon-pokedex-link"
+                      data-pokedex-url="{{pokemonDbUrl}}"
+                      title="Ver o golpe no Pok&eacute;monDB"
+                    >
+                      <i class="fa-solid fa-mobile-screen-button"></i>
+                      Pok&eacute;monDB
+                    </button>
+                  {{/if}}
+                </span>
 
               </span>
 
@@ -1052,7 +1173,7 @@
     <section class="pokemon-wizard-page pokemon-themes-page">
 
       <h2>
-        Construa seus Temas
+        {{#if isPokemon}}Construa seus Temas de Perfil{{else}}Construa seus Temas{{/if}}
       </h2>
 
 
@@ -1065,12 +1186,10 @@
       </div>
 
       {{#if isPokemon}}
-        {{#if pokemonPlayerMoveCount}}
-          <div class="pokemon-player-moves-theme-note">
-            <i class="fa-solid fa-bolt"></i>
-            Os {{pokemonPlayerMoveCount}} golpes escolhidos ser&atilde;o adicionados automaticamente como Tags de Poder estruturadas do personagem.
-          </div>
-        {{/if}}
+        <div class="pokemon-player-moves-theme-note">
+          <i class="fa-solid fa-layer-group"></i>
+          Escolha aqui apenas os 2 Temas narrativos. Natureza &amp; Habilidade e Golpes formar&atilde;o os outros 2 Themes automaticamente.
+        </div>
       {{/if}}
 
       {{#if selectedArchetype}}
@@ -1219,7 +1338,7 @@
       Etapa {{step}} de {{totalSteps}}
     </span>
 
-    {{#if stepIsThemes}}
+    {{#if isFinalStep}}
 
       <button
         type="button"

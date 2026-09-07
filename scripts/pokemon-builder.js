@@ -1698,6 +1698,28 @@ export async function loadPokemonTrainerCustomization(
             label:
               row.label,
 
+            raised:
+              row.raised,
+
+            lowered:
+              row.lowered,
+
+            raisedLabel:
+              row.raised
+                ? statLabel(
+                    row.raised,
+                    data.contentLanguage
+                  )
+                : "",
+
+            loweredLabel:
+              row.lowered
+                ? statLabel(
+                    row.lowered,
+                    data.contentLanguage
+                  )
+                : "",
+
             effect:
               row.effect
           };
@@ -1787,6 +1809,12 @@ export async function loadPokemonTrainerCustomization(
 
             description:
               move.shortDescription,
+
+            pokemonDbUrl:
+              "https://pokemondb.net/move/"
+              + encodeURIComponent(
+                  move.id
+                ),
 
             englishName:
               move.englishName,

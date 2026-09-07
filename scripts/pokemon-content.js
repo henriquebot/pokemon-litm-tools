@@ -524,10 +524,52 @@ function databaseMoveEffectPt(move, displayName) {
     ?? move?.flavorEn
     ?? ""
   )
-    .replace(/$effect_chance/g, "")
-    .replace(/s+/g, " ")
+    .replace(/\$effect_chance/g, "")
+    .replace(/\s+/g, " ")
     .trim()
     .toLocaleLowerCase();
+
+  const knownDescriptions = {
+    return:
+      "Quanto maior a amizade e o vínculo com seu treinador ou companheiros, maior é a força deste golpe.",
+
+    frustration:
+      "Quanto menor a amizade e o vínculo com seu treinador, maior é a força deste golpe.",
+
+    "natural-gift":
+      "Consome a Berry segurada pelo Pokémon. O tipo e o poder do golpe dependem da Berry utilizada.",
+
+    synthesis:
+      "Recupera as próprias forças. A quantidade recuperada muda conforme as condições climáticas.",
+
+    "hidden-power":
+      "Libera um poder oculto cujo tipo depende das características internas do Pokémon.",
+
+    flail:
+      "Fica mais poderoso quanto mais ferido e próximo de cair estiver o usuário.",
+
+    reversal:
+      "Fica mais poderoso quanto mais ferido e próximo de cair estiver o usuário.",
+
+    facade:
+      "Fica muito mais poderoso quando o usuário está queimado, paralisado ou envenenado.",
+
+    "gyro-ball":
+      "Fica mais poderoso quanto mais lento o usuário for em comparação ao alvo.",
+
+    "electro-ball":
+      "Fica mais poderoso quanto mais rápido o usuário for em comparação ao alvo."
+  };
+
+  if (
+    knownDescriptions[
+      move?.id
+    ]
+  ) {
+    return knownDescriptions[
+      move.id
+    ];
+  }
 
   if (!text) return "";
 

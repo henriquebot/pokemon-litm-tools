@@ -3003,3 +3003,321 @@ has(
 .pokemon-type-screen-vfx.active {
   opacity: .92;
 }
+
+/* Character Creator V2 and Pokemon Challenge action layout */
+
+.pokemon-character-creator .window-content {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pokemon-character-creator-shell {
+  height: 100%;
+  min-height: 0;
+}
+
+.pokemon-character-fields-compact {
+  flex: 0 0 auto;
+  grid-template-columns:
+    minmax(240px, 2fr)
+    minmax(160px, 1fr)
+    minmax(220px, 1.4fr);
+  gap: 8px 12px;
+  padding: 3px 0 8px;
+}
+
+.pokemon-character-fields-compact .form-group {
+  margin: 0;
+  min-width: 0;
+}
+
+.pokemon-character-fields-compact label {
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.pokemon-character-fields-compact input,
+.pokemon-character-fields-compact select {
+  width: 100%;
+  min-width: 0;
+}
+
+.pokemon-wizard-visual-page > h2 {
+  margin-bottom: 1px;
+}
+
+.pokemon-wizard-visual-page > p {
+  margin: 2px 0 5px;
+}
+
+.pokemon-character-step-divider {
+  flex: 0 0 auto;
+  margin: 7px 0;
+}
+
+.pokemon-character-creator .pokemon-wizard-progress {
+  padding: 10px 14px;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.pokemon-character-creator .pokemon-wizard-step {
+  white-space: nowrap;
+  font-size: .82rem;
+}
+
+.pokemon-character-creator .pokemon-wizard-step span {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.pokemon-character-creator .pokemon-wizard-line {
+  width: 24px;
+  min-width: 14px;
+}
+
+.pokemon-character-creator .pokemon-wizard-page {
+  padding: 16px 20px;
+}
+
+.pokemon-character-list,
+.pokemon-team-list,
+.pokemon-dream-list {
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(235px, 1fr)
+    );
+  gap: 7px;
+}
+
+.pokemon-character-creator-shell.preview-zoomed .pokemon-character-list,
+.pokemon-character-creator-shell.preview-zoomed .pokemon-team-list,
+.pokemon-character-creator-shell.preview-zoomed .pokemon-dream-list {
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(330px, 1fr)
+    );
+}
+
+.pokemon-team-slot {
+  position: relative;
+  min-height: 94px;
+  border:
+    1px solid
+    var(--color-border-light-primary);
+  border-radius: 5px;
+  background:
+    rgb(0 0 0 / .1);
+  color: inherit;
+  cursor: pointer;
+}
+
+.pokemon-team-slot:hover {
+  border-color:
+    var(--color-border-highlight);
+}
+
+.pokemon-team-remove {
+  position: absolute;
+  z-index: 5;
+  top: 3px;
+  right: 4px;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+  opacity: .7;
+  cursor: pointer;
+}
+
+.pokemon-team-remove:hover {
+  opacity: 1;
+  background:
+    rgb(255 255 255 / .08);
+}
+
+.pokemon-player-profile-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pokemon-player-profile-card {
+  display: grid;
+  grid-template-columns:
+    210px
+    minmax(0, 1fr);
+  gap: 20px;
+  padding: 16px;
+  margin: 8px 0 12px;
+  border:
+    1px solid
+    var(--color-border-light-primary);
+  border-radius: 7px;
+  background:
+    rgb(255 255 255 / .025);
+}
+
+.pokemon-player-profile-card > header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.pokemon-player-profile-card > header img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.pokemon-player-profile-card > header > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.pokemon-player-profile-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.pokemon-player-profile-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.pokemon-player-profile-grid label > span {
+  font-weight: 700;
+}
+
+.pokemon-player-profile-grid select {
+  width: 100%;
+}
+
+.pokemon-player-mechanical-effect {
+  display: block;
+  min-height: 54px;
+  padding: 8px 9px;
+  border-radius: 5px;
+  background:
+    rgb(0 0 0 / .13);
+  line-height: 1.35;
+  opacity: .85;
+}
+
+.pokemon-player-move-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pokemon-player-move-meta .pokemon-pokedex-link {
+  margin-top: 0;
+}
+
+.pokemon-biography-effects {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.pokemon-biography-effect {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(220px, 285px);
+  grid-template-areas:
+    "title actions"
+    "description actions";
+  column-gap: 14px;
+  row-gap: 4px;
+  align-items: start;
+  min-height: 72px;
+  padding: 9px 4px;
+  overflow: visible;
+}
+
+.pokemon-biography-effect > h3 {
+  grid-area: title;
+  margin: 0;
+}
+
+.pokemon-biography-effect > p {
+  grid-area: description;
+  margin: 0;
+  min-width: 0;
+}
+
+.pokemon-biography-effect-actions {
+  grid-area: actions;
+  align-self: center;
+  justify-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: center;
+  gap: 5px;
+  margin: 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.pokemon-biography-effect-actions button {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .pokemon-character-fields-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .pokemon-player-profile-card {
+    grid-template-columns: 1fr;
+  }
+
+  .pokemon-player-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pokemon-biography-effect {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "title"
+      "description"
+      "actions";
+  }
+
+  .pokemon-biography-effect-actions {
+    justify-content: flex-start;
+    margin-top: 5px;
+  }
+}

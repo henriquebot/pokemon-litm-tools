@@ -56,6 +56,8 @@
 
 ## Backlog — Configurações do módulo
 - [ ] Fazer uma auditoria completa de regras, automações e comportamentos atualmente fixos para decidir o que deve virar opção configurável do módulo, com defaults sensatos e escopo correto (mundo ou cliente). Revisar especialmente combate (ex.: exigir Rolagem Detalhada ao usar Tag de Golpe), targeting, consequências do Narrador, visibilidade, aplicação automática de efeitos, followers, VFX/áreas, interface e comportamentos padrão.
+- [ ] Guia Effects nas Configurações: editar VFX por golpe, testar, restaurar padrão e exportar presets modificados para JSON versionável no Git.
+- [ ] Hierarquia de VFX: override do mundo → preset oficial do golpe → preset do tipo → fallback nativo.
 
 ## Marco 3 — Pokémon-jogador
 - [ ] Validar no Foundry a etapa de Golpes do Pokémon-jogador com seleção de 1–4 golpes
@@ -64,7 +66,7 @@
 - [ ] Botão no header para reabrir Trainer/Pokémon-jogador no Criador em modo edição
 - [ ] Quest dos Themes Pokémon baseada em Nature, relação e evolução
 - [ ] Regras e ativação de Mega Evolução, Z-Move, Dynamax, Gigantamax, Terastalização, Reversão Primal e Ultra Burst
-- [ ] Themes reais: Habitat, Ability, Nature, Estágio Evolutivo e Move Set
+- [ ] Pokémon-jogador com 4 Themes fixos: 2 Temas de Perfil + Natureza/Habilidade + Golpes
 - [ ] Tags de Poder, Fraquezas e Quests
 - [ ] Refinamentos de Mochila e Trocas
 

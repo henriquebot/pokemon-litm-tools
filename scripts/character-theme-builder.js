@@ -37,6 +37,514 @@ function buildTag(name) {
 }
 
 
+function validProfileDraft(draft) {
+  const powerTags =
+    Array.isArray(
+      draft?.powerTags
+    )
+      ? draft.powerTags
+      : [];
+
+  const weaknessTags =
+    Array.isArray(
+      draft?.weaknessTags
+    )
+      ? draft.weaknessTags
+      : [];
+
+  return (
+    !!cleanText(
+      draft?.name
+    )
+    &&
+    powerTags.length === 3
+    &&
+    powerTags.every(
+      tag =>
+        !!cleanText(tag)
+    )
+    &&
+    weaknessTags.length === 1
+    &&
+    !!cleanText(
+      weaknessTags[0]
+    )
+    &&
+    !!cleanText(
+      draft?.quest
+    )
+  );
+}
+
+
+function normalizePokemonMoves(rows) {
+  return (
+    Array.isArray(rows)
+      ? rows
+      : []
+  )
+    .filter(
+      move =>
+        move?.id
+        &&
+        move?.name
+    )
+    .slice(0, 4)
+    .map(
+      move => ({
+        id:
+          cleanText(move.id),
+
+        name:
+          cleanText(move.name),
+
+        englishName:
+          cleanText(
+            move.englishName
+          ),
+
+        type:
+          cleanText(
+            move.type
+            || "normal"
+          ),
+
+        damageClass:
+          cleanText(
+            move.damageClass
+          ),
+
+        power:
+          Number(
+            move.power ?? 0
+          ),
+
+        accuracy:
+          move.accuracy
+          ?? null,
+
+        target:
+          cleanText(
+            move.target
+          ),
+
+        description:
+          cleanText(
+            move.description
+          ),
+
+        pokemonDbUrl:
+          cleanText(
+            move.pokemonDbUrl
+          ),
+
+        vfx:
+          cleanText(
+            move.vfx
+            ||
+            (
+              String(
+                move.type
+                || "normal"
+              )
+              + "-move"
+            )
+          ),
+
+        effects:
+          foundry.utils.deepClone(
+            Array.isArray(
+              move.effects
+            )
+              ? move.effects
+              : []
+          )
+      })
+    );
+}
+
+
+function profileThemeData(
+  draft,
+  index,
+  archetypeId
+) {
+  const powerTags =
+    (
+      Array.isArray(
+        draft?.powerTags
+      )
+        ? draft.powerTags
+        : []
+    )
+      .map(cleanText)
+      .filter(Boolean)
+      .map(buildTag);
+
+  const weaknessTags =
+    (
+      Array.isArray(
+        draft?.weaknessTags
+      )
+        ? draft.weaknessTags
+        : []
+    )
+      .map(cleanText)
+      .filter(Boolean)
+      .map(buildTag);
+
+  return {
+    name:
+      cleanText(
+        draft?.name
+      )
+      ||
+      (
+        "Tema "
+        + (index + 1)
+      ),
+
+    type:
+      "themebook",
+
+    system: {
+      type:
+        "litm-variable",
+
+      color:
+        "litm-variable",
+
+      quest:
+        cleanText(
+          draft?.quest
+        ),
+
+      story:
+        "",
+
+      tabCategory:
+        "main",
+
+      powertags:
+        powerTags,
+
+      weaknesstags:
+        weaknessTags,
+
+      options: {
+        isStoryTheme:
+          false
+      }
+    },
+
+    flags: {
+      [MODULE_ID]: {
+        characterTheme:
+          true,
+
+        characterThemeSlot:
+          index,
+
+        archetypeId,
+
+        themeRole:
+          "character-profile",
+
+        pokemonMoveBindings:
+          []
+      }
+    }
+  };
+}
+
+
+function pokemonNatureTheme(
+  profile,
+  archetypeId
+) {
+  const nature =
+    profile?.nature
+    ?? {};
+
+  const ability =
+    profile?.ability
+    ?? {};
+
+  const natureLabel =
+    cleanText(
+      nature.label
+    );
+
+  const raisedLabel =
+    cleanText(
+      nature.raisedLabel
+    );
+
+  const loweredLabel =
+    cleanText(
+      nature.loweredLabel
+    );
+
+  const abilityName =
+    cleanText(
+      ability.name
+    );
+
+  const powerNames = [
+    natureLabel
+      ? "Natureza: " + natureLabel
+      : "Natureza a definir",
+
+    raisedLabel
+      ? raisedLabel + " favorecido"
+      : "Natureza equilibrada",
+
+    abilityName
+      ? "Habilidade: " + abilityName
+      : "Habilidade a definir"
+  ];
+
+  const weakness =
+    loweredLabel
+      ? loweredLabel
+        + " prejudicado pela Natureza"
+      : (
+          cleanText(
+            profile?.weaknessTag
+          )
+          ||
+          "Ponto fraco a descobrir"
+        );
+
+  const story =
+    [
+      cleanText(
+        nature.effect
+      ),
+      cleanText(
+        ability.description
+      )
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+  return {
+    name:
+      "Natureza & Habilidade",
+
+    type:
+      "themebook",
+
+    system: {
+      type:
+        "litm-variable",
+
+      color:
+        "litm-variable",
+
+      quest:
+        "Como minha Natureza e Habilidade definem meu jeito de agir?",
+
+      story,
+
+      tabCategory:
+        "main",
+
+      powertags:
+        powerNames.map(
+          buildTag
+        ),
+
+      weaknesstags: [
+        buildTag(
+          weakness
+        )
+      ],
+
+      options: {
+        isStoryTheme:
+          false
+      }
+    },
+
+    flags: {
+      [MODULE_ID]: {
+        characterTheme:
+          true,
+
+        characterThemeSlot:
+          2,
+
+        archetypeId,
+
+        themeRole:
+          "pokemon-nature-ability",
+
+        pokemonNature:
+          foundry.utils.deepClone(
+            nature
+          ),
+
+        pokemonAbility:
+          foundry.utils.deepClone(
+            ability
+          ),
+
+        pokemonMoveBindings:
+          []
+      }
+    }
+  };
+}
+
+
+function pokemonMovesTheme(
+  moves,
+  archetypeId
+) {
+  const powerTags =
+    (
+      moves.length
+        ? moves.map(
+            move =>
+              move.name
+          )
+        : [
+            "Golpes a definir"
+          ]
+    )
+      .map(buildTag);
+
+  const uniqueTypes =
+    new Set(
+      moves
+        .map(
+          move =>
+            cleanText(
+              move.type
+            )
+        )
+        .filter(Boolean)
+    );
+
+  const weakness =
+    !moves.length
+      ? "Golpes ainda não definidos"
+      : (
+          moves.length > 1
+          && uniqueTypes.size === 1
+        )
+          ? "Cobertura de tipos limitada"
+          : "Repertório limitado aos golpes conhecidos";
+
+  const bindings =
+    moves.map(
+      (
+        move,
+        index
+      ) => ({
+        tagIndex:
+          index,
+
+        tagName:
+          move.name,
+
+        kind:
+          "pokemonMove",
+
+        moveId:
+          move.id,
+
+        type:
+          move.type,
+
+        vfx:
+          move.vfx,
+
+        effects:
+          foundry.utils.deepClone(
+            move.effects
+          )
+      })
+    );
+
+  const story =
+    moves
+      .map(
+        move =>
+          move.name
+          + (
+              move.description
+                ? ": "
+                  + move.description
+                : ""
+            )
+      )
+      .join("\n");
+
+  return {
+    name:
+      "Golpes",
+
+    type:
+      "themebook",
+
+    system: {
+      type:
+        "litm-variable",
+
+      color:
+        "litm-variable",
+
+      quest:
+        "Que novas técnicas vou dominar?",
+
+      story,
+
+      tabCategory:
+        "main",
+
+      powertags:
+        powerTags,
+
+      weaknesstags: [
+        buildTag(
+          weakness
+        )
+      ],
+
+      options: {
+        isStoryTheme:
+          false
+      }
+    },
+
+    flags: {
+      [MODULE_ID]: {
+        characterTheme:
+          true,
+
+        characterThemeSlot:
+          3,
+
+        archetypeId,
+
+        themeRole:
+          "pokemon-moves",
+
+        moves:
+          foundry.utils.deepClone(
+            moves
+          ),
+
+        pokemonMoveBindings:
+          bindings
+      }
+    }
+  };
+}
+
+
 export async function createCharacterThemes(
   actor,
   drafts,
@@ -46,277 +554,70 @@ export async function createCharacterThemes(
   if (
     !actor
     ||
-    !Array.isArray(drafts)
+    !Array.isArray(
+      drafts
+    )
   ) {
     return [];
   }
 
+  const pokemonMode =
+    options?.pokemonMode
+    === true;
+
+  const expectedDrafts =
+    pokemonMode
+      ? 2
+      : 4;
+
   const validDrafts =
-    drafts.length === 4
+    drafts.length
+      === expectedDrafts
     &&
     drafts.every(
-      draft => {
-        const powerTags =
-          Array.isArray(
-            draft?.powerTags
-          )
-            ? draft.powerTags
-            : [];
-
-        const weaknessTags =
-          Array.isArray(
-            draft?.weaknessTags
-          )
-            ? draft.weaknessTags
-            : [];
-
-        return (
-          !!cleanText(
-            draft?.name
-          )
-          &&
-          powerTags.length === 3
-          &&
-          powerTags.every(
-            tag =>
-              !!cleanText(tag)
-          )
-          &&
-          weaknessTags.length === 1
-          &&
-          !!cleanText(
-            weaknessTags[0]
-          )
-          &&
-          !!cleanText(
-            draft?.quest
-          )
-        );
-      }
+      validProfileDraft
     );
 
   if (!validDrafts) {
     throw new Error(
-      "Os 4 Temas precisam ter nome, 3 Tags de Poder, 1 Tag de Fraqueza e Quest."
+      pokemonMode
+        ? "Os 2 Temas de Perfil precisam ter nome, 3 Tags de Poder, 1 Tag de Fraqueza e Quest."
+        : "Os 4 Temas precisam ter nome, 3 Tags de Poder, 1 Tag de Fraqueza e Quest."
     );
   }
 
-
   const pokemonMoves =
-    (
-      Array.isArray(
-        options?.pokemonMoves
-      )
-        ? options.pokemonMoves
-        : []
-    )
-      .filter(
-        move =>
-          move?.id
-          &&
-          move?.name
-      )
-      .slice(0, 4)
-      .map(
-        move => ({
-          id:
-            cleanText(move.id),
-
-          name:
-            cleanText(move.name),
-
-          englishName:
-            cleanText(
-              move.englishName
-            ),
-
-          type:
-            cleanText(
-              move.type
-              || "normal"
-            ),
-
-          damageClass:
-            cleanText(
-              move.damageClass
-            ),
-
-          power:
-            Number(
-              move.power ?? 0
-            ),
-
-          accuracy:
-            move.accuracy
-            ?? null,
-
-          target:
-            cleanText(
-              move.target
-            ),
-
-          description:
-            cleanText(
-              move.description
-            ),
-
-          vfx:
-            cleanText(
-              move.vfx
-              ||
-              `${move.type || "normal"}-move`
-            ),
-
-          effects:
-            foundry.utils.deepClone(
-              Array.isArray(
-                move.effects
-              )
-                ? move.effects
-                : []
-            )
-        })
-      );
-
+    normalizePokemonMoves(
+      options?.pokemonMoves
+    );
 
   const data =
-    drafts
-      .map(
-        (draft, index) => {
-          const powerTags =
-            (
-              Array.isArray(
-                draft?.powerTags
-              )
-                ? draft.powerTags
-                : []
-            )
-              .map(cleanText)
-              .filter(Boolean)
-              .map(buildTag);
+    drafts.map(
+      (
+        draft,
+        index
+      ) =>
+        profileThemeData(
+          draft,
+          index,
+          archetypeId
+        )
+    );
 
-          const movePowerTags =
-            index === 0
-              ? pokemonMoves.map(
-                  move =>
-                    buildTag(
-                      move.name
-                    )
-                )
-              : [];
+  if (pokemonMode) {
+    data.push(
+      pokemonNatureTheme(
+        options?.pokemonProfile,
+        archetypeId
+      )
+    );
 
-          const pokemonMoveBindings =
-            index === 0
-              ? pokemonMoves.map(
-                  (
-                    move,
-                    moveIndex
-                  ) => ({
-                    tagIndex:
-                      powerTags.length
-                      + moveIndex,
-
-                    tagName:
-                      move.name,
-
-                    kind:
-                      "pokemonMove",
-
-                    moveId:
-                      move.id,
-
-                    type:
-                      move.type,
-
-                    vfx:
-                      move.vfx,
-
-                    effects:
-                      foundry.utils.deepClone(
-                        move.effects
-                      )
-                  })
-                )
-              : [];
-
-          const weaknessTags =
-            (
-              Array.isArray(
-                draft?.weaknessTags
-              )
-                ? draft.weaknessTags
-                : []
-            )
-              .map(cleanText)
-              .filter(Boolean)
-              .map(buildTag);
-
-          return {
-            name:
-              cleanText(
-                draft?.name
-              )
-              ||
-              `Tema ${index + 1}`,
-
-            type:
-              "themebook",
-
-            system: {
-              type:
-                "litm-variable",
-
-              color:
-                "litm-variable",
-
-              quest:
-                cleanText(
-                  draft?.quest
-                ),
-
-              story:
-                "",
-
-              tabCategory:
-                "main",
-
-              powertags: [
-                ...powerTags,
-                ...movePowerTags
-              ],
-
-              weaknesstags:
-                weaknessTags,
-
-              options: {
-                isStoryTheme:
-                  false
-              }
-            },
-
-            flags: {
-              [MODULE_ID]: {
-                characterTheme:
-                  true,
-
-                characterThemeSlot:
-                  index,
-
-                archetypeId,
-
-                themeRole:
-                  "character",
-
-                pokemonMoveBindings:
-                  pokemonMoveBindings
-              }
-            }
-          };
-        }
-      );
-
-  if (!data.length) {
-    return [];
+    data.push(
+      pokemonMovesTheme(
+        pokemonMoves,
+        archetypeId
+      )
+    );
   }
 
   const created =
@@ -331,11 +632,22 @@ export async function createCharacterThemes(
     archetypeId
   );
 
-  await actor.setFlag(
-    MODULE_ID,
-    "characterPokemonMoves",
-    pokemonMoves
-  );
+  if (pokemonMode) {
+    await actor.setFlag(
+      MODULE_ID,
+      "characterPokemonProfile",
+      foundry.utils.deepClone(
+        options?.pokemonProfile
+        ?? null
+      )
+    );
+
+    await actor.setFlag(
+      MODULE_ID,
+      "characterPokemonMoves",
+      pokemonMoves
+    );
+  }
 
   return created;
 }

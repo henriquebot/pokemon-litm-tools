@@ -46,7 +46,7 @@ const JB2A_PATHS = {
   electric: ["jb2a.lightning_bolt", "jb2a.chain_lightning"],
   poison: ["jb2a.poison_spray"],
   psychic: ["jb2a.energy_beam"],
-  grass: ["jb2a.entangle"],
+  grass: ["jb2a.energy_beam.green", "jb2a.energy_beam", "jb2a.entangle"],
   water: ["jb2a.water_bolt"],
   fighting: ["jb2a.unarmed_strike"],
   normal: ["jb2a.bullet.01"]
@@ -418,32 +418,89 @@ async function playMoveVfxLocal(sceneId, sourceTokenId, targetTokenIds, type) {
   if (canvas?.scene?.id !== sceneId) return;
 
   playPokemonScreenVfx(type);
-  shakePokemonScreen();
 
   const source =
     canvas.scene.tokens.get(
       sourceTokenId
     )
     ?? null;
-  const targets = (targetTokenIds ?? [])
-    .map(id => canvas.scene.tokens.get(id))
-    .filter(Boolean);
+
+  const targets =
+    (targetTokenIds ?? [])
+      .map(
+        id =>
+          canvas.scene.tokens.get(id)
+      )
+      .filter(Boolean);
+
+  const selfOnly =
+    !!source
+    &&
+    targets.length > 0
+    &&
+    targets.every(
+      target =>
+        target.id === source.id
+    );
+
+  if (!selfOnly) {
+    shakePokemonScreen();
+  }
 
   if (sequenceAvailable()) {
-    const path = databasePath(JB2A_PATHS[type] ?? []);
-    if (path && source && targets.length) {
+    const path =
+      databasePath(
+        JB2A_PATHS[type]
+        ?? []
+      );
+
+    const externalTargets =
+      targets.filter(
+        target =>
+          target.id
+          !== source?.id
+      );
+
+    if (
+      path
+      &&
+      source
+      &&
+      externalTargets.length
+    ) {
       try {
-        const seq = new Sequence({ inModuleName: MODULE_ID, softFail: true });
-        for (const target of targets) {
+        const seq =
+          new Sequence({
+            inModuleName:
+              MODULE_ID,
+
+            softFail:
+              true
+          });
+
+        for (
+          const target
+          of externalTargets
+        ) {
           seq.effect()
             .file(path)
-            .atLocation(tokenObject(source) ?? source)
-            .stretchTo(tokenObject(target) ?? target);
+            .atLocation(
+              tokenObject(source)
+              ?? source
+            )
+            .stretchTo(
+              tokenObject(target)
+              ?? target
+            );
         }
+
         await seq.play();
         return;
       } catch (error) {
-        console.warn("Pokemon LITM Tools | Sequencer Move VFX:", error);
+        console.warn(
+          "Pokemon LITM Tools | Sequencer Move VFX:",
+          error
+        );
       }
     }
 
@@ -1804,6 +1861,67 @@ function addChallengeBiographyActions(
 }
 
 
+function renamePokemonChallengeBiographyTab(
+  root
+) {
+  if (!root) return;
+
+  const candidates =
+    root.querySelectorAll(
+      "[data-tab='biography'], nav button, nav a, [role='tab'], .tabs .item"
+    );
+
+  for (
+    const candidate
+    of candidates
+  ) {
+    const label =
+      String(
+        candidate.textContent
+        ?? ""
+      ).trim();
+
+    if (
+      label.toLocaleLowerCase()
+      !== "biography"
+    ) {
+      continue;
+    }
+
+    const walker =
+      document.createTreeWalker(
+        candidate,
+        NodeFilter.SHOW_TEXT
+      );
+
+    while (
+      walker.nextNode()
+    ) {
+      const node =
+        walker.currentNode;
+
+      if (
+        /biography/i.test(
+          node.nodeValue
+          ?? ""
+        )
+      ) {
+        node.nodeValue =
+          String(
+            node.nodeValue
+          ).replace(
+            /biography/gi,
+            "Ações"
+          );
+      }
+    }
+
+    candidate.title =
+      "Ações";
+  }
+}
+
+
 function onRenderPokemonActorSheet(
   app,
   html
@@ -1831,6 +1949,10 @@ function onRenderPokemonActorSheet(
     );
 
   if (!root) return;
+
+  renamePokemonChallengeBiographyTab(
+    root
+  );
 
   addChallengeBiographyActions(
     actor,
