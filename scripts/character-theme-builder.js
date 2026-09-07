@@ -420,20 +420,37 @@ function pokemonNatureTheme(
 
 function pokemonMovesTheme(
   moves,
-  archetypeId
+  archetypeId,
+  profile = {}
 ) {
-  const powerTags =
-    (
-      moves.length
-        ? moves.map(
-            move =>
-              pokemonMoveDisplayName(move)
-          )
-        : [
-            "Golpes a definir"
-          ]
+  const speciesName =
+    cleanText(
+      profile?.species
+      || profile?.name
+      || "Pokémon"
     )
-      .map(buildTag);
+    || "Pokémon";
+
+  const speciesTag =
+    "Espécie: " + speciesName;
+
+  const moveTagNames =
+    moves.length
+      ? moves.map(
+          move =>
+            pokemonMoveDisplayName(
+              move
+            )
+        )
+      : [
+          "Golpes a definir"
+        ];
+
+  const powerTags =
+    [
+      speciesTag,
+      ...moveTagNames
+    ].map(buildTag);
 
   const uniqueTypes =
     new Set(
@@ -464,10 +481,12 @@ function pokemonMovesTheme(
         index
       ) => ({
         tagIndex:
-          index,
+          index + 1,
 
         tagName:
-          pokemonMoveDisplayName(move),
+          pokemonMoveDisplayName(
+            move
+          ),
 
         englishName:
           move.englishName,
@@ -558,6 +577,9 @@ function pokemonMovesTheme(
         themeRole:
           "pokemon-moves",
 
+        pokemonSpecies:
+          speciesName,
+
         moves:
           foundry.utils.deepClone(
             moves
@@ -641,7 +663,8 @@ export async function createCharacterThemes(
     data.push(
       pokemonMovesTheme(
         pokemonMoves,
-        archetypeId
+        archetypeId,
+        options?.pokemonProfile
       )
     );
   }

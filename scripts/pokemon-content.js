@@ -534,150 +534,967 @@ function cleanDatabaseEffect(value, effectChance = 0) {
 }
 
 
-function databaseMoveEffectPt(move, displayName) {
-  const directPt = cleanDatabaseEffect(
-    move?.effectTextPt
-    || move?.shortEffectPt
-    || "",
-    move?.effectChance
-  );
+function databaseMoveEffectPt(
+  move,
+  displayName
+) {
+  const directPt =
+    cleanDatabaseEffect(
+      move?.effectTextPt
+      || move?.shortEffectPt
+      || "",
+      move?.effectChance
+    );
 
-  if (directPt) return directPt;
+  if (directPt) {
+    return directPt;
+  }
 
-  const english = cleanDatabaseEffect(
-    move?.effectTextEn
-    || move?.shortEffectEn
-    || move?.flavorEn
-    || "",
-    move?.effectChance
-  );
+  const shortEnglish =
+    cleanDatabaseEffect(
+      move?.shortEffectEn
+      || "",
+      move?.effectChance
+    );
 
-  const text = english.toLocaleLowerCase();
+  const fullEnglish =
+    cleanDatabaseEffect(
+      move?.effectTextEn
+      || move?.flavorEn
+      || "",
+      move?.effectChance
+    );
+
+  const english =
+    shortEnglish
+    || fullEnglish;
+
+  const text =
+    english
+      .toLocaleLowerCase();
+
+  const id =
+    String(
+      move?.id
+      ?? ""
+    ).toLocaleLowerCase();
+
+  const type =
+    typeLabel(
+      move?.type
+      ?? "normal",
+      "pt-BR"
+    );
+
+  const meta =
+    move?.meta
+    ?? {};
 
   const knownDescriptions = {
     return:
       "Quanto maior a amizade e o vínculo com seu treinador ou companheiros, maior é a força deste golpe.",
+
     frustration:
       "Quanto menor a amizade e o vínculo com seu treinador, maior é a força deste golpe.",
+
     "natural-gift":
       "Consome a Berry segurada pelo Pokémon. O tipo e o poder do golpe dependem da Berry utilizada.",
+
     synthesis:
       "Recupera as próprias forças. A quantidade recuperada muda conforme as condições climáticas.",
+
+    moonlight:
+      "Recupera as próprias forças. A quantidade recuperada muda conforme as condições climáticas.",
+
+    "morning-sun":
+      "Recupera as próprias forças. A quantidade recuperada muda conforme as condições climáticas.",
+
     "hidden-power":
       "Libera um poder oculto cujo tipo depende das características internas do Pokémon.",
+
     flail:
       "Fica mais poderoso quanto mais ferido e próximo de cair estiver o usuário.",
+
     reversal:
       "Fica mais poderoso quanto mais ferido e próximo de cair estiver o usuário.",
+
     facade:
       "Fica muito mais poderoso quando o usuário está queimado, paralisado ou envenenado.",
+
     "gyro-ball":
       "Fica mais poderoso quanto mais lento o usuário for em comparação ao alvo.",
+
     "electro-ball":
       "Fica mais poderoso quanto mais rápido o usuário for em comparação ao alvo.",
+
     "focus-punch":
       "O usuário se concentra antes de atacar. Se sofrer dano antes de executar o golpe, a concentração é quebrada e o golpe falha.",
+
     "magic-coat":
       "Cria uma barreira que devolve ao responsável vários movimentos de efeito que seriam usados contra o usuário.",
+
     "light-screen":
       "Cria uma tela de luz no lado do usuário que reduz o dano causado por ataques especiais durante alguns turnos.",
+
     teleport:
       "Permite abandonar um confronto contra Pokémon selvagens; em batalhas entre treinadores, pode retirar o usuário e substituí-lo por outro Pokémon.",
+
     "guard-swap":
       "Troca com o alvo as alterações acumuladas de Defesa e Defesa Especial.",
+
     reflect:
       "Cria uma barreira no lado do usuário que reduz o dano causado por ataques físicos durante alguns turnos.",
+
     protect:
       "Protege o usuário da maioria dos golpes naquele momento; usar repetidamente torna a proteção menos confiável.",
+
     detect:
       "Protege o usuário da maioria dos golpes naquele momento; usar repetidamente torna a proteção menos confiável.",
+
     "power-swap":
       "Troca com o alvo as alterações acumuladas de Ataque e Ataque Especial.",
+
     "heart-swap":
       "Troca com o alvo todas as alterações acumuladas de atributos.",
+
     haze:
       "Remove as alterações de atributos de todos os Pokémon envolvidos no confronto.",
+
     "psych-up":
       "Copia para o usuário as alterações de atributos acumuladas pelo alvo.",
+
     "baton-pass":
       "Retira o usuário do confronto e transfere ao substituto várias alterações e efeitos que estavam ativos sobre ele.",
+
     "u-turn":
       "Causa dano e, em seguida, permite retirar o usuário do confronto e substituí-lo por outro Pokémon.",
+
     "volt-switch":
       "Causa dano e, em seguida, permite retirar o usuário do confronto e substituí-lo por outro Pokémon.",
+
     "parting-shot":
       "Reduz o Ataque e o Ataque Especial do alvo e, em seguida, permite retirar o usuário do confronto.",
+
     substitute:
       "Consome parte da vitalidade do usuário para criar um substituto que recebe ataques e vários efeitos em seu lugar.",
+
     rest:
       "O usuário adormece, recupera completamente suas forças e remove outras condições negativas.",
+
     "belly-drum":
       "Sacrifica grande parte da vitalidade do usuário para elevar seu Ataque ao máximo.",
+
     "pain-split":
       "Soma a vitalidade atual do usuário e do alvo e divide o total igualmente entre os dois.",
+
     "perish-song":
       "Marca os Pokémon que ouvirem a canção; se permanecerem em batalha até a contagem terminar, são derrotados.",
+
     "destiny-bond":
       "Se o usuário for derrotado por um ataque antes de agir novamente, o responsável por derrotá-lo também cai.",
+
     encore:
       "Força o alvo a repetir por algum tempo o último movimento que utilizou.",
+
     disable:
       "Impede temporariamente que o alvo utilize o último movimento que executou.",
+
     taunt:
       "Provoca o alvo e o impede temporariamente de utilizar movimentos que não causam dano direto.",
+
     torment:
-      "Impede o alvo de repetir o mesmo movimento em ações consecutivas."
+      "Impede o alvo de repetir o mesmo movimento em ações consecutivas.",
+
+    "giga-impact":
+      "Causa dano. Depois de usar, o usuário precisa se recuperar e não pode atacar nem ser trocado na próxima ação.",
+
+    "hyper-beam":
+      "Causa dano. Depois de usar, o usuário precisa se recuperar e não pode atacar nem ser trocado na próxima ação.",
+
+    "last-resort":
+      "Só pode ser usado depois que o usuário tiver utilizado pelo menos uma vez cada um de seus outros golpes desde que entrou em campo. Falha se for seu único golpe.",
+
+    stomp:
+      "Causa dano e pode fazer o alvo hesitar. O poder é dobrado contra um Pokémon que tenha usado Minimizar desde que entrou em campo.",
+
+    headbutt:
+      "Causa dano e pode fazer o alvo hesitar.",
+
+    "false-swipe":
+      "Causa dano, mas nunca reduz o alvo abaixo do mínimo necessário para continuar de pé.",
+
+    endeavor:
+      "Reduz a vitalidade do alvo até ela se igualar à vitalidade atual do usuário; falha se o alvo já estiver igual ou abaixo.",
+
+    "super-fang":
+      "Reduz pela metade a vitalidade atual do alvo.",
+
+    "seismic-toss":
+      "Causa uma quantidade fixa de dano baseada no nível do usuário.",
+
+    "night-shade":
+      "Causa uma quantidade fixa de dano baseada no nível do usuário.",
+
+    "dragon-rage":
+      "Causa uma quantidade fixa de dano, independentemente dos atributos ofensivos e defensivos.",
+
+    "sonic-boom":
+      "Causa uma quantidade fixa de dano, independentemente dos atributos ofensivos e defensivos.",
+
+    "low-kick":
+      "Fica mais poderoso quanto mais pesado for o alvo.",
+
+    "grass-knot":
+      "Fica mais poderoso quanto mais pesado for o alvo.",
+
+    "heavy-slam":
+      "Fica mais poderoso quanto mais pesado o usuário for em comparação ao alvo.",
+
+    "heat-crash":
+      "Fica mais poderoso quanto mais pesado o usuário for em comparação ao alvo.",
+
+    eruption:
+      "Fica mais poderoso quanto maior estiver a vitalidade atual do usuário.",
+
+    "water-spout":
+      "Fica mais poderoso quanto maior estiver a vitalidade atual do usuário.",
+
+    brine:
+      "Causa mais dano quando o alvo já está muito ferido.",
+
+    venoshock:
+      "Causa mais dano se o alvo estiver envenenado.",
+
+    hex:
+      "Causa mais dano se o alvo estiver sob uma condição negativa importante.",
+
+    avalanche:
+      "Causa mais dano se o usuário já tiver sido atingido pelo alvo naquela ação.",
+
+    revenge:
+      "Causa mais dano se o usuário já tiver sido atingido pelo alvo naquela ação.",
+
+    payback:
+      "Causa mais dano quando o usuário age depois do alvo.",
+
+    assurance:
+      "Causa mais dano se o alvo já tiver sofrido dano naquela ação.",
+
+    "stored-power":
+      "Fica mais poderoso conforme aumentam os atributos do usuário.",
+
+    punishment:
+      "Fica mais poderoso conforme aumentam os atributos do alvo.",
+
+    "solar-beam":
+      "Concentra energia antes de atacar. Sob sol forte, pode ser disparado sem a etapa de preparação.",
+
+    "solar-blade":
+      "Concentra energia antes de atacar. Sob sol forte, pode ser executado sem a etapa de preparação.",
+
+    fly:
+      "O usuário sobe para fora de alcance e ataca depois. Enquanto está no ar, evita a maioria dos golpes comuns.",
+
+    dig:
+      "O usuário se esconde sob o solo e ataca depois. Enquanto está subterrâneo, evita a maioria dos golpes comuns.",
+
+    dive:
+      "O usuário mergulha e ataca depois. Enquanto está submerso, evita a maioria dos golpes comuns.",
+
+    bounce:
+      "O usuário salta para fora de alcance e ataca depois, podendo também paralisar o alvo.",
+
+    bide:
+      "Suporta ataques por um período e depois devolve ao adversário uma quantidade de dano baseada no que sofreu.",
+
+    counter:
+      "Revida um ataque físico recebido, devolvendo dano ampliado ao responsável.",
+
+    "mirror-coat":
+      "Revida um ataque especial recebido, devolvendo dano ampliado ao responsável.",
+
+    metronome:
+      "Executa aleatoriamente outro golpe disponível no conjunto de movimentos do jogo.",
+
+    "mirror-move":
+      "Tenta copiar e executar o último golpe usado pelo alvo contra o usuário.",
+
+    copycat:
+      "Executa novamente o último golpe usado no campo, quando esse golpe puder ser copiado.",
+
+    "sleep-talk":
+      "Enquanto dorme, escolhe e executa aleatoriamente um dos outros golpes conhecidos pelo usuário.",
+
+    snore:
+      "Só pode ser usado enquanto o usuário está dormindo; causa dano e pode fazer o alvo hesitar.",
+
+    "dream-eater":
+      "Só funciona contra um alvo adormecido; causa dano e recupera parte da vitalidade do usuário.",
+
+    "future-sight":
+      "Prepara um ataque que atinge o alvo depois de um intervalo, mesmo que o usuário já tenha agido novamente.",
+
+    "doom-desire":
+      "Prepara um ataque que atinge o alvo depois de um intervalo, mesmo que o usuário já tenha agido novamente.",
+
+    "rapid-spin":
+      "Causa dano e remove do lado do usuário vários efeitos que prendem o Pokémon ou permanecem espalhados pelo campo.",
+
+    defog:
+      "Reduz a Evasão do alvo e remove vários efeitos de campo, barreiras e perigos de entrada.",
+
+    whirlwind:
+      "Força o alvo a deixar o confronto; contra Pokémon selvagens, pode encerrar o encontro.",
+
+    roar:
+      "Força o alvo a deixar o confronto; contra Pokémon selvagens, pode encerrar o encontro.",
+
+    "dragon-tail":
+      "Causa dano e força o alvo a deixar o confronto quando isso for possível.",
+
+    "circle-throw":
+      "Causa dano e força o alvo a deixar o confronto quando isso for possível.",
+
+    "trick-room":
+      "Distorce a ordem de velocidade no campo, fazendo os mais lentos agirem antes dos mais rápidos enquanto durar.",
+
+    gravity:
+      "Intensifica a gravidade no campo, impedindo voo livre e tornando evasões mais difíceis.",
+
+    tailwind:
+      "Cria um vento favorável que aumenta a velocidade do lado do usuário por algum tempo.",
+
+    spikes:
+      "Espalha espinhos no lado adversário do campo, ferindo Pokémon que entrarem em contato com o chão.",
+
+    "toxic-spikes":
+      "Espalha espinhos tóxicos no lado adversário, capazes de envenenar Pokémon que entrarem em contato com o chão.",
+
+    "stealth-rock":
+      "Espalha pedras afiadas ao redor do lado adversário, ferindo Pokémon que entrarem no campo conforme sua relação com o tipo Pedra.",
+
+    "sticky-web":
+      "Espalha uma teia no lado adversário que reduz a Velocidade de Pokémon que entrarem em contato com o chão.",
+
+    "rain-dance":
+      "Invoca chuva e altera as condições do campo por algum tempo.",
+
+    "sunny-day":
+      "Intensifica a luz solar e altera as condições do campo por algum tempo.",
+
+    sandstorm:
+      "Invoca uma tempestade de areia e altera as condições do campo por algum tempo.",
+
+    hail:
+      "Invoca granizo e altera as condições do campo por algum tempo.",
+
+    "electric-terrain":
+      "Eletrifica o terreno, fortalecendo interações Elétricas e impedindo que Pokémon em contato com o chão adormeçam.",
+
+    "grassy-terrain":
+      "Transforma o terreno em Campo de Grama, fortalecendo interações de Planta e ajudando Pokémon em contato com o chão a se recuperar.",
+
+    "misty-terrain":
+      "Cobre o terreno com névoa, protegendo Pokémon em contato com o chão de várias condições negativas.",
+
+    "psychic-terrain":
+      "Transforma o terreno em Campo Psíquico, fortalecendo interações Psíquicas e interferindo em golpes de prioridade contra alvos no chão."
   };
 
-  if (knownDescriptions[move?.id]) {
-    return knownDescriptions[move.id];
+  if (
+    knownDescriptions[id]
+  ) {
+    return knownDescriptions[id];
   }
 
-  if (!text) return "";
+  if (!text) {
+    return "";
+  }
 
-  if (/changes? the target'?s ability to insomnia/.test(text)) {
-    return "Substitui a Habilidade do alvo por Insônia, impedindo que ele adormeça enquanto o efeito permanecer.";
+  const statPt =
+    value => ({
+      attack:
+        "Ataque",
+
+      defense:
+        "Defesa",
+
+      "special attack":
+        "Ataque Especial",
+
+      "special defense":
+        "Defesa Especial",
+
+      speed:
+        "Velocidade",
+
+      accuracy:
+        "Precisão",
+
+      evasion:
+        "Evasão"
+    }[
+      String(
+        value
+        ?? ""
+      ).toLocaleLowerCase()
+    ]
+    ?? String(
+      value
+      ?? "atributo"
+    ));
+
+  let match =
+    null;
+
+  if (
+    /^inflicts (regular |normal )?damage with no additional effect\.?$/
+      .test(text)
+  ) {
+    return "Causa dano sem efeito adicional.";
   }
-  if (/suppresses? the target'?s ability/.test(text)) {
-    return "Suprime temporariamente a Habilidade do alvo e impede que seus efeitos funcionem.";
+
+  if (
+    /^(inflicts|deals) (regular |normal )?damage\.?$/
+      .test(text)
+  ) {
+    return "Causa dano.";
   }
-  if (/swaps?.*abilit/.test(text)) {
-    return "Troca as Habilidades do usuário e do alvo enquanto o efeito permanecer.";
+
+  if (
+    /^puts? the target to sleep\.?$/
+      .test(text)
+  ) {
+    return "Faz o alvo dormir.";
   }
-  if (/copies?.*target'?s ability/.test(text)) {
-    return "Copia temporariamente a Habilidade do alvo.";
+
+  if (
+    /^never misses\.?$/
+      .test(text)
+  ) {
+    return "Ignora as alterações normais de Precisão e Evasão e não erra em condições comuns.";
   }
-  if (/prevents?.*status moves/.test(text)) {
-    return "Impede temporariamente o alvo de utilizar movimentos que não causam dano direto.";
+
+  match =
+    text.match(
+      /^(raises|lowers) the (user|target)'s (attack|defense|special attack|special defense|speed|accuracy|evasion) by (one|two|three) stages?\.?$/
+    );
+
+  if (match) {
+    const verb =
+      match[1] === "raises"
+        ? "Aumenta"
+        : "Reduz";
+
+    const who =
+      match[2] === "user"
+        ? "do usuário"
+        : "do alvo";
+
+    const amount =
+      ({
+        one:
+          "um nível",
+
+        two:
+          "dois níveis",
+
+        three:
+          "três níveis"
+      })[
+        match[4]
+      ]
+      || "um nível";
+
+    return (
+      verb
+      + " "
+      + statPt(match[3])
+      + " "
+      + who
+      + " em "
+      + amount
+      + "."
+    );
   }
-  if (/same move twice in a row/.test(text)) {
-    return "Impede o alvo de repetir o mesmo movimento em ações consecutivas.";
+
+  match =
+    text.match(
+      /^has a ([0-9]+)% chance to (poison|burn|paralyze|freeze|confuse) the target\.?$/
+    );
+
+  if (match) {
+    const status =
+      ({
+        poison:
+          "envenenar",
+
+        burn:
+          "queimar",
+
+        paralyze:
+          "paralisar",
+
+        freeze:
+          "congelar",
+
+        confuse:
+          "confundir"
+      })[
+        match[2]
+      ];
+
+    return (
+      "Tem "
+      + match[1]
+      + "% de chance de "
+      + status
+      + " o alvo."
+    );
   }
-  if (/repeat.*last move/.test(text)) {
-    return "Força o alvo a continuar repetindo o último movimento utilizado.";
+
+  match =
+    text.match(
+      /^has a ([0-9]+)% chance to make the target flinch\.?$/
+    );
+
+  if (match) {
+    return (
+      "Tem "
+      + match[1]
+      + "% de chance de fazer o alvo hesitar."
+    );
   }
-  if (/changes? the weather to rain|summons? rain/.test(text)) {
+
+  if (
+    /drains? half the damage inflicted to heal the user/
+      .test(text)
+  ) {
+    return "Causa dano e recupera para o usuário uma parte da vitalidade com base no dano causado.";
+  }
+
+  if (
+    /user receives?.*damage inflicted.*recoil|user takes?.*damage.*recoil/
+      .test(text)
+  ) {
+    return "Causa dano, mas o usuário também sofre parte do impacto como recuo.";
+  }
+
+  if (
+    /hits? (two|twice)/
+      .test(text)
+  ) {
+    return "Atinge o alvo duas vezes na mesma execução.";
+  }
+
+  if (
+    /hits? (2.?5|two to five).*times/
+      .test(text)
+  ) {
+    return "Atinge o alvo várias vezes na mesma execução, normalmente entre duas e cinco vezes.";
+  }
+
+  if (
+    /forces? the target to switch|switches? the target out/
+      .test(text)
+  ) {
+    return "Força o alvo a deixar o confronto e ser substituído quando isso for possível.";
+  }
+
+  if (
+    /switches the user out|user switches out/
+      .test(text)
+  ) {
+    return (
+      String(displayName)
+      + " produz seu efeito e então permite retirar o usuário do confronto."
+    );
+  }
+
+  if (
+    /changes? the weather to rain|summons? rain/
+      .test(text)
+  ) {
     return "Invoca chuva e altera as condições do campo de batalha.";
   }
-  if (/sunlight|sunny/.test(text) && /weather|intensif|summon|changes/.test(text)) {
+
+  if (
+    /sunlight|sunny|sunshine/
+      .test(text)
+    &&
+    /weather|intensif|summon|changes/
+      .test(text)
+  ) {
     return "Intensifica a luz solar e altera as condições do campo de batalha.";
   }
-  if (/terrain/.test(text) && /grass/.test(text)) {
+
+  if (
+    /terrain/
+      .test(text)
+    &&
+    /grass/
+      .test(text)
+  ) {
     return "Transforma o terreno em um Campo de Grama e modifica como certas técnicas interagem com o campo.";
   }
-  if (/switches the user out|user switches out/.test(text)) {
-    return String(displayName) + " produz seu efeito e então permite retirar o usuário do confronto.";
+
+  if (
+    /changes? the target'?s ability to insomnia/
+      .test(text)
+  ) {
+    return "Substitui a Habilidade do alvo por Insônia, impedindo que ele adormeça enquanto o efeito permanecer.";
   }
 
-  // Um efeito real do banco nunca vira uma descricao generica silenciosa.
-  // Quando ainda nao houver adaptacao PT-BR, mostramos o texto mecanico
-  // oficial em ingles, claramente identificado, em vez de inventar regra.
-  const regularOnly = /^(inflicts|deals) (regular |normal )?damage\.?$/.test(text);
-  if (english && !regularOnly) {
-    return "Efeito oficial (inglês): " + english;
+  if (
+    /suppresses? the target'?s ability/
+      .test(text)
+  ) {
+    return "Suprime temporariamente a Habilidade do alvo e impede que seus efeitos funcionem.";
   }
 
-  return "";
+  if (
+    /swaps?.*abilit/
+      .test(text)
+  ) {
+    return "Troca as Habilidades do usuário e do alvo enquanto o efeito permanecer.";
+  }
+
+  if (
+    /copies?.*target'?s ability/
+      .test(text)
+  ) {
+    return "Copia temporariamente a Habilidade do alvo.";
+  }
+
+  if (
+    /prevents?.*status moves/
+      .test(text)
+  ) {
+    return "Impede temporariamente o alvo de utilizar movimentos que não causam dano direto.";
+  }
+
+  if (
+    /same move twice in a row/
+      .test(text)
+  ) {
+    return "Impede o alvo de repetir o mesmo movimento em ações consecutivas.";
+  }
+
+  if (
+    /repeat.*last move/
+      .test(text)
+  ) {
+    return "Força o alvo a continuar repetindo o último movimento utilizado.";
+  }
+
+  if (
+    /protects? the user|prevents? attacks? from hitting the user/
+      .test(text)
+  ) {
+    return "Protege o usuário de ataques enquanto o efeito permanecer, sujeito às limitações do próprio golpe.";
+  }
+
+  if (
+    /critical hit/
+      .test(text)
+    &&
+    /more likely|increased|higher/
+      .test(text)
+  ) {
+    return "Causa dano com chance aumentada de acertar um ponto crítico.";
+  }
+
+  if (
+    /ignores?.*accuracy|ignores?.*evasion/
+      .test(text)
+  ) {
+    return "Ignora alterações comuns de Precisão e Evasão ao tentar acertar o alvo.";
+  }
+
+  const parts = [];
+
+  const add =
+    value => {
+      const clean =
+        String(
+          value
+          ?? ""
+        ).trim();
+
+      if (
+        clean
+        &&
+        !parts.includes(clean)
+      ) {
+        parts.push(clean);
+      }
+    };
+
+  if (
+    Number(
+      move?.power
+      ?? 0
+    ) > 0
+    &&
+    move?.damageClass
+      !== "status"
+  ) {
+    add(
+      "Causa dano do tipo "
+      + type
+      + "."
+    );
+  }
+
+  const ailment =
+    String(
+      meta.ailment
+      ?? ""
+    );
+
+  if (
+    ailment
+    &&
+    ailment !== "none"
+    &&
+    ailment !== "unknown"
+  ) {
+    const status =
+      AILMENT_PTBR[ailment]
+      ?? ailment;
+
+    const chance =
+      Number(
+        meta.ailmentChance
+        ?? move?.effectChance
+        ?? 0
+      );
+
+    add(
+      chance > 0
+      && chance < 100
+        ? (
+            "Tem "
+            + chance
+            + "% de chance de deixar o alvo "
+            + status
+            + "."
+          )
+        : (
+            "Pode deixar o alvo "
+            + status
+            + "."
+          )
+    );
+  }
+
+  const flinch =
+    Number(
+      meta.flinchChance
+      ?? 0
+    );
+
+  if (flinch > 0) {
+    add(
+      "Tem "
+      + flinch
+      + "% de chance de fazer o alvo hesitar."
+    );
+  }
+
+  const drain =
+    Number(
+      meta.drain
+      ?? 0
+    );
+
+  if (drain > 0) {
+    add(
+      "Recupera parte da vitalidade do usuário com base no dano causado."
+    );
+  }
+
+  if (drain < 0) {
+    add(
+      "O usuário sofre parte do dano causado como recuo."
+    );
+  }
+
+  const healing =
+    Number(
+      meta.healing
+      ?? 0
+    );
+
+  if (healing > 0) {
+    add(
+      "Recupera parte da vitalidade do usuário."
+    );
+  }
+
+  for (
+    const change
+    of move?.statChanges
+      ?? []
+  ) {
+    const amount =
+      Number(
+        change?.change
+        ?? 0
+      );
+
+    if (!amount) {
+      continue;
+    }
+
+    const targetSelf =
+      String(
+        move?.target
+        ?? ""
+      ).includes("user");
+
+    add(
+      (
+        amount > 0
+          ? "Aumenta "
+          : "Reduz "
+      )
+      + statLabel(
+          change.stat,
+          "pt-BR"
+        )
+      + (
+          targetSelf
+            ? " do usuário."
+            : " do alvo."
+        )
+    );
+  }
+
+  const minHits =
+    Number(
+      meta.minHits
+      ?? 0
+    );
+
+  const maxHits =
+    Number(
+      meta.maxHits
+      ?? 0
+    );
+
+  if (maxHits > 1) {
+    add(
+      minHits > 0
+      && minHits !== maxHits
+        ? (
+            "Pode atingir de "
+            + minHits
+            + " a "
+            + maxHits
+            + " vezes na mesma execução."
+          )
+        : (
+            "Atinge "
+            + maxHits
+            + " vezes na mesma execução."
+          )
+    );
+  }
+
+  if (
+    /recharge|loses its next turn/
+      .test(text)
+  ) {
+    add(
+      "Depois de usar, o usuário precisa se recuperar antes de agir normalmente de novo."
+    );
+  }
+
+  if (
+    /charge turn|charges? for one turn|first turn/
+      .test(text)
+    &&
+    /second turn|next turn|then attacks/
+      .test(text)
+  ) {
+    add(
+      "Exige uma etapa de preparação antes de executar o efeito principal."
+    );
+  }
+
+  if (
+    /held item|holding an item|berry/
+      .test(text)
+  ) {
+    add(
+      "Interage com o item segurado pelo Pokémon; o resultado depende do item e das condições descritas pelo golpe."
+    );
+  }
+
+  if (
+    /power.*higher|power.*increases|power doubles|double power|more damage/
+      .test(text)
+  ) {
+    add(
+      "Seu poder varia de acordo com uma condição específica do usuário, do alvo ou do confronto."
+    );
+  }
+
+  if (
+    /fails? if|only works? if|can only be used/
+      .test(text)
+  ) {
+    add(
+      "Só funciona quando as condições específicas deste golpe são atendidas."
+    );
+  }
+
+  if (
+    /changes? the user'?s type|changes? type|becomes? .*type/
+      .test(text)
+  ) {
+    add(
+      "Pode alterar a tipagem envolvida no confronto conforme as regras próprias do golpe."
+    );
+  }
+
+  if (
+    /copies?|mimics?|uses? the target'?s move/
+      .test(text)
+  ) {
+    add(
+      "Copia ou reutiliza outro golpe quando as condições próprias desta técnica permitem."
+    );
+  }
+
+  if (parts.length) {
+    return parts.join(" ");
+  }
+
+  console.warn(
+    "Pokemon LITM Tools | Efeito de golpe ainda sem adaptacao especifica PT-BR:",
+    id,
+    english
+  );
+
+  return (
+    move?.damageClass
+      === "status"
+  )
+    ? (
+        "Altera as condições do confronto de acordo com a mecânica própria de "
+        + String(
+            displayName
+            || "este golpe"
+          )
+        + "."
+      )
+    : (
+        "Causa dano do tipo "
+        + type
+        + "."
+      );
 }
 
 

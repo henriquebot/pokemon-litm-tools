@@ -11,6 +11,423 @@ const COMBAT_FOLDER_NAME = "Pokémon - Combate (Gerado)";
 const pendingRequests = new Map();
 let activated = false;
 
+function wait(ms) {
+  return new Promise(
+    resolve =>
+      setTimeout(
+        resolve,
+        ms
+      )
+  );
+}
+
+
+function pokemonCombatTokenObject(
+  tokenDoc
+) {
+  return (
+    tokenDoc?.object
+    ?? canvas?.tokens?.get?.(
+      tokenDoc?.id
+    )
+    ?? null
+  );
+}
+
+
+async function waitForPokemonToken(
+  sceneId,
+  tokenId,
+  attempts = 14
+) {
+  for (
+    let index = 0;
+    index < attempts;
+    index++
+  ) {
+    if (
+      canvas?.scene?.id
+        !== sceneId
+    ) {
+      return null;
+    }
+
+    const token =
+      canvas.scene.tokens.get(
+        tokenId
+      )
+      ?? null;
+
+    if (
+      token
+      &&
+      pokemonCombatTokenObject(
+        token
+      )
+    ) {
+      return token;
+    }
+
+    await wait(45);
+  }
+
+  return (
+    canvas?.scene?.id
+      === sceneId
+  )
+    ? (
+        canvas.scene.tokens.get(
+          tokenId
+        )
+        ?? null
+      )
+    : null;
+}
+
+
+function pokeballSequenceAvailable() {
+  return (
+    game.modules
+      .get("sequencer")
+      ?.active
+      === true
+
+    &&
+
+    typeof globalThis.Sequence
+      === "function"
+  );
+}
+
+
+async function animatePokemonTokenNative(
+  tokenDoc,
+  mode
+) {
+  const object =
+    pokemonCombatTokenObject(
+      tokenDoc
+    );
+
+  const mesh =
+    object?.mesh
+    ?? object?.icon
+    ?? null;
+
+  if (!mesh) {
+    await wait(420);
+    return;
+  }
+
+  const duration =
+    mode === "recollect"
+      ? 470
+      : 520;
+
+  const started =
+    performance.now();
+
+  const originalAlpha =
+    Number(
+      mesh.alpha
+      ?? 1
+    );
+
+  const originalTint =
+    mesh.tint;
+
+  const scaleX =
+    Number(
+      mesh.scale?.x
+      ?? 1
+    );
+
+  const scaleY =
+    Number(
+      mesh.scale?.y
+      ?? 1
+    );
+
+  const setScale =
+    factor => {
+      try {
+        mesh.scale?.set?.(
+          scaleX * factor,
+          scaleY * factor
+        );
+      } catch {}
+    };
+
+  await new Promise(
+    resolve => {
+      const frame =
+        now => {
+          const progress =
+            Math.max(
+              0,
+              Math.min(
+                1,
+                (
+                  now
+                  - started
+                )
+                / duration
+              )
+            );
+
+          const eased =
+            1
+            - Math.pow(
+                1 - progress,
+                3
+              );
+
+          try {
+            if (
+              mode === "deploy"
+            ) {
+              mesh.alpha =
+                originalAlpha
+                * eased;
+
+              setScale(
+                0.12
+                + 0.88
+                  * eased
+              );
+
+              if (
+                progress < 0.58
+              ) {
+                mesh.tint =
+                  0xffffff;
+              } else {
+                mesh.tint =
+                  originalTint;
+              }
+
+            } else {
+              mesh.alpha =
+                originalAlpha
+                * (
+                    1
+                    - eased
+                  );
+
+              setScale(
+                1
+                - 0.88
+                  * eased
+              );
+
+              mesh.tint =
+                progress < 0.35
+                  ? 0xffffff
+                  : 0xff4d4d;
+            }
+
+          } catch {}
+
+          if (
+            progress < 1
+          ) {
+            requestAnimationFrame(
+              frame
+            );
+          } else {
+            resolve();
+          }
+        };
+
+      requestAnimationFrame(
+        frame
+      );
+    }
+  );
+
+  if (
+    mode === "deploy"
+  ) {
+    try {
+      mesh.alpha =
+        originalAlpha;
+
+      mesh.tint =
+        originalTint;
+
+      mesh.scale?.set?.(
+        scaleX,
+        scaleY
+      );
+
+    } catch {}
+  }
+}
+
+
+async function playPokeballVfxLocal(
+  sceneId,
+  tokenId,
+  mode
+) {
+  if (
+    canvas?.scene?.id
+      !== sceneId
+  ) {
+    return;
+  }
+
+  const tokenDoc =
+    await waitForPokemonToken(
+      sceneId,
+      tokenId
+    );
+
+  if (!tokenDoc) {
+    return;
+  }
+
+  const object =
+    pokemonCombatTokenObject(
+      tokenDoc
+    );
+
+  if (
+    pokeballSequenceAvailable()
+    &&
+    object
+  ) {
+    try {
+      const sequence =
+        new Sequence({
+          inModuleName:
+            MODULE_ID,
+
+          softFail:
+            true
+        });
+
+      sequence.effect()
+        .atLocation(
+          object
+        )
+        .shape(
+          "circle",
+          {
+            radius:
+              0.48,
+
+            gridUnits:
+              true,
+
+            fillColor:
+              0xffffff,
+
+            fillAlpha:
+              0.86,
+
+            lineSize:
+              4,
+
+            lineColor:
+              0xff3b30,
+
+            name:
+              "pokemon-pokeball-flash"
+          }
+        )
+        .scaleIn(
+          mode === "deploy"
+            ? 0.25
+            : 1.05,
+          160
+        )
+        .fadeIn(55)
+        .fadeOut(330)
+        .duration(430);
+
+      sequence.effect()
+        .atLocation(
+          object
+        )
+        .shape(
+          "circle",
+          {
+            radius:
+              0.68,
+
+            gridUnits:
+              true,
+
+            fillColor:
+              0xff4d4d,
+
+            fillAlpha:
+              0.18,
+
+            lineSize:
+              3,
+
+            lineColor:
+              0xffffff,
+
+            name:
+              "pokemon-pokeball-ring"
+          }
+        )
+        .scaleIn(
+          mode === "deploy"
+            ? 0.35
+            : 1.1,
+          220
+        )
+        .fadeOut(420)
+        .duration(500);
+
+      void sequence.play();
+
+    } catch (error) {
+      console.warn(
+        "Pokemon LITM Tools | Pokeball Sequencer:",
+        error
+      );
+    }
+  }
+
+  await animatePokemonTokenNative(
+    tokenDoc,
+    mode
+  );
+}
+
+
+async function broadcastPokeballVfx(
+  sceneId,
+  tokenId,
+  mode
+) {
+  game.socket.emit(
+    SOCKET_NAME,
+    {
+      kind:
+        "pokeball-vfx",
+
+      sourceUserId:
+        game.user.id,
+
+      sceneId,
+      tokenId,
+      mode
+    }
+  );
+
+  await playPokeballVfxLocal(
+    sceneId,
+    tokenId,
+    mode
+  );
+}
+
 function randomId() {
   return foundry.utils.randomID(16);
 }
@@ -408,6 +825,12 @@ async function deployDirect({
     throw new Error("Não foi possível colocar o Pokémon na cena.");
   }
 
+  await broadcastPokeballVfx(
+    scene.id,
+    token.id,
+    "deploy"
+  );
+
   return {
     tokenId: token.id,
     actorId: actor.id,
@@ -448,7 +871,21 @@ async function recollectDirect({
     .map(token => token.id);
 
   if (ids.length) {
-    await scene.deleteEmbeddedDocuments("Token", ids);
+    for (
+      const tokenId
+      of ids
+    ) {
+      await broadcastPokeballVfx(
+        scene.id,
+        tokenId,
+        "recollect"
+      );
+    }
+
+    await scene.deleteEmbeddedDocuments(
+      "Token",
+      ids
+    );
   }
 
   return true;
@@ -511,6 +948,27 @@ async function socketRequest(message) {
 
 function onSocket(message) {
   if (!message || typeof message !== "object") return;
+
+  if (
+    message.kind
+      === "pokeball-vfx"
+  ) {
+    if (
+      message.sourceUserId
+        === game.user.id
+    ) {
+      return;
+    }
+
+    void playPokeballVfxLocal(
+      message.sceneId,
+      message.tokenId,
+      message.mode
+    );
+
+    return;
+  }
+
   if (message.kind === "response") {
     socketResponse(message);
     return;

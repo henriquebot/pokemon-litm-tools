@@ -3520,3 +3520,34 @@ has(
   }
 }
 
+/* Pokemon move UX stabilization */
+
+.pokemon-character-other-actions {
+  margin-left: 300px;
+  max-width: calc(100% - 300px);
+  box-sizing: border-box;
+}
+
+.pokemon-character-action-card {
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(250px, 330px);
+}
+
+.pokemon-character-action-main p,
+.pokemon-biography-effect-main p {
+  overflow-wrap: anywhere;
+}
+
+.pokemon-character-action-buttons,
+.pokemon-biography-vfx-actions,
+.pokemon-biography-mechanical-actions {
+  align-content: start;
+}
+
+@media (max-width: 900px) {
+  .pokemon-character-other-actions {
+    margin-left: 0;
+    max-width: 100%;
+  }
+}

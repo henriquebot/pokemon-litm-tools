@@ -254,15 +254,9 @@ const resolvedMoveCache = new Map();
 async function enrichMoveForActor(actor, move) {
   if (!move?.id) return move;
 
-  if (
-    !move._needsEnrichment
-    && move.type
-    && Array.isArray(move.effects)
-    && move.description
-  ) {
-    return move;
-  }
-
+  // Sempre resolve o perfil pelo ID canonico.
+  // O cache abaixo evita requisicoes repetidas e impede
+  // descricoes antigas de ficarem presas no Actor.
   const language = actor?.getFlag?.(MODULE_ID, "contentLanguage") ?? "pt-BR";
   const might = actor?.getFlag?.(MODULE_ID, "might") ?? "origin";
   const key = [move.id, language, might].join("|");
@@ -489,17 +483,55 @@ function sequenceAvailable() {
 }
 
 function databasePath(candidates) {
-  if (!sequenceAvailable()) return null;
-  for (const path of candidates ?? []) {
+  if (!sequenceAvailable()) {
+    return null;
+  }
+
+  const database =
+    globalThis
+      .Sequencer
+      ?.Database;
+
+  const entryExists =
+    database
+      ?.entryExists;
+
+  for (
+    const path
+    of candidates
+      ?? []
+  ) {
     try {
       if (
-        globalThis.Sequencer?.Database?.getEntry?.(
-          path,
-          { softFail: true }
-        )
-      ) return path;
+        typeof entryExists
+          === "function"
+      ) {
+        if (
+          entryExists.call(
+            database,
+            path
+          )
+        ) {
+          return path;
+        }
+
+        continue;
+      }
+
+      if (
+        database
+          ?.getEntry
+          ?.(path, {
+            softFail:
+              true
+          })
+      ) {
+        return path;
+      }
+
     } catch {}
   }
+
   return null;
 }
 
@@ -751,6 +783,199 @@ async function broadcastMoveVfx(
 }
 
 
+async function playMoveVfxAtPointLocal(
+  sceneId,
+  sourceTokenId,
+  point,
+  type
+) {
+  if (
+    canvas?.scene?.id
+      !== sceneId
+  ) {
+    return;
+  }
+
+  playPokemonScreenVfx(
+    type
+  );
+
+  const source =
+    canvas.scene.tokens.get(
+      sourceTokenId
+    )
+    ?? null;
+
+  const center = {
+    x:
+      Number(
+        point?.x
+        ?? 0
+      ),
+
+    y:
+      Number(
+        point?.y
+        ?? 0
+      )
+  };
+
+  if (
+    sequenceAvailable()
+  ) {
+    const path =
+      databasePath(
+        JB2A_PATHS[type]
+        ?? []
+      );
+
+    if (
+      path
+      &&
+      source
+    ) {
+      try {
+        const seq =
+          new Sequence({
+            inModuleName:
+              MODULE_ID,
+
+            softFail:
+              true
+          });
+
+        seq.effect()
+          .file(path)
+          .atLocation(
+            tokenObject(source)
+            ?? source
+          )
+          .stretchTo(
+            center
+          );
+
+        await seq.play();
+        return;
+
+      } catch (error) {
+        console.warn(
+          "Pokemon LITM Tools | Sequencer Area target:",
+          error
+        );
+      }
+    }
+
+    try {
+      const seq =
+        new Sequence({
+          inModuleName:
+            MODULE_ID,
+
+          softFail:
+            true
+        });
+
+      seq.effect()
+        .atLocation(center)
+        .shape(
+          "circle",
+          {
+            radius:
+              0.9,
+
+            gridUnits:
+              true,
+
+            fillColor:
+              typeColor(type),
+
+            fillAlpha:
+              0.3,
+
+            lineSize:
+              5,
+
+            lineColor:
+              typeColor(type),
+
+            name:
+              "pokemon-area-impact"
+          }
+        )
+        .fadeIn(70)
+        .fadeOut(430)
+        .scaleIn(
+          0.45,
+          160
+        )
+        .duration(650);
+
+      await seq.play();
+      return;
+
+    } catch (error) {
+      console.warn(
+        "Pokemon LITM Tools | Sequencer Area impact fallback:",
+        error
+      );
+    }
+  }
+
+  // Sem Sequencer a Region nativa continua sendo
+  // a representacao visual da Area.
+  if (source) {
+    pulseToken(
+      source,
+      type
+    );
+  }
+}
+
+
+async function broadcastMoveVfxAtPoint(
+  sceneId,
+  sourceTokenId,
+  point,
+  type
+) {
+  game.socket.emit(
+    SOCKET_NAME,
+    {
+      kind:
+        "pokemon-fx-play-point",
+
+      sourceUserId:
+        game.user.id,
+
+      sceneId,
+      sourceTokenId,
+
+      point: {
+        x:
+          Number(
+            point?.x
+            ?? 0
+          ),
+
+        y:
+          Number(
+            point?.y
+            ?? 0
+          )
+      },
+
+      type
+    }
+  );
+
+  await playMoveVfxAtPointLocal(
+    sceneId,
+    sourceTokenId,
+    point,
+    type
+  );
+}
+
 async function playAreaVfx(region, radiusGrids, type) {
   if (!region || !sequenceAvailable()) return;
 
@@ -849,6 +1074,13 @@ async function createAreaDirect(payload) {
   }
 
   await playAreaVfx(region, radiusGrids, move.type);
+
+  await broadcastMoveVfxAtPoint(
+    scene.id,
+    payload.sourceTokenId,
+    center,
+    move.type
+  );
 
   Hooks.callAll("pokemonLitmAreaCreated", {
     region,
@@ -1124,6 +1356,24 @@ function onSocket(message) {
 
   if (message.kind === "pokemon-fx-request") {
     void socketRequest(message);
+    return;
+  }
+
+  if (message.kind === "pokemon-fx-play-point") {
+    if (
+      message.sourceUserId
+        === game.user.id
+    ) {
+      return;
+    }
+
+    void playMoveVfxAtPointLocal(
+      message.sceneId,
+      message.sourceTokenId,
+      message.point,
+      message.type
+    );
+
     return;
   }
 
@@ -1902,128 +2152,432 @@ async function playActorMoveVfx(
 
 
 function ensureBiographyMoveCardLayout(card) {
-  let main = card.querySelector(":scope > .pokemon-biography-effect-main");
+  let main =
+    card.querySelector(
+      ":scope > .pokemon-biography-effect-main"
+    );
 
   if (!main) {
-    main = document.createElement("div");
-    main.className = "pokemon-biography-effect-main";
+    main =
+      document.createElement(
+        "div"
+      );
 
-    const heading = card.querySelector(":scope > h3");
-    const description = card.querySelector(":scope > p");
+    main.className =
+      "pokemon-biography-effect-main";
 
-    if (heading) main.append(heading);
-    if (description) main.append(description);
-    card.prepend(main);
+    const heading =
+      card.querySelector(
+        ":scope > h3"
+      );
+
+    const description =
+      card.querySelector(
+        ":scope > p"
+      );
+
+    if (heading) {
+      main.append(heading);
+    }
+
+    if (description) {
+      main.append(
+        description
+      );
+    }
+
+    card.prepend(
+      main
+    );
   }
 
-  let controls = card.querySelector(":scope > .pokemon-biography-effect-actions");
+  const actionNodes =
+    Array.from(
+      card.querySelectorAll(
+        ":scope > .pokemon-biography-effect-actions"
+      )
+    );
+
+  let controls =
+    actionNodes[0]
+    ?? null;
+
+  for (
+    const duplicate
+    of actionNodes.slice(1)
+  ) {
+    duplicate.remove();
+  }
+
   if (!controls) {
-    controls = document.createElement("div");
-    controls.className = "pokemon-biography-effect-actions";
-    controls.dataset.pokemonBiographyActions = "true";
-    card.append(controls);
+    controls =
+      document.createElement(
+        "div"
+      );
+
+    controls.className =
+      "pokemon-biography-effect-actions";
+
+    card.append(
+      controls
+    );
   }
 
-  controls.dataset.pokemonBiographyActions = "true";
-  return { main, controls };
+  controls.dataset
+    .pokemonBiographyActions =
+      "true";
+
+  controls.removeAttribute(
+    "data-pokemon-effect-actions"
+  );
+
+  return {
+    main,
+    controls
+  };
 }
 
 
-function addChallengeBiographyActions(actor, root) {
-  if (!root || !actor) return;
-
-  const effectsRoot = root.querySelector("[data-pokemon-effect-actions='true']");
-  const pokedexUrl = actor.getFlag?.(MODULE_ID, "pokedexUrl");
-
+async function addChallengeBiographyActions(
+  actor,
+  root
+) {
   if (
-    effectsRoot
-    && pokedexUrl
-    && !root.querySelector("[data-pokemon-challenge-pokedex]")
+    !root
+    ||
+    !actor
   ) {
-    const toolbar = document.createElement("div");
-    toolbar.className = "pokemon-biography-toolbar";
-
-    const button = document.createElement("button");
-    button.type = "button";
-    button.dataset.pokemonChallengePokedex = "true";
-    button.innerHTML = '<i class="fa-solid fa-mobile-screen-button"></i> Pokédex';
-    button.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      window.open(pokedexUrl, "_blank", "noopener,noreferrer");
-    });
-
-    toolbar.append(button);
-    effectsRoot.before(toolbar);
+    return;
   }
 
-  for (const card of root.querySelectorAll(
-    ".pokemon-biography-effect[data-pokemon-effect-kind='move']"
-  )) {
-    const { controls } = ensureBiographyMoveCardLayout(card);
-    controls.replaceChildren();
+  if (
+    root.dataset
+      .pokemonChallengeActionsHydrating
+      === "true"
+  ) {
+    return;
+  }
 
-    if (!game.user.isGM) continue;
+  root.dataset
+    .pokemonChallengeActionsHydrating =
+      "true";
 
-    const moveId = card.dataset.pokemonEffectId;
-    const move = moveForActor(actor, moveId);
-    if (!move) continue;
+  try {
+    const moves =
+      await resolvedPokemonMovesForActor(
+        actor
+      );
 
-    const vfxRow = document.createElement("div");
-    vfxRow.className = "pokemon-biography-vfx-actions";
+    if (!root.isConnected) {
+      return;
+    }
 
-    const tokenButton = document.createElement("button");
-    tokenButton.type = "button";
-    tokenButton.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Token';
-    tokenButton.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      void playActorMoveVfx(actor, move).catch(error => {
-        ui.notifications.error(error?.message ?? "Nao foi possivel executar o VFX.");
-      });
-    });
+    const moveMap =
+      new Map(
+        moves
+          .filter(
+            move =>
+              move?.id
+          )
+          .map(
+            move => [
+              move.id,
+              move
+            ]
+          )
+      );
 
-    const areaButton = document.createElement("button");
-    areaButton.type = "button";
-    areaButton.innerHTML = '<i class="fa-solid fa-circle-nodes"></i> Área';
-    areaButton.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-      void placeMoveArea(actor, move, "challenge").catch(error => {
-        ui.notifications.error(error?.message ?? "Nao foi possivel criar a Area.");
-      });
-    });
+    const effectsRoot =
+      root.querySelector(
+        "[data-pokemon-effect-actions='true']"
+      );
 
-    vfxRow.append(tokenButton, areaButton);
-    controls.append(vfxRow);
+    const pokedexUrl =
+      actor.getFlag?.(
+        MODULE_ID,
+        "pokedexUrl"
+      );
 
-    const effects = effectsForMove(actor, move);
-    if (effects.length) {
-      const mechanics = document.createElement("div");
-      mechanics.className = "pokemon-biography-mechanical-actions";
+    if (
+      effectsRoot
+      &&
+      pokedexUrl
+      &&
+      !root.querySelector(
+        "[data-pokemon-challenge-pokedex]"
+      )
+    ) {
+      const toolbar =
+        document.createElement(
+          "div"
+        );
 
-      effects.forEach((effect, index) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.dataset.pokemonEffectIndex = String(index);
-        const suffix = effect?.kind === "tag"
-          ? ""
-          : "-" + Number(effect?.level ?? 1);
-        button.innerHTML = '<i class="fa-solid fa-burst"></i> '
-          + esc(String(effect?.name ?? "efeito") + suffix);
-        button.addEventListener("click", event => {
+      toolbar.className =
+        "pokemon-biography-toolbar";
+
+      const button =
+        document.createElement(
+          "button"
+        );
+
+      button.type =
+        "button";
+
+      button.dataset
+        .pokemonChallengePokedex =
+          "true";
+
+      button.innerHTML =
+        '<i class="fa-solid fa-mobile-screen-button"></i> Pokédex';
+
+      button.addEventListener(
+        "click",
+        event => {
           event.preventDefault();
           event.stopPropagation();
-          void applyChallengeEffect(actor, move, effect).catch(error => {
-            console.error("Pokemon LITM Tools | Challenge effect:", error);
-            ui.notifications.error(error?.message ?? "Nao foi possivel aplicar o efeito.");
-          });
-        });
-        mechanics.append(button);
-      });
 
-      controls.append(mechanics);
+          window.open(
+            pokedexUrl,
+            "_blank",
+            "noopener,noreferrer"
+          );
+        }
+      );
+
+      toolbar.append(
+        button
+      );
+
+      effectsRoot.before(
+        toolbar
+      );
     }
+
+    for (
+      const card
+      of root.querySelectorAll(
+        ".pokemon-biography-effect[data-pokemon-effect-kind='move']"
+      )
+    ) {
+      const {
+        main,
+        controls
+      } =
+        ensureBiographyMoveCardLayout(
+          card
+        );
+
+      controls.replaceChildren();
+
+      const moveId =
+        card.dataset
+          .pokemonEffectId;
+
+      const move =
+        moveMap.get(
+          moveId
+        )
+        ?? null;
+
+      if (!move) {
+        continue;
+      }
+
+      const description =
+        main.querySelector(
+          "p"
+        );
+
+      if (
+        description
+        &&
+        move.description
+      ) {
+        description.textContent =
+          move.description;
+      }
+
+      if (!game.user.isGM) {
+        continue;
+      }
+
+      const vfxRow =
+        document.createElement(
+          "div"
+        );
+
+      vfxRow.className =
+        "pokemon-biography-vfx-actions";
+
+      const tokenButton =
+        document.createElement(
+          "button"
+        );
+
+      tokenButton.type =
+        "button";
+
+      tokenButton.innerHTML =
+        '<i class="fa-solid fa-wand-magic-sparkles"></i> Token';
+
+      tokenButton.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          void playActorMoveVfx(
+            actor,
+            move
+          ).catch(
+            error => {
+              ui.notifications.error(
+                error?.message
+                ?? "Nao foi possivel executar o VFX."
+              );
+            }
+          );
+        }
+      );
+
+      const areaButton =
+        document.createElement(
+          "button"
+        );
+
+      areaButton.type =
+        "button";
+
+      areaButton.innerHTML =
+        '<i class="fa-solid fa-circle-nodes"></i> Área';
+
+      areaButton.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          void placeMoveArea(
+            actor,
+            move,
+            "challenge"
+          ).catch(
+            error => {
+              ui.notifications.error(
+                error?.message
+                ?? "Nao foi possivel criar a Area."
+              );
+            }
+          );
+        }
+      );
+
+      vfxRow.append(
+        tokenButton,
+        areaButton
+      );
+
+      controls.append(
+        vfxRow
+      );
+
+      const effects =
+        effectsForMove(
+          actor,
+          move
+        );
+
+      if (
+        effects.length
+      ) {
+        const mechanics =
+          document.createElement(
+            "div"
+          );
+
+        mechanics.className =
+          "pokemon-biography-mechanical-actions";
+
+        effects.forEach(
+          (
+            effect,
+            index
+          ) => {
+            const button =
+              document.createElement(
+                "button"
+              );
+
+            button.type =
+              "button";
+
+            button.dataset
+              .pokemonEffectIndex =
+                String(index);
+
+            const suffix =
+              effect?.kind
+                === "tag"
+                ? ""
+                : (
+                    "-"
+                    + Number(
+                        effect?.level
+                        ?? 1
+                      )
+                  );
+
+            button.innerHTML =
+              '<i class="fa-solid fa-burst"></i> '
+              + esc(
+                  String(
+                    effect?.name
+                    ?? "efeito"
+                  )
+                  + suffix
+                );
+
+            button.addEventListener(
+              "click",
+              event => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                void applyChallengeEffect(
+                  actor,
+                  move,
+                  effect
+                ).catch(
+                  error => {
+                    console.error(
+                      "Pokemon LITM Tools | Challenge effect:",
+                      error
+                    );
+
+                    ui.notifications.error(
+                      error?.message
+                      ?? "Nao foi possivel aplicar o efeito."
+                    );
+                  }
+                );
+              }
+            );
+
+            mechanics.append(
+              button
+            );
+          }
+        );
+
+        controls.append(
+          mechanics
+        );
+      }
+    }
+
+  } finally {
+    delete root.dataset
+      .pokemonChallengeActionsHydrating;
   }
 }
 
@@ -2090,24 +2644,159 @@ function renamePokemonChallengeBiographyTab(
 
 
 function findOtherPanel(root) {
-  const navItems = Array.from(root.querySelectorAll(
-    "nav [data-tab], .tabs [data-tab], [role='tab'][data-tab]"
-  ));
+  const navItems =
+    Array.from(
+      root.querySelectorAll(
+        "nav [data-tab], .tabs [data-tab], [role='tab'][data-tab]"
+      )
+    );
 
-  const nav = navItems.find(element =>
-    String(element.textContent ?? "").trim().toLocaleLowerCase() === "other"
+  const nav =
+    navItems.find(
+      element =>
+        String(
+          element.dataset?.tab
+          ?? ""
+        ).toLocaleLowerCase()
+          === "other"
+
+        ||
+
+        String(
+          element.textContent
+          ?? ""
+        )
+          .trim()
+          .toLocaleLowerCase()
+          === "other"
+
+        ||
+
+        String(
+          element.textContent
+          ?? ""
+        )
+          .trim()
+          .toLocaleLowerCase()
+          === "ações"
+    );
+
+  const tabId =
+    nav?.dataset?.tab
+    || "other";
+
+  const candidates =
+    Array.from(
+      root.querySelectorAll(
+        "[data-tab='"
+        + CSS.escape(tabId)
+        + "']"
+      )
+    );
+
+  return (
+    candidates.find(
+      element =>
+        element !== nav
+        &&
+        !element.closest("nav")
+        &&
+        !element.matches(
+          "button,a,[role='tab']"
+        )
+    )
+    ?? null
   );
+}
 
-  const tabId = nav?.dataset?.tab || "other";
-  const candidates = Array.from(root.querySelectorAll(
-    "[data-tab='" + CSS.escape(tabId) + "']"
-  ));
 
-  return candidates.find(element =>
-    element !== nav
-    && !element.closest("nav")
-    && !element.matches("button,a,[role='tab']")
-  ) ?? null;
+function renamePokemonCharacterOtherTab(
+  root
+) {
+  if (!root) {
+    return;
+  }
+
+  const navItems =
+    Array.from(
+      root.querySelectorAll(
+        "nav [data-tab], .tabs [data-tab], [role='tab'][data-tab]"
+      )
+    );
+
+  for (
+    const item
+    of navItems
+  ) {
+    const tabId =
+      String(
+        item.dataset?.tab
+        ?? ""
+      ).toLocaleLowerCase();
+
+    const label =
+      String(
+        item.textContent
+        ?? ""
+      )
+        .trim()
+        .toLocaleLowerCase();
+
+    if (
+      tabId !== "other"
+      &&
+      label !== "other"
+    ) {
+      continue;
+    }
+
+    const walker =
+      document.createTreeWalker(
+        item,
+        NodeFilter.SHOW_TEXT
+      );
+
+    let changed =
+      false;
+
+    while (
+      walker.nextNode()
+    ) {
+      const node =
+        walker.currentNode;
+
+      if (
+        /\bother\b/i
+          .test(
+            node.nodeValue
+            ?? ""
+          )
+      ) {
+        node.nodeValue =
+          String(
+            node.nodeValue
+          ).replace(
+            /\bother\b/gi,
+            "Ações"
+          );
+
+        changed =
+          true;
+      }
+    }
+
+    if (
+      !changed
+      &&
+      !item.children.length
+    ) {
+      item.textContent =
+        "Ações";
+    }
+
+    item.title =
+      "Ações";
+  }
 }
 
 
@@ -2121,6 +2810,178 @@ function isPokemonPlayerActor(actor) {
   );
 }
 
+
+function pokemonSpeciesTagData(
+  name
+) {
+  return {
+    name:
+      "Espécie: "
+      + String(
+          name
+          ?? "Pokémon"
+        ).trim(),
+
+    question:
+      "",
+
+    burned:
+      false,
+
+    toBurn:
+      false,
+
+    planned:
+      false,
+
+    selected:
+      false,
+
+    expiring:
+      false,
+
+    expired:
+      false
+  };
+}
+
+
+async function ensurePokemonPlayerMoveSpeciesTag(
+  actor
+) {
+  const item =
+    Array.from(
+      actor?.items
+      ?? []
+    ).find(
+      candidate =>
+        candidate.getFlag?.(
+          MODULE_ID,
+          "themeRole"
+        )
+        === "pokemon-moves"
+    );
+
+  if (!item) {
+    return false;
+  }
+
+  const tags =
+    foundry.utils.deepClone(
+      Array.isArray(
+        item.system?.powertags
+      )
+        ? item.system.powertags
+        : []
+    );
+
+  const firstName =
+    currentTagName(
+      tags[0]
+    );
+
+  if (
+    /^(espécie|especie|species)\s*:/i
+      .test(firstName)
+  ) {
+    return false;
+  }
+
+  const profile =
+    actor.getFlag?.(
+      MODULE_ID,
+      "characterPokemonProfile"
+    )
+    ?? {};
+
+  const species =
+    String(
+      profile?.species
+      || profile?.name
+      || item.getFlag?.(
+          MODULE_ID,
+          "pokemonSpecies"
+        )
+      || actor.getFlag?.(
+          MODULE_ID,
+          "speciesName"
+        )
+      || actor.name
+      || "Pokémon"
+    ).trim();
+
+  const flags =
+    item.flags?.[MODULE_ID]
+    ?? {};
+
+  const bindings =
+    foundry.utils.deepClone(
+      Array.isArray(
+        flags.pokemonMoveBindings
+      )
+        ? flags.pokemonMoveBindings
+        : Array.isArray(
+            flags.tagBindings
+          )
+          ? flags.tagBindings
+          : []
+    );
+
+  const shifted =
+    bindings.map(
+      binding => {
+        if (
+          binding?.kind
+            !== "pokemonMove"
+        ) {
+          return binding;
+        }
+
+        const index =
+          Number(
+            binding.tagIndex
+          );
+
+        return {
+          ...binding,
+
+          tagIndex:
+            Number.isInteger(index)
+              ? index + 1
+              : index
+        };
+      }
+    );
+
+  const update = {
+    "system.powertags": [
+      pokemonSpeciesTagData(
+        species
+      ),
+      ...tags
+    ]
+  };
+
+  update[
+    "flags."
+    + MODULE_ID
+    + ".pokemonMoveBindings"
+  ] =
+    shifted;
+
+  update[
+    "flags."
+    + MODULE_ID
+    + ".pokemonSpecies"
+  ] =
+    species;
+
+  await item.update(
+    update
+  );
+
+  return true;
+}
 
 function actionButton(label, icon, handler) {
   const button = document.createElement("button");
@@ -2142,8 +3003,35 @@ async function addPokemonCharacterOtherActions(actor, root) {
   const panel = findOtherPanel(root);
   if (!panel) return;
 
-  const old = panel.querySelector("[data-pokemon-character-actions]");
-  if (old) old.remove();
+  if (
+    panel.dataset
+      .pokemonCharacterActionsHydrating
+      === "true"
+  ) {
+    return;
+  }
+
+  panel.dataset
+    .pokemonCharacterActionsHydrating =
+      "true";
+
+  try {
+    await ensurePokemonPlayerMoveSpeciesTag(
+      actor
+    );
+
+    if (!panel.isConnected) {
+      return;
+    }
+
+    const old =
+      panel.querySelector(
+        "[data-pokemon-character-actions]"
+      );
+
+    if (old) {
+      old.remove();
+    }
 
   const section = document.createElement("section");
   section.className = "pokemon-character-other-actions";
@@ -2226,6 +3114,11 @@ async function addPokemonCharacterOtherActions(actor, root) {
     card.append(main, actions);
     list.append(card);
   }
+
+  } finally {
+    delete panel.dataset
+      .pokemonCharacterActionsHydrating;
+  }
 }
 
 
@@ -2242,13 +3135,39 @@ function onRenderPokemonActorSheet(app, html) {
 
   if (challenge) {
     renamePokemonChallengeBiographyTab(root);
-    addChallengeBiographyActions(actor, root);
-    decorateStructuredStatusMarkup(root);
+
+    void addChallengeBiographyActions(
+      actor,
+      root
+    ).catch(
+      error => {
+        console.error(
+          "Pokemon LITM Tools | Challenge actions:",
+          error
+        );
+      }
+    );
+
+    decorateStructuredStatusMarkup(
+      root
+    );
+
     return;
   }
 
-  if (isPokemonPlayerActor(actor)) {
-    void addPokemonCharacterOtherActions(actor, root);
+  if (
+    isPokemonPlayerActor(
+      actor
+    )
+  ) {
+    renamePokemonCharacterOtherTab(
+      root
+    );
+
+    void addPokemonCharacterOtherActions(
+      actor,
+      root
+    );
   }
 }
 
@@ -2473,8 +3392,20 @@ async function onRenderPokemonChatMessage(
       const token = sourceToken();
       const selfTarget = ["self", "user", "users-field"]
         .includes(String(move?.target ?? "").toLowerCase());
-      const ids = selfTarget ? [token.id] : frozenTargetIds;
-      if (!ids.length) throw new Error("A rolagem nao tinha alvo marcado.");
+      const ids =
+        selfTarget
+          ? [token.id]
+          : targetDocuments()
+              .map(
+                target =>
+                  target.id
+              );
+
+      if (!ids.length) {
+        throw new Error(
+          "Marque pelo menos um alvo antes de usar o VFX Token."
+        );
+      }
       await broadcastMoveVfx(
         canvas.scene.id,
         token.id,

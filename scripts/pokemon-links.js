@@ -97,16 +97,84 @@ function isPokemonChallenge(doc) {
   );
 }
 
-function addPokemonDbButton(app, html) {
-  const doc = appDocument(app);
+function pokemonDbUrlForDocument(
+  doc
+) {
+  if (
+    !doc
+    ||
+    doc.documentName
+      !== "Actor"
+  ) {
+    return null;
+  }
 
-  if (!isPokemonChallenge(doc)) return;
+  if (
+    isPokemonChallenge(
+      doc
+    )
+  ) {
+    return (
+      doc.getFlag?.(
+        MODULE_ID,
+        "pokedexUrl"
+      )
+      ?? null
+    );
+  }
 
-  const url =
+  if (
+    doc.type
+      !== "litm-character"
+  ) {
+    return null;
+  }
+
+  const profile =
     doc.getFlag?.(
       MODULE_ID,
-      "pokedexUrl"
+      "characterPokemonProfile"
+    )
+    ?? null;
+
+  const pokemonPlayer =
+    doc.getFlag?.(
+      MODULE_ID,
+      "kind"
+    )
+      === "pokemon"
+
+    ||
+
+    Array.from(
+      doc.items
+      ?? []
+    ).some(
+      item =>
+        item.getFlag?.(
+          MODULE_ID,
+          "themeRole"
+        )
+          === "pokemon-moves"
     );
+
+  if (!pokemonPlayer) {
+    return null;
+  }
+
+  return (
+    profile?.pokedexUrl
+    ?? doc.getFlag?.(
+      MODULE_ID,
+      "pokedexUrl"
+    )
+    ?? null
+  );
+}
+
+function addPokemonDbButton(app, html) {
+  const doc = appDocument(app);
+  const url = pokemonDbUrlForDocument(doc);
 
   if (!url) return;
 
@@ -320,7 +388,7 @@ function wirePokemonEffectButtons(app, html) {
   for (
     const article
     of root.querySelectorAll(
-      ".pokemon-biography-effect[data-pokemon-effect-kind]"
+      ".pokemon-biography-effect[data-pokemon-effect-kind='ability']"
     )
   ) {
     if (
