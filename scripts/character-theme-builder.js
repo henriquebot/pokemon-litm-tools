@@ -123,6 +123,12 @@ function normalizePokemonMoves(rows) {
           move.accuracy
           ?? null,
 
+        priority:
+          Number(
+            move.priority
+            ?? 0
+          ),
+
         target:
           cleanText(
             move.target
@@ -426,7 +432,6 @@ function pokemonMovesTheme(
   const speciesName =
     cleanText(
       profile?.species
-      || profile?.name
       || "Pokémon"
     )
     || "Pokémon";

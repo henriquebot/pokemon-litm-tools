@@ -1883,6 +1883,766 @@ export function buildDexText({ pokemon, species, types, ability }, language = ge
   return `Pokémon do tipo ${typeText || "desconhecido"}. Mede ${height.toFixed(1).replace(".", ",")} m e pesa ${weight.toFixed(1).replace(".", ",")} kg. Habilidade principal: ${abilityText}.`;
 }
 
+
+const POKEMON_GENUS_PTBR = {
+  farfetchd:
+    "Pato Selvagem",
+
+  bulbasaur:
+    "Semente",
+
+  ivysaur:
+    "Semente",
+
+  venusaur:
+    "Semente",
+
+  charmander:
+    "Lagarto",
+
+  charmeleon:
+    "Chama",
+
+  charizard:
+    "Chama",
+
+  squirtle:
+    "Tartaruga",
+
+  wartortle:
+    "Tartaruga",
+
+  blastoise:
+    "Marisco",
+
+  caterpie:
+    "Lagarta",
+
+  metapod:
+    "Casulo",
+
+  butterfree:
+    "Borboleta",
+
+  weedle:
+    "Larva",
+
+  kakuna:
+    "Casulo",
+
+  beedrill:
+    "Abelha Venenosa",
+
+  pidgey:
+    "Pássaro Pequeno",
+
+  rattata:
+    "Rato",
+
+  spearow:
+    "Pássaro Pequeno",
+
+  ekans:
+    "Serpente",
+
+  arbok:
+    "Cobra",
+
+  pikachu:
+    "Rato",
+
+  raichu:
+    "Rato",
+
+  sandshrew:
+    "Rato",
+
+  clefairy:
+    "Fada",
+
+  clefable:
+    "Fada",
+
+  vulpix:
+    "Raposa",
+
+  ninetales:
+    "Raposa",
+
+  jigglypuff:
+    "Balão",
+
+  wigglytuff:
+    "Balão",
+
+  zubat:
+    "Morcego",
+
+  golbat:
+    "Morcego",
+
+  oddish:
+    "Erva",
+
+  gloom:
+    "Erva",
+
+  vileplume:
+    "Flor",
+
+  paras:
+    "Cogumelo",
+
+  parasect:
+    "Cogumelo",
+
+  venonat:
+    "Inseto",
+
+  venomoth:
+    "Mariposa Venenosa",
+
+  diglett:
+    "Toupeira",
+
+  dugtrio:
+    "Toupeira",
+
+  meowth:
+    "Gato Arranhador",
+
+  persian:
+    "Gato Elegante",
+
+  psyduck:
+    "Pato",
+
+  golduck:
+    "Pato",
+
+  growlithe:
+    "Cachorro",
+
+  arcanine:
+    "Lendário",
+
+  poliwag:
+    "Girino",
+
+  poliwhirl:
+    "Girino",
+
+  abra:
+    "Psíquico",
+
+  kadabra:
+    "Psíquico",
+
+  alakazam:
+    "Psíquico",
+
+  machop:
+    "Superpoder",
+
+  machoke:
+    "Superpoder",
+
+  machamp:
+    "Superpoder",
+
+  bellsprout:
+    "Flor",
+
+  tentacool:
+    "Água-viva",
+
+  tentacruel:
+    "Água-viva",
+
+  geodude:
+    "Pedra",
+
+  graveler:
+    "Pedra",
+
+  golem:
+    "Megaton",
+
+  ponyta:
+    "Cavalo de Fogo",
+
+  rapidash:
+    "Cavalo de Fogo",
+
+  slowpoke:
+    "Tonto",
+
+  magnemite:
+    "Ímã",
+
+  magneton:
+    "Ímã",
+
+  doduo:
+    "Pássaro Gêmeo",
+
+  dodrio:
+    "Pássaro Triplo",
+
+  seel:
+    "Leão-marinho",
+
+  dewgong:
+    "Leão-marinho",
+
+  grimer:
+    "Lodo",
+
+  muk:
+    "Lodo",
+
+  shellder:
+    "Bivalve",
+
+  cloyster:
+    "Bivalve",
+
+  gastly:
+    "Gás",
+
+  haunter:
+    "Gás",
+
+  gengar:
+    "Sombra",
+
+  onix:
+    "Serpente de Pedra",
+
+  drowzee:
+    "Hipnose",
+
+  hypno:
+    "Hipnose",
+
+  krabby:
+    "Caranguejo de Rio",
+
+  kingler:
+    "Pinça",
+
+  voltorb:
+    "Pokébola",
+
+  electrode:
+    "Pokébola",
+
+  exeggcute:
+    "Ovo",
+
+  exeggutor:
+    "Coco",
+
+  cubone:
+    "Solitário",
+
+  marowak:
+    "Guardião de Ossos",
+
+  hitmonlee:
+    "Chute",
+
+  hitmonchan:
+    "Soco",
+
+  lickitung:
+    "Lambida",
+
+  koffing:
+    "Gás Venenoso",
+
+  weezing:
+    "Gás Venenoso",
+
+  rhyhorn:
+    "Espinhos",
+
+  rhydon:
+    "Broca",
+
+  chansey:
+    "Ovo",
+
+  tangela:
+    "Vinha",
+
+  kangaskhan:
+    "Parental",
+
+  horsea:
+    "Dragão",
+
+  seadra:
+    "Dragão",
+
+  goldeen:
+    "Peixe Dourado",
+
+  seaking:
+    "Peixe Dourado",
+
+  staryu:
+    "Forma de Estrela",
+
+  starmie:
+    "Misterioso",
+
+  mrmime:
+    "Barreira",
+
+  scyther:
+    "Louva-a-deus",
+
+  jynx:
+    "Forma Humana",
+
+  electabuzz:
+    "Elétrico",
+
+  magmar:
+    "Cuspidor de Fogo",
+
+  pinsir:
+    "Besouro",
+
+  tauros:
+    "Touro Selvagem",
+
+  magikarp:
+    "Peixe",
+
+  gyarados:
+    "Atroz",
+
+  lapras:
+    "Transporte",
+
+  ditto:
+    "Transformação",
+
+  eevee:
+    "Evolução",
+
+  vaporeon:
+    "Jato de Bolhas",
+
+  jolteon:
+    "Relâmpago",
+
+  flareon:
+    "Chama",
+
+  porygon:
+    "Virtual",
+
+  omanyte:
+    "Espiral",
+
+  omastar:
+    "Espiral",
+
+  kabuto:
+    "Marisco",
+
+  kabutops:
+    "Marisco",
+
+  aerodactyl:
+    "Fóssil",
+
+  snorlax:
+    "Dorminhoco",
+
+  articuno:
+    "Congelamento",
+
+  zapdos:
+    "Elétrico",
+
+  moltres:
+    "Chama",
+
+  dratini:
+    "Dragão",
+
+  dragonair:
+    "Dragão",
+
+  dragonite:
+    "Dragão",
+
+  mewtwo:
+    "Genético",
+
+  mew:
+    "Nova Espécie",
+
+  raikou:
+    "Trovão",
+
+  entei:
+    "Vulcão",
+
+  suicune:
+    "Aurora",
+
+  lugia:
+    "Mergulho",
+
+  hooh:
+    "Arco-íris",
+
+  celebi:
+    "Viagem no Tempo"
+};
+
+
+const GENUS_WORD_PTBR = {
+  wild:
+    "Selvagem",
+
+  duck:
+    "Pato",
+
+  mouse:
+    "Rato",
+
+  seed:
+    "Semente",
+
+  lizard:
+    "Lagarto",
+
+  flame:
+    "Chama",
+
+  turtle:
+    "Tartaruga",
+
+  tiny:
+    "Pequeno",
+
+  bird:
+    "Pássaro",
+
+  butterfly:
+    "Borboleta",
+
+  worm:
+    "Lagarta",
+
+  cocoon:
+    "Casulo",
+
+  poison:
+    "Venenoso",
+
+  bee:
+    "Abelha",
+
+  snake:
+    "Serpente",
+
+  cobra:
+    "Cobra",
+
+  dragon:
+    "Dragão",
+
+  fairy:
+    "Fada",
+
+  bat:
+    "Morcego",
+
+  flower:
+    "Flor",
+
+  mushroom:
+    "Cogumelo",
+
+  insect:
+    "Inseto",
+
+  mole:
+    "Toupeira",
+
+  cat:
+    "Gato",
+
+  balloon:
+    "Balão",
+
+  fish:
+    "Peixe",
+
+  star:
+    "Estrela",
+
+  crab:
+    "Caranguejo",
+
+  horse:
+    "Cavalo",
+
+  sea:
+    "Mar",
+
+  jellyfish:
+    "Água-viva",
+
+  rock:
+    "Pedra",
+
+  psychic:
+    "Psíquico",
+
+  electric:
+    "Elétrico",
+
+  magnet:
+    "Ímã",
+
+  gas:
+    "Gás",
+
+  shadow:
+    "Sombra",
+
+  egg:
+    "Ovo",
+
+  fox:
+    "Raposa",
+
+  rabbit:
+    "Coelho",
+
+  frog:
+    "Rã",
+
+  monkey:
+    "Macaco",
+
+  pig:
+    "Porco",
+
+  horn:
+    "Chifre",
+
+  drill:
+    "Broca",
+
+  fossil:
+    "Fóssil",
+
+  spiral:
+    "Espiral",
+
+  water:
+    "Água",
+
+  fire:
+    "Fogo",
+
+  grass:
+    "Planta",
+
+  armor:
+    "Armadura",
+
+  shell:
+    "Concha",
+
+  bone:
+    "Osso",
+
+  dream:
+    "Sonho",
+
+  virtual:
+    "Virtual",
+
+  barrier:
+    "Barreira",
+
+  transport:
+    "Transporte",
+
+  time:
+    "Tempo",
+
+  baby:
+    "Bebê",
+
+  dark:
+    "Sombrio",
+
+  light:
+    "Luz",
+
+  moon:
+    "Lua",
+
+  sun:
+    "Sol",
+
+  snow:
+    "Neve",
+
+  ice:
+    "Gelo",
+
+  volcano:
+    "Vulcão",
+
+  legendary:
+    "Lendário",
+
+  rainbow:
+    "Arco-íris",
+
+  evolution:
+    "Evolução",
+
+  mysterious:
+    "Misterioso",
+
+  genetic:
+    "Genético",
+
+  human:
+    "Humano"
+};
+
+
+function normalizeGenusKey(
+  value
+) {
+  return String(
+    value
+    ?? ""
+  )
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      ""
+    )
+    .toLocaleLowerCase()
+    .replace(
+      /[^a-z0-9]+/g,
+      ""
+    );
+}
+
+
+function stripPokemonGenusSuffix(
+  value
+) {
+  return String(
+    value
+    ?? ""
+  )
+    .replace(
+      /\s+pok[eé]mon\s*$/i,
+      ""
+    )
+    .replace(
+      /^\s*pok[eé]mon\s+/i,
+      ""
+    )
+    .trim();
+}
+
+
+export function pokemonGenusLabel(
+  species,
+  language =
+    getPokemonContentLanguage()
+) {
+  const speciesId =
+    normalizeGenusKey(
+      species?.name
+    );
+
+  if (
+    language !== "en"
+    &&
+    POKEMON_GENUS_PTBR[
+      speciesId
+    ]
+  ) {
+    return POKEMON_GENUS_PTBR[
+      speciesId
+    ];
+  }
+
+  const rows =
+    Array.isArray(
+      species?.genera
+    )
+      ? species.genera
+      : [];
+
+  const english =
+    stripPokemonGenusSuffix(
+      rows.find(
+        row =>
+          row.language?.name
+            === "en"
+      )?.genus
+    );
+
+  if (
+    language === "en"
+  ) {
+    return (
+      english
+      || "Pokémon"
+    );
+  }
+
+  if (!english) {
+    return "Pokémon";
+  }
+
+  const translated =
+    english
+      .split(/\s+/)
+      .map(
+        word => {
+          const key =
+            normalizeGenusKey(
+              word
+            );
+
+          return (
+            GENUS_WORD_PTBR[
+              key
+            ]
+            ?? word
+          );
+        }
+      )
+      .join(" ")
+      .trim();
+
+  return (
+    translated
+    || "Pokémon"
+  );
+}
+
 export function statPowerText(statId, language = getPokemonContentLanguage()) {
   const pt = {
     hp: "Resistência impressionante",
@@ -1978,6 +2738,402 @@ function damageStatusLevel(power) {
   return value > 0 ? 1 : 0;
 }
 
+
+export function moveImpact(
+  power
+) {
+  const value =
+    Number(
+      power
+      ?? 0
+    );
+
+  if (value <= 0) {
+    return 0;
+  }
+
+  if (value <= 60) {
+    return 0;
+  }
+
+  if (value <= 90) {
+    return 1;
+  }
+
+  if (value <= 120) {
+    return 2;
+  }
+
+  return 3;
+}
+
+
+function moveTargetSkipsAccuracy(
+  target
+) {
+  return [
+    "self",
+    "user",
+    "users-field",
+    "opponents-field",
+    "entire-field",
+    "all-pokemon"
+  ].includes(
+    String(
+      target
+      ?? ""
+    ).toLocaleLowerCase()
+  );
+}
+
+
+export function moveAccuracyPenalty(
+  move
+) {
+  if (
+    moveTargetSkipsAccuracy(
+      move?.target
+    )
+  ) {
+    return 0;
+  }
+
+  if (
+    move?.accuracy === null
+    ||
+    move?.accuracy === undefined
+  ) {
+    return 0;
+  }
+
+  const value =
+    Number(
+      move.accuracy
+    );
+
+  if (
+    !Number.isFinite(value)
+  ) {
+    return 0;
+  }
+
+  if (value >= 90) {
+    return 0;
+  }
+
+  if (value >= 80) {
+    return 1;
+  }
+
+  if (value >= 60) {
+    return 2;
+  }
+
+  return 3;
+}
+
+
+export function effectivenessTierDelta(
+  multiplier
+) {
+  const value =
+    Number(
+      multiplier
+      ?? 1
+    );
+
+  if (value === 0) {
+    return null;
+  }
+
+  if (value >= 4) {
+    return 2;
+  }
+
+  if (value > 1) {
+    return 1;
+  }
+
+  if (
+    value > 0
+    &&
+    value <= 0.25
+  ) {
+    return -2;
+  }
+
+  if (
+    value > 0
+    &&
+    value < 1
+  ) {
+    return -1;
+  }
+
+  return 0;
+}
+
+
+function moveTargetLitmLabel(
+  target,
+  language
+) {
+  const pt = {
+    "selected-pokemon":
+      "1 alvo",
+
+    "random-opponent":
+      "Oponente aleatório",
+
+    "all-opponents":
+      "Todos os oponentes",
+
+    "all-other-pokemon":
+      "Todos ao redor",
+
+    "user":
+      "Usuário",
+
+    "self":
+      "Usuário",
+
+    "user-or-ally":
+      "Usuário ou aliado",
+
+    "users-field":
+      "Seu lado do campo",
+
+    "opponents-field":
+      "Lado adversário",
+
+    "entire-field":
+      "Campo",
+
+    "all-pokemon":
+      "Todos"
+  };
+
+  const en = {
+    "selected-pokemon":
+      "1 target",
+
+    "random-opponent":
+      "Random opponent",
+
+    "all-opponents":
+      "All opponents",
+
+    "all-other-pokemon":
+      "Everyone nearby",
+
+    "user":
+      "Self",
+
+    "self":
+      "Self",
+
+    "user-or-ally":
+      "Self or ally",
+
+    "users-field":
+      "Own side",
+
+    "opponents-field":
+      "Opposing side",
+
+    "entire-field":
+      "Field",
+
+    "all-pokemon":
+      "Everyone"
+  };
+
+  const map =
+    language === "en"
+      ? en
+      : pt;
+
+  return (
+    map[
+      String(
+        target
+        ?? ""
+      ).toLocaleLowerCase()
+    ]
+    ??
+    (
+      language === "en"
+        ? "Target"
+        : "Alvo"
+    )
+  );
+}
+
+
+export function moveLitmProfile(
+  move,
+  language =
+    getPokemonContentLanguage()
+) {
+  const impact =
+    moveImpact(
+      move?.power
+    );
+
+  const accuracyPenalty =
+    moveAccuracyPenalty(
+      move
+    );
+
+  const accuracyApplies =
+    !moveTargetSkipsAccuracy(
+      move?.target
+    );
+
+  const neverMisses =
+    accuracyApplies
+    &&
+    (
+      move?.accuracy === null
+      ||
+      move?.accuracy === undefined
+    );
+
+  const priority =
+    Number(
+      move?.priority
+      ?? 0
+    );
+
+  const typeText =
+    typeLabel(
+      move?.type
+      ?? "normal",
+      language
+    );
+
+  const classText =
+    damageClassLabel(
+      move?.damageClass
+      ?? "status",
+      language
+    );
+
+  const targetText =
+    moveTargetLitmLabel(
+      move?.target,
+      language
+    );
+
+  let accuracyText =
+    "";
+
+  if (accuracyApplies) {
+    if (neverMisses) {
+      accuracyText =
+        language === "en"
+          ? "Certain"
+          : "Certeiro";
+
+    } else {
+      accuracyText =
+        (
+          language === "en"
+            ? "Accuracy "
+            : "Precisão "
+        )
+        +
+        (
+          accuracyPenalty > 0
+            ? "-"
+              + accuracyPenalty
+            : "0"
+        );
+    }
+  }
+
+  const impactText =
+    Number(
+      move?.power
+      ?? 0
+    ) > 0
+      ? (
+          (
+            language === "en"
+              ? "Impact "
+              : "Impacto "
+          )
+          + "+"
+          + impact
+        )
+      : "";
+
+  const priorityText =
+    priority > 0
+      ? (
+          language === "en"
+            ? "Fast"
+            : "Rápido"
+        )
+      : priority < 0
+        ? (
+            language === "en"
+              ? "Slow"
+              : "Lento"
+          )
+        : "";
+
+  return {
+    type:
+      move?.type
+      ?? "normal",
+
+    typeText,
+
+    damageClass:
+      move?.damageClass
+      ?? "status",
+
+    classText,
+
+    impact,
+
+    impactText,
+
+    accuracy:
+      move?.accuracy
+      ?? null,
+
+    accuracyPenalty,
+
+    accuracyModifier:
+      -accuracyPenalty,
+
+    accuracyText,
+
+    neverMisses,
+
+    target:
+      move?.target
+      ?? "selected-pokemon",
+
+    targetText,
+
+    priority,
+
+    priorityText,
+
+    badges: [
+      typeText,
+      classText,
+      accuracyText,
+      impactText,
+      targetText,
+      priorityText
+    ].filter(Boolean)
+  };
+}
+
 function moveDescriptionPt(move, displayName) {
   const meta = move.meta ?? {};
   const rule = SPECIAL_MOVE_RULES[move.id] ?? {};
@@ -2063,6 +3219,7 @@ export async function loadPokemonMoveProfile(
     power: Number(detail.power ?? 0),
     accuracy: detail.accuracy == null ? null : Number(detail.accuracy),
     target: detail.target?.name ?? "selected-pokemon",
+    priority: Number(detail.priority ?? 0),
     effectChance: Number(detail.effect_chance ?? 0),
     effectTextPt: String(effectPt?.effect ?? "").trim(),
     shortEffectPt: String(effectPt?.short_effect ?? "").trim(),

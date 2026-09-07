@@ -1540,6 +1540,32 @@ class PokemonCharacterCreatorApp
           name:
             entry.name,
 
+          species:
+            options.speciesLabel
+            ?? "Pokémon",
+
+          speciesEn:
+            options.speciesLabelEn
+            ?? "",
+
+          types:
+            foundry.utils.deepClone(
+              options.types
+              ?? []
+            ),
+
+          baseStats:
+            foundry.utils.deepClone(
+              options.baseStats
+              ?? {}
+            ),
+
+          typeEffectiveness:
+            foundry.utils.deepClone(
+              options.typeEffectiveness
+              ?? {}
+            ),
+
           preview:
             entry.preview
             ?? entry.portrait

@@ -245,12 +245,14 @@
                   </a>
                 </div>
 
-                <small>{{typeText}} · {{methodLabel}} · {{damageText}}</small>
+                <small class="pokemon-move-litm-mechanics">{{mechanicsText}}</small>
+                <small class="pokemon-move-learn-method">{{methodLabel}}</small>
+
                 <p>{{shortDescription}}</p>
 
                 <ul>
                   {{#each consequences}}
-                    <li>{{this}}</li>
+                    <li>{{{this}}}</li>
                   {{/each}}
                 </ul>
               </div>
@@ -298,10 +300,11 @@
           {{#each finalReview.moves}}
             <article>
               <strong>{{name}} ({{englishName}})</strong>
+              <small class="pokemon-move-litm-mechanics">{{mechanicsText}}</small>
               <p>{{threat.description}}</p>
               <ul>
                 {{#each threat.list}}
-                  <li>{{this}}</li>
+                  <li>{{{this}}}</li>
                 {{/each}}
               </ul>
             </article>

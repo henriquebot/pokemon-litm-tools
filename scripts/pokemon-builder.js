@@ -19,7 +19,9 @@ import {
   moveShortDescription,
   moveEnglishLabel,
   formatThemeDescription,
-  pokemonSpecialImprovements
+  pokemonSpecialImprovements,
+  moveLitmProfile,
+  pokemonGenusLabel
 } from "./pokemon-content.js";
 
 import {
@@ -323,6 +325,84 @@ function englishEffect(entries) {
 
 const apiCache = new Map();
 
+
+let litmMarkupModulePromise =
+  null;
+
+
+function litmSystemRoute(
+  relativePath
+) {
+  const raw =
+    "systems/mist-engine-fvtt/"
+    + relativePath;
+
+  try {
+    return (
+      foundry.utils.getRoute
+        ?.(
+          raw
+        )
+      ?? (
+        "/"
+        + raw
+      )
+    );
+
+  } catch {
+    return (
+      "/"
+      + raw
+    );
+  }
+}
+
+
+async function litmMarkupHtml(
+  value
+) {
+  try {
+    if (
+      !litmMarkupModulePromise
+    ) {
+      litmMarkupModulePromise =
+        import(
+          litmSystemRoute(
+            "module/lib/tag-status-text-helper.mjs"
+          )
+        );
+    }
+
+    const module =
+      await litmMarkupModulePromise;
+
+    if (
+      typeof module.textWithTags
+        === "function"
+    ) {
+      return module.textWithTags(
+        String(
+          value
+          ?? ""
+        )
+      );
+    }
+
+  } catch (error) {
+    console.warn(
+      "Pokemon LITM Tools | Markup LitM:",
+      error
+    );
+  }
+
+  return foundry.utils.escapeHTML(
+    String(
+      value
+      ?? ""
+    )
+  );
+}
+
 function randomId() {
   return foundry.utils.randomID(16);
 }
@@ -417,6 +497,19 @@ async function loadPokemonBuildData(entry, might) {
   )).filter(Boolean);
 
   const ability = abilities.find(row => !row.hidden) ?? abilities[0] ?? null;
+
+  const speciesLabel =
+    pokemonGenusLabel(
+      species,
+      language
+    );
+
+  const speciesLabelEn =
+    pokemonGenusLabel(
+      species,
+      "en"
+    );
+
   const dexText = buildDexText({ pokemon, species, types, ability }, language);
 
   const typeEffectiveness = {};
@@ -506,7 +599,19 @@ async function loadPokemonBuildData(entry, might) {
         type: detail.type?.name ?? "normal",
         damageClass: detail.damage_class?.name ?? "status",
         power: Number(detail.power ?? 0),
-        accuracy: Number(detail.accuracy ?? 0),
+        accuracy:
+          detail.accuracy == null
+            ? null
+            : Number(
+                detail.accuracy
+              ),
+
+        priority:
+          Number(
+            detail.priority
+            ?? 0
+          ),
+
         level: source.level,
         rank: source.rank,
         methods: source.methods,
@@ -617,6 +722,10 @@ async function loadPokemonBuildData(entry, might) {
     moves,
     moveChoices,
     dexText,
+
+    speciesLabel,
+    speciesLabelEn,
+
     catchRate: Number(species.capture_rate ?? 0),
     genderRate: Number(species.gender_rate ?? -1),
     biographyMoves,
@@ -1210,6 +1319,13 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
       damageClass: move.damageClass,
       power: move.power,
       accuracy: move.accuracy,
+
+      priority:
+        Number(
+          move.priority
+          ?? 0
+        ),
+
       learnedAt: move.level,
       target: move.target,
       description: move.shortDescription ?? move.description ?? "",
@@ -1669,6 +1785,32 @@ export async function loadPokemonTrainerCustomization(
     );
 
   return {
+    speciesLabel:
+      data.speciesLabel
+      ?? "Pokémon",
+
+    speciesLabelEn:
+      data.speciesLabelEn
+      ?? "",
+
+    types:
+      foundry.utils.deepClone(
+        data.types
+        ?? []
+      ),
+
+    baseStats:
+      foundry.utils.deepClone(
+        data.stats
+        ?? {}
+      ),
+
+    typeEffectiveness:
+      foundry.utils.deepClone(
+        data.typeEffectiveness
+        ?? {}
+      ),
+
     defaults: {
       assetId:
         entry.id,
@@ -1858,6 +2000,12 @@ export async function loadPokemonTrainerCustomization(
 
             accuracy:
               move.accuracy,
+
+            priority:
+              Number(
+                move.priority
+                ?? 0
+              ),
 
             target:
               move.target,
@@ -2497,43 +2645,59 @@ class PokemonChallengeWizardApp
         }));
 
       moveChoices =
-        (this.data.moveChoices ?? [])
-          .map(move => {
-            const threat =
-              buildMoveThreat(
-                move,
-                move.name,
-                this.config.might,
-                language
-              );
+        await Promise.all(
+          (
+            this.data.moveChoices
+            ?? []
+          )
+            .map(
+              async move => {
+                const threat =
+                  buildMoveThreat(
+                    move,
+                    move.name,
+                    this.config.might,
+                    language
+                  );
 
-            return {
-              ...move,
-              checked:
-                this.selectedMoveIds.has(
-                  move.id
-                ),
-              typeText:
-                typeLabel(
-                  move.type,
-                  language
-                ),
-              damageText:
-                move.power
-                  ? (
-                      language === "en"
-                        ? `Power ${move.power}`
-                        : `Poder ${move.power}`
-                    )
-                  : (
-                      language === "en"
-                        ? "No direct damage"
-                        : "Sem dano direto"
+                const litm =
+                  moveLitmProfile(
+                    move,
+                    language
+                  );
+
+                return {
+                  ...move,
+
+                  checked:
+                    this.selectedMoveIds.has(
+                      move.id
                     ),
-              consequences:
-                threat.list
-            };
-          });
+
+                  typeText:
+                    typeLabel(
+                      move.type,
+                      language
+                    ),
+
+                  mechanicsText:
+                    litm.badges.join(
+                      " · "
+                    ),
+
+                  consequences:
+                    await Promise.all(
+                      threat.list.map(
+                        item =>
+                          litmMarkupHtml(
+                            item
+                          )
+                      )
+                    )
+                };
+              }
+            )
+        );
 
       if (this.step === 5) {
         const built =
@@ -2553,16 +2717,48 @@ class PokemonChallengeWizardApp
           powerStatTag:
             built.review.powerStatTag,
           moves:
-            built.moves.map(move => ({
-              ...move,
-              threat:
-                buildMoveThreat(
-                  move,
-                  move.name,
-                  this.config.might,
-                  language
-                )
-            }))
+            await Promise.all(
+              built.moves.map(
+                async move => {
+                  const threat =
+                    buildMoveThreat(
+                      move,
+                      move.name,
+                      this.config.might,
+                      language
+                    );
+
+                  const litm =
+                    moveLitmProfile(
+                      move,
+                      language
+                    );
+
+                  return {
+                    ...move,
+
+                    mechanicsText:
+                      litm.badges.join(
+                        " · "
+                      ),
+
+                    threat: {
+                      ...threat,
+
+                      list:
+                        await Promise.all(
+                          threat.list.map(
+                            item =>
+                              litmMarkupHtml(
+                                item
+                              )
+                          )
+                        )
+                    }
+                  };
+                }
+              )
+            )
         };
       }
     }

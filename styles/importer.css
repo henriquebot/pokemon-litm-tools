@@ -3551,3 +3551,140 @@ has(
     max-width: 100%;
   }
 }
+
+/* Pokemon LitM roll integration */
+
+.pokemon-move-litm-mechanics,
+.pokemon-move-learn-method {
+  display: block;
+  margin-top: 3px;
+}
+
+.pokemon-move-learn-method {
+  opacity: .72;
+}
+
+.pokemon-litm-mechanic-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 5px 0;
+}
+
+.pokemon-litm-mechanic-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 999px;
+  background: rgb(0 0 0 / .12);
+  font-size: .76rem;
+  line-height: 1.2;
+}
+
+.pokemon-litm-roll-package {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 6px;
+  background: rgb(255 255 255 / .035);
+}
+
+.pokemon-litm-roll-package-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pokemon-litm-roll-auto-tags {
+  display: grid;
+  gap: 4px;
+}
+
+.pokemon-character-move-effects-info {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 3px;
+}
+
+.pokemon-litm-spend-panel {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgb(255 255 255 / .12);
+}
+
+.pokemon-litm-spend-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pokemon-litm-spend-heading span {
+  opacity: .8;
+  font-size: .78rem;
+}
+
+.pokemon-litm-spend-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.pokemon-litm-spend-options button {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.pokemon-litm-spend-purchased {
+  display: grid;
+  gap: 5px;
+}
+
+.pokemon-litm-purchased-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  padding: 5px 0;
+  border-top: 1px solid rgb(255 255 255 / .08);
+}
+
+.pokemon-litm-purchased-row button {
+  width: auto;
+  margin: 0;
+}
+
+.pokemon-litm-reaction-result {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+  padding: 8px;
+  border-top: 1px solid rgb(255 255 255 / .16);
+}
+
+.pokemon-litm-reaction-controls {
+  display: grid;
+  gap: 5px;
+}
+
+.pokemon-litm-reaction-controls button {
+  width: 100%;
+  margin: 0;
+}
+
+.pokemon-litm-reaction-final {
+  padding: 4px 0;
+}
+
+@media (max-width: 700px) {
+  .pokemon-litm-spend-options,
+  .pokemon-litm-purchased-row {
+    grid-template-columns: 1fr;
+  }
+}
