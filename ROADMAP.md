@@ -40,7 +40,7 @@
 - [x] Metadata de tipo por Move
 - [x] Targeting e múltiplos alvos pelo target nativo do Foundry
 - [x] Prévia de fraqueza, resistência e imunidade por alvo
-- [ ] Injetar automaticamente a eficácia de tipo na rolagem nativa do LitM
+- [x] Eficácia de tipo altera consequência/dano, nunca o Power da rolagem nativa do LitM
 - [ ] Aprovação do GM antes da rolagem nativa
 - [x] Target → aplicação de Tags e Status estruturados no alvo
 - [x] Aplicação e empilhamento de Status conforme o modelo do LitM
@@ -53,6 +53,8 @@
 
 ## Backlog visual
 - [ ] Recolher Pokémon com efeito cinematográfico de retorno à Pokébola
+- [ ] VFX automático de golpes por moveId via Pokémon Showdown como provider principal, preparado para futuras gerações
+- [ ] JB2A, Eskie e outros packs de VFX permanecem apenas opcionais/fallback
 
 ## Backlog — Configurações do módulo
 - [ ] Fazer uma auditoria completa de regras, automações e comportamentos atualmente fixos para decidir o que deve virar opção configurável do módulo, com defaults sensatos e escopo correto (mundo ou cliente). Revisar especialmente combate (ex.: exigir Rolagem Detalhada ao usar Tag de Golpe), targeting, consequências do Narrador, visibilidade, aplicação automática de efeitos, followers, VFX/áreas, interface e comportamentos padrão.
@@ -80,6 +82,3 @@
 - [ ] Restaurar padrão por entrada ou globalmente
 - [ ] Idioma configurável, PT-BR padrão
 - [ ] Dependências externas sempre opcionais quando possível
-
-## Fora do roadmap
-- Speed controlando velocidade de animação.

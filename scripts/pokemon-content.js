@@ -2970,6 +2970,7 @@ function moveTargetLitmLabel(
 }
 
 
+
 export function moveLitmProfile(
   move,
   language =
@@ -3025,46 +3026,94 @@ export function moveLitmProfile(
       language
     );
 
-  let accuracyText =
-    "";
+  const typeBadge =
+    (
+      language === "en"
+        ? "Type: "
+        : "Tipo: "
+    )
+    + typeText;
 
-  if (accuracyApplies) {
-    if (neverMisses) {
-      accuracyText =
-        language === "en"
-          ? "Certain"
-          : "Certeiro";
+  const classBadge =
+    (
+      language === "en"
+        ? "Category: "
+        : "Categoria: "
+    )
+    + classText;
 
-    } else {
-      accuracyText =
-        (
+  const targetBadge =
+    (
+      language === "en"
+        ? "Target: "
+        : "Alvo: "
+    )
+    + targetText;
+
+  const accuracyName =
+    accuracyPenalty === 1
+      ? (
           language === "en"
-            ? "Accuracy "
-            : "Precisão "
+            ? "Accuracy: Demanding"
+            : "Acerto: Exigente"
         )
-        +
-        (
-          accuracyPenalty > 0
-            ? "-"
-              + accuracyPenalty
-            : "0"
-        );
-    }
-  }
+      : accuracyPenalty === 2
+        ? (
+            language === "en"
+              ? "Accuracy: Difficult"
+              : "Acerto: Difícil"
+          )
+        : accuracyPenalty >= 3
+          ? (
+              language === "en"
+                ? "Accuracy: Very difficult"
+                : "Acerto: Muito difícil"
+            )
+          : "";
+
+  const accuracyText =
+    accuracyPenalty > 0
+      ? (
+          accuracyName
+          + " (-"
+          + accuracyPenalty
+          + ")"
+        )
+      : "";
+
+  const impactName =
+    impact === 1
+      ? (
+          language === "en"
+            ? "Strong"
+            : "Forte"
+        )
+      : impact === 2
+        ? (
+            language === "en"
+              ? "Powerful"
+              : "Poderosa"
+          )
+        : impact >= 3
+          ? (
+              language === "en"
+                ? "Devastating"
+                : "Devastadora"
+            )
+          : "";
 
   const impactText =
-    Number(
-      move?.power
-      ?? 0
-    ) > 0
+    impact > 0
       ? (
           (
             language === "en"
-              ? "Impact "
-              : "Impacto "
+              ? "Potency: "
+              : "Potência: "
           )
-          + "+"
+          + impactName
+          + " (+"
           + impact
+          + ")"
         )
       : "";
 
@@ -3072,14 +3121,14 @@ export function moveLitmProfile(
     priority > 0
       ? (
           language === "en"
-            ? "Fast"
-            : "Rápido"
+            ? "Priority: Fast"
+            : "Prioridade: Rápido"
         )
       : priority < 0
         ? (
             language === "en"
-              ? "Slow"
-              : "Lento"
+              ? "Priority: Slow"
+              : "Prioridade: Lento"
           )
         : "";
 
@@ -3089,15 +3138,17 @@ export function moveLitmProfile(
       ?? "normal",
 
     typeText,
+    typeBadge,
 
     damageClass:
       move?.damageClass
       ?? "status",
 
     classText,
+    classBadge,
 
     impact,
-
+    impactName,
     impactText,
 
     accuracy:
@@ -3109,6 +3160,7 @@ export function moveLitmProfile(
     accuracyModifier:
       -accuracyPenalty,
 
+    accuracyName,
     accuracyText,
 
     neverMisses,
@@ -3118,21 +3170,22 @@ export function moveLitmProfile(
       ?? "selected-pokemon",
 
     targetText,
+    targetBadge,
 
     priority,
-
     priorityText,
 
     badges: [
-      typeText,
-      classText,
+      typeBadge,
+      classBadge,
       accuracyText,
       impactText,
-      targetText,
+      targetBadge,
       priorityText
     ].filter(Boolean)
   };
 }
+
 
 function moveDescriptionPt(move, displayName) {
   const meta = move.meta ?? {};

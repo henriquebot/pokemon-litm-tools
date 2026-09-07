@@ -3688,3 +3688,36 @@ has(
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Pokémon Detailed Spend — aplicação reversível */
+.pokemon-litm-applied-state {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  margin-left: 6px;
+}
+
+.pokemon-litm-undo-applied {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  min-width: 18px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  line-height: 1;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.pokemon-litm-undo-applied:hover {
+  opacity: 1;
+}

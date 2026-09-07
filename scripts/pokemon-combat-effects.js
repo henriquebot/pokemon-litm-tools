@@ -1248,6 +1248,231 @@ async function applyMoveEffectDirect(payload) {
 
 
 
+
+function floatingEffectIdentity(
+  entry
+) {
+  return {
+    name:
+      String(
+        entry?.name
+        ?? ""
+      )
+        .trim()
+        .toLocaleLowerCase(),
+
+    isStatus:
+      entry?.isStatus === true
+      ||
+      Number(
+        entry?.value
+        ?? 0
+      ) > 0,
+
+    positive:
+      entry?.positive
+        !== false
+  };
+}
+
+
+function sameFloatingEffectIdentity(
+  entry,
+  identity
+) {
+  if (
+    !entry
+    ||
+    !identity
+  ) {
+    return false;
+  }
+
+  const current =
+    floatingEffectIdentity(
+      entry
+    );
+
+  return (
+    current.name
+      === identity.name
+    &&
+    current.isStatus
+      === identity.isStatus
+    &&
+    current.positive
+      === identity.positive
+  );
+}
+
+
+function matchingFloatingEffects(
+  list,
+  identity
+) {
+  return foundry.utils.deepClone(
+    (
+      Array.isArray(list)
+        ? list
+        : []
+    ).filter(
+      entry =>
+        sameFloatingEffectIdentity(
+          entry,
+          identity
+        )
+    )
+  );
+}
+
+
+function restoreMatchingFloatingEffects(
+  list,
+  identity,
+  replacement
+) {
+  const current =
+    foundry.utils.deepClone(
+      Array.isArray(list)
+        ? list
+        : []
+    );
+
+  let insertAt =
+    current.length;
+
+  for (
+    let index = 0;
+    index < current.length;
+    index++
+  ) {
+    if (
+      sameFloatingEffectIdentity(
+        current[index],
+        identity
+      )
+    ) {
+      insertAt =
+        current
+          .slice(
+            0,
+            index
+          )
+          .filter(
+            entry =>
+              !sameFloatingEffectIdentity(
+                entry,
+                identity
+              )
+          )
+          .length;
+
+      break;
+    }
+  }
+
+  const kept =
+    current.filter(
+      entry =>
+        !sameFloatingEffectIdentity(
+          entry,
+          identity
+        )
+    );
+
+  kept.splice(
+    Math.min(
+      insertAt,
+      kept.length
+    ),
+    0,
+    ...foundry.utils.deepClone(
+      replacement
+      ?? []
+    )
+  );
+
+  return kept;
+}
+
+
+async function applyExplicitEffectToActor(
+  actor,
+  effect,
+  multiplier,
+  tokenId = null
+) {
+  const beforeList =
+    foundry.utils.deepClone(
+      actor?.system
+        ?.floatingTagsAndStatuses
+      ?? []
+    );
+
+  const preview =
+    statusEntry(
+      effect,
+      multiplier
+    );
+
+  const identity =
+    preview
+      ? floatingEffectIdentity(
+          preview
+        )
+      : null;
+
+  const before =
+    identity
+      ? matchingFloatingEffects(
+          beforeList,
+          identity
+        )
+      : [];
+
+  const applied =
+    await applyEffectsToActor(
+      actor,
+      [effect],
+      multiplier,
+      3
+    );
+
+  const afterList =
+    foundry.utils.deepClone(
+      actor?.system
+        ?.floatingTagsAndStatuses
+      ?? []
+    );
+
+  const after =
+    identity
+      ? matchingFloatingEffects(
+          afterList,
+          identity
+        )
+      : [];
+
+  return {
+    actorId:
+      actor.id,
+
+    tokenId,
+
+    applied,
+
+    undo:
+      identity
+        ? {
+            identity,
+            before,
+            after
+          }
+        : null
+  };
+}
+
+
 async function applyExplicitEffectDirect(
   payload
 ) {
@@ -1339,18 +1564,13 @@ async function applyExplicitEffectDirect(
 
     return {
       report: [
-        {
-          actorId:
-            actor.id,
-
-          applied:
-            await applyEffectsToActor(
-              actor,
-              [effect],
-              1,
-              3
-            )
-        }
+        await applyExplicitEffectToActor(
+          actor,
+          effect,
+          1,
+          sourceToken?.id
+          ?? null
+        )
       ]
     };
   }
@@ -1390,31 +1610,139 @@ async function applyExplicitEffectDirect(
           )
         : 1;
 
-    const applied =
-      await applyEffectsToActor(
+    report.push(
+      await applyExplicitEffectToActor(
         token.actor,
-        [effect],
+        effect,
         multiplier,
-        3
-      );
-
-    report.push({
-      actorId:
-        token.actor.id,
-
-      tokenId:
-        token.id,
-
-      multiplier,
-
-      applied
-    });
+        token.id
+      )
+    );
   }
 
   return {
     report
   };
 }
+
+
+async function undoExplicitEffectDirect(
+  payload
+) {
+  if (!isAuthority()) {
+    throw new Error(
+      "Somente o GM ativo pode desfazer efeitos Pokémon."
+    );
+  }
+
+  const scene =
+    game.scenes.get(
+      payload.sceneId
+    );
+
+  const report =
+    Array.isArray(
+      payload?.application
+        ?.report
+    )
+      ? payload.application.report
+      : [];
+
+  if (!report.length) {
+    throw new Error(
+      "Esta aplicação não possui dados para desfazer."
+    );
+  }
+
+  const planned = [];
+
+  for (
+    const row
+    of report
+  ) {
+    if (!row?.undo?.identity) {
+      continue;
+    }
+
+    const actor =
+      game.actors.get(
+        row.actorId
+      )
+      ??
+      scene?.tokens?.get(
+        row.tokenId
+      )?.actor
+      ??
+      null;
+
+    if (!actor) {
+      throw new Error(
+        "O alvo original do efeito não foi encontrado."
+      );
+    }
+
+    const current =
+      foundry.utils.deepClone(
+        actor.system
+          ?.floatingTagsAndStatuses
+        ?? []
+      );
+
+    const currentMatching =
+      matchingFloatingEffects(
+        current,
+        row.undo.identity
+      );
+
+    if (
+      JSON.stringify(
+        currentMatching
+      )
+      !==
+      JSON.stringify(
+        row.undo.after
+        ?? []
+      )
+    ) {
+      throw new Error(
+        (
+          actor.name
+          ?? "O alvo"
+        )
+        + " teve este mesmo Status/Tag alterado depois da aplicação. "
+        + "O undo foi bloqueado para não apagar uma alteração posterior."
+      );
+    }
+
+    planned.push({
+      actor,
+
+      list:
+        restoreMatchingFloatingEffects(
+          current,
+          row.undo.identity,
+          row.undo.before
+            ?? []
+        )
+    });
+  }
+
+  for (
+    const update
+    of planned
+  ) {
+    await update.actor.update({
+      "system.floatingTagsAndStatuses":
+        update.list
+    });
+  }
+
+  return {
+    undone:
+      true
+  };
+}
+
 
 async function deletePokemonInstanceDocuments(instanceId) {
   const id = String(instanceId ?? "");
@@ -1517,6 +1845,7 @@ async function socketRequest(message) {
     else if (message.action === "apply-move") result = await applyMoveDirect(message.payload);
     else if (message.action === "apply-effect") result = await applyMoveEffectDirect(message.payload);
     else if (message.action === "apply-explicit") result = await applyExplicitEffectDirect(message.payload);
+    else if (message.action === "undo-explicit") result = await undoExplicitEffectDirect(message.payload);
     else if (message.action === "delete-combat") result = await deleteCombatProjectionDirect(message.payload);
     else if (message.action === "cleanup-instance") result = await cleanupPokemonInstanceDirect(message.payload);
     else return;
@@ -1628,6 +1957,7 @@ function requestAuthority(action, payload) {
     if (action === "apply-move") return applyMoveDirect(payload);
     if (action === "apply-effect") return applyMoveEffectDirect(payload);
     if (action === "apply-explicit") return applyExplicitEffectDirect(payload);
+    if (action === "undo-explicit") return undoExplicitEffectDirect(payload);
     if (action === "delete-combat") return deleteCombatProjectionDirect(payload);
     if (action === "cleanup-instance") return cleanupPokemonInstanceDirect(payload);
   }
@@ -2583,7 +2913,8 @@ function decoratePokemonRollDialog(
       app,
       {
         name:
-          "Precisão",
+          mechanics.accuracyName
+          || "Acerto",
 
         value:
           mechanics.accuracyPenalty,
@@ -5336,7 +5667,54 @@ async function spendPokemonPower(
 }
 
 
+
 async function markPokemonSpendApplied(
+  message,
+  predicate,
+  application
+) {
+  const data =
+    foundry.utils.deepClone(
+      message.getFlag?.(
+        LITM_SYSTEM_ID,
+        "detailedSpend"
+      )
+    );
+
+  if (!data) {
+    return;
+  }
+
+  for (
+    const entry
+    of data.entries
+      ?? []
+  ) {
+    if (
+      predicate(entry)
+    ) {
+      entry.pokemonApplied =
+        true;
+
+      entry.pokemonApplication =
+        foundry.utils.deepClone(
+          application
+          ?? {
+            sceneEffect:
+              true
+          }
+        );
+    }
+  }
+
+  await updateDetailedSpendMessage(
+    message,
+    data
+  );
+}
+
+
+async function markPokemonSpendUnapplied(
   message,
   predicate
 ) {
@@ -5361,7 +5739,9 @@ async function markPokemonSpendApplied(
       predicate(entry)
     ) {
       entry.pokemonApplied =
-        true;
+        false;
+
+      delete entry.pokemonApplication;
     }
   }
 
@@ -5405,6 +5785,7 @@ async function nativeStatusMarkup(
 }
 
 
+
 async function applyPurchasedMoveEffect({
   message,
   actor,
@@ -5429,7 +5810,11 @@ async function applyPurchasedMoveEffect({
 
     await markPokemonSpendApplied(
       message,
-      predicate
+      predicate,
+      {
+        sceneEffect:
+          true
+      }
     );
 
     return;
@@ -5452,32 +5837,158 @@ async function applyPurchasedMoveEffect({
     );
   }
 
-  await requestAuthority(
-    "apply-explicit",
-    {
-      sceneId:
-        canvas.scene.id,
+  const application =
+    await requestAuthority(
+      "apply-explicit",
+      {
+        sceneId:
+          canvas.scene.id,
 
-      sourceActorId:
-        actor.id,
+        sourceActorId:
+          actor.id,
 
-      sourceTokenId:
-        sourceToken.id,
+        sourceTokenId:
+          sourceToken.id,
 
-      moveId:
-        move.id,
+        moveId:
+          move.id,
 
-      targetTokenIds:
-        ids,
+        targetTokenIds:
+          ids,
 
-      effect
-    }
-  );
+        effect
+      }
+    );
 
   await markPokemonSpendApplied(
     message,
+    predicate,
+    application
+  );
+}
+
+
+async function undoPurchasedMoveEffect({
+  message,
+  predicate,
+  application
+}) {
+  if (!application) {
+    throw new Error(
+      "Esta aplicação não possui dados para desfazer."
+    );
+  }
+
+  if (
+    application.sceneEffect
+      !== true
+  ) {
+    await requestAuthority(
+      "undo-explicit",
+      {
+        sceneId:
+          canvas.scene.id,
+
+        application:
+          foundry.utils.deepClone(
+            application
+          )
+      }
+    );
+  }
+
+  await markPokemonSpendUnapplied(
+    message,
     predicate
   );
+}
+
+
+function appliedStateControl({
+  message,
+  editable,
+  predicate,
+  application
+}) {
+  const state =
+    document.createElement(
+      "span"
+    );
+
+  state.className =
+    "pokemon-litm-applied-state";
+
+  const done =
+    document.createElement(
+      "small"
+    );
+
+  done.textContent =
+    "Aplicado";
+
+  state.append(
+    done
+  );
+
+  if (
+    editable
+    &&
+    application
+  ) {
+    const undo =
+      document.createElement(
+        "button"
+      );
+
+    undo.type =
+      "button";
+
+    undo.className =
+      "pokemon-litm-undo-applied";
+
+    undo.title =
+      "Desfazer aplicação";
+
+    undo.setAttribute(
+      "aria-label",
+      "Desfazer aplicação"
+    );
+
+    undo.innerHTML =
+      '<i class="fa-solid fa-rotate-left"></i>';
+
+    undo.addEventListener(
+      "click",
+      event => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        void undoPurchasedMoveEffect({
+          message,
+          predicate,
+          application
+        }).catch(
+          error => {
+            console.error(
+              "Pokemon LITM Tools | Undo application:",
+              error
+            );
+
+            ui.notifications.error(
+              error?.message
+              ?? "Não foi possível desfazer a aplicação."
+            );
+          }
+        );
+      }
+    );
+
+    state.append(
+      undo
+    );
+  }
+
+  return state;
 }
 
 
@@ -5885,8 +6396,12 @@ function addPokemonDetailedSpendControls(
       "Dano: "
       + spent
       + " Power"
-      + " · Impacto +"
-      + mechanics.impact
+      + (
+          mechanics.impactText
+            ? " · "
+              + mechanics.impactText
+            : ""
+        )
       + (
           targetText
             ? " · "
@@ -5959,16 +6474,28 @@ function addPokemonDetailedSpendControls(
       );
 
     } else if (applied) {
-      const done =
-        document.createElement(
-          "small"
-        );
-
-      done.textContent =
-        "Aplicado";
+      const application =
+        damageEntries.find(
+          entry =>
+            entry?.pokemonApplication
+        )?.pokemonApplication
+        ?? null;
 
       row.append(
-        done
+        appliedStateControl({
+          message,
+          editable,
+
+          predicate:
+            entry =>
+              entry?.type
+                === "pokemon-damage"
+              &&
+              entry?.pokemonMoveId
+                === move.id,
+
+          application
+        })
       );
     }
 
@@ -6065,16 +6592,28 @@ function addPokemonDetailedSpendControls(
           entry.pokemonApplied
             === true
         ) {
-          const done =
-            document.createElement(
-              "small"
-            );
-
-          done.textContent =
-            "Aplicado";
-
           row.append(
-            done
+            appliedStateControl({
+              message,
+              editable,
+
+              predicate:
+                candidate =>
+                  candidate?.type
+                    === "pokemon-effect"
+                  &&
+                  candidate?.pokemonMoveId
+                    === move.id
+                  &&
+                  Number(
+                    candidate
+                      .pokemonEffectIndex
+                  ) === index,
+
+              application:
+                entry.pokemonApplication
+                ?? null
+            })
           );
         }
 
