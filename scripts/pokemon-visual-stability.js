@@ -31,6 +31,17 @@ function managedActor(actor) {
   );
 }
 
+function isPokemonVisual(flags) {
+  return Boolean(
+    flags?.kind === "pokemon"
+    || flags?.pokemonBuilder === true
+    || flags?.pokemonTheme === true
+    || flags?.combatProjection === true
+    || flags?.pokemonFollowerToken === true
+    || flags?.pokemonInstanceId
+  );
+}
+
 function visualData(flags) {
   const assets = flags?.assets ?? {};
   const overworld = assetPath(assets.overworld);
@@ -62,6 +73,11 @@ async function repairActor(actor) {
     [`prototypeToken.flags.${MODULE_ID}.assets.spritesheet`]: visual.spritesheet
   };
 
+  if (isPokemonVisual(flags)) {
+    update["prototypeToken.texture.anchorX"] = 0.5;
+    update["prototypeToken.texture.anchorY"] = 1;
+  }
+
   if (visual.portrait) {
     update.img = visual.portrait;
     update[`prototypeToken.flags.${MODULE_ID}.assets.portrait`] = visual.portrait;
@@ -85,6 +101,11 @@ function tokenRepairUpdate(token) {
     [`flags.${MODULE_ID}.assets.overworld`]: visual.overworld,
     [`flags.${MODULE_ID}.assets.spritesheet`]: visual.spritesheet
   };
+
+  if (isPokemonVisual(flags)) {
+    update["texture.anchorX"] = 0.5;
+    update["texture.anchorY"] = 1;
+  }
 
   if (visual.portrait) update[`flags.${MODULE_ID}.assets.portrait`] = visual.portrait;
   return update;

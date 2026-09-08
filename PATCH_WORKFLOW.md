@@ -19,6 +19,8 @@ Este arquivo define o gate obrigatório para qualquer patch gerado para a branch
 13. Depois que o usuário executar apply.cmd, consultar o GitHub antes de pedir qualquer diagnóstico Git ao usuário.
 14. Testes funcionais/self-tests são gates; buscas textuais frágeis são apenas auxiliares.
 15. “Validado” significa que o payload exato entregue passou pelo gate de transformação, sintaxe, diff, arquivos esperados e simulação de commit/push; não significa apenas inspeção visual do código.
+16. O payload JavaScript executado pelo `apply.ps1` só transforma e valida arquivos; ele nunca executa `git add`, `git commit` ou `git push`. O wrapper é a única autoridade para stage/commit/push.
+17. O gate deve simular o fluxo real `apply.cmd`/`apply.ps1`: executar o payload, confirmar diff não vazio, stage, `git diff --cached --check`, `node --check`, commit, push e HEAD remoto. O transformador também deve aceitar uma segunda execução como no-op sem alterar arquivos.
 
 ## Princípio
 

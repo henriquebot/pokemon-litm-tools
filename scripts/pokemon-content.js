@@ -1,7 +1,7 @@
 const MODULE_ID = "pokemon-litm-tools";
 
 export const POKEMON_LITM_SEMANTICS_REV =
-  "2026-09-08-native-move-burn-v3";
+  "2026-09-08-foundation-pulla-v4";
 
 const TYPE_PTBR = {
   normal: "Normal",
@@ -3834,7 +3834,7 @@ export function pokemonLitmSemanticsSelfTest(
   const checks = {
     revision:
       POKEMON_LITM_SEMANTICS_REV
-        === "2026-09-08-native-move-burn-v3",
+        === "2026-09-08-foundation-pulla-v4",
 
     mightOrigin:
       mightConsequenceLevel(

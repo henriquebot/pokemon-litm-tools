@@ -1746,6 +1746,56 @@ function storedPokemonChallengeThreats(
 }
 
 
+function migratePokemonChallengeLimits(
+  actor,
+  language
+) {
+  const limits =
+    foundry.utils.deepClone(
+      Array.isArray(
+        actor.system?.limits
+      )
+        ? actor.system.limits
+        : []
+    );
+
+  let changed = false;
+
+  for (
+    const limit
+    of limits
+  ) {
+    const name =
+      String(
+        limit?.name
+        ?? ""
+      )
+        .trim()
+        .toLocaleLowerCase();
+
+    if (
+      name !== "derrotado"
+      &&
+      name !== "defeated"
+    ) {
+      continue;
+    }
+
+    limit.name =
+      language === "en"
+        ? "Wound"
+        : "Ferido";
+
+    changed = true;
+  }
+
+  return {
+    changed,
+    limits
+  };
+}
+
+
 export async function refreshPokemonChallengeSemantics(
   actor,
   {
@@ -1787,6 +1837,16 @@ export async function refreshPokemonChallengeSemantics(
     };
   }
 
+  const language =
+    flags.contentLanguage
+    ?? getPokemonContentLanguage();
+
+  const limitMigration =
+    migratePokemonChallengeLimits(
+      actor,
+      language
+    );
+
   const {
     threats,
     moves
@@ -1797,6 +1857,8 @@ export async function refreshPokemonChallengeSemantics(
 
   if (
     !threats.length
+    &&
+    !limitMigration.changed
   ) {
     return {
       updated:
@@ -1808,9 +1870,6 @@ export async function refreshPokemonChallengeSemantics(
   }
 
   const update = {
-    "system.threatsAndConsequences":
-      threats,
-
     [
       "flags."
       + MODULE_ID
@@ -1818,6 +1877,24 @@ export async function refreshPokemonChallengeSemantics(
     ]:
       POKEMON_LITM_SEMANTICS_REV
   };
+
+  if (
+    threats.length
+  ) {
+    update[
+      "system.threatsAndConsequences"
+    ] =
+      threats;
+  }
+
+  if (
+    limitMigration.changed
+  ) {
+    update[
+      "system.limits"
+    ] =
+      limitMigration.limits;
+  }
 
   if (
     JSON.stringify(
@@ -2096,7 +2173,7 @@ async function createChallenge(entry, config, data, review, definition, existing
 
   const limits = [
     {
-      name: language === "en" ? "Defeated" : "Derrotado",
+      name: language === "en" ? "Wound" : "Ferido",
       value: String(defeated),
       consequence: language === "en" ? "Out of action" : "Fora de combate"
     }
