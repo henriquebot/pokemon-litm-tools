@@ -3175,11 +3175,10 @@ export function moveLitmProfile(
     priority,
     priorityText,
 
+    // Base Power e Accuracy continuam como metadados de referência.
     badges: [
       typeBadge,
       classBadge,
-      accuracyText,
-      impactText,
       targetBadge,
       priorityText
     ].filter(Boolean)
@@ -3271,6 +3270,7 @@ export async function loadPokemonMoveProfile(
     damageClass: detail.damage_class?.name ?? "status",
     power: Number(detail.power ?? 0),
     accuracy: detail.accuracy == null ? null : Number(detail.accuracy),
+    pp: Number(detail.pp ?? 0),
     target: detail.target?.name ?? "selected-pokemon",
     priority: Number(detail.priority ?? 0),
     effectChance: Number(detail.effect_chance ?? 0),

@@ -606,6 +606,8 @@ async function loadPokemonBuildData(entry, might) {
                 detail.accuracy
               ),
 
+        pp: Number(detail.pp ?? 0),
+
         priority:
           Number(
             detail.priority
@@ -1319,6 +1321,7 @@ function moduleMetadata(entry, definition, config, data, review, instanceId) {
       damageClass: move.damageClass,
       power: move.power,
       accuracy: move.accuracy,
+      pp: Number(move.pp ?? 0),
 
       priority:
         Number(

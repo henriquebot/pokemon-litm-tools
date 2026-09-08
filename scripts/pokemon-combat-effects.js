@@ -16,7 +16,9 @@ import {
   moveLitmProfile,
   effectivenessTierDelta,
   fetchPokeJson,
-  pokemonGenusLabel
+  pokemonGenusLabel,
+  statPowerText,
+  statWeaknessText
 } from "./pokemon-content.js";
 
 const MODULE_ID = "pokemon-litm-tools";
@@ -308,6 +310,7 @@ async function enrichMoveForActor(actor, move) {
     damageClass: detail.damageClass ?? move.damageClass,
     power: detail.power ?? move.power,
     accuracy: detail.accuracy ?? move.accuracy,
+    pp: detail.pp ?? move.pp ?? 0,
     target: detail.target ?? move.target,
     description: detail.description ?? detail.shortDescription ?? move.description ?? "",
     pokemonDbUrl: detail.pokemonDbUrl ?? move.pokemonDbUrl,
@@ -379,11 +382,13 @@ function multiplierFor(actor, moveType) {
 }
 
 function matchupLabel(multiplier) {
-  if (multiplier === 0) return "Imune";
-  if (multiplier >= 4) return "Extremamente efetivo ×" + multiplier;
-  if (multiplier > 1) return "Super efetivo ×" + multiplier;
-  if (multiplier < 1) return "Resistido ×" + multiplier;
-  return "Eficácia normal";
+  const value = Number(multiplier ?? 1);
+  if (value === 0) return "Imune";
+  if (value >= 4) return "Muito vulnerável";
+  if (value > 1) return "Vulnerável";
+  if (value > 0 && value <= 0.25) return "Muito resistente";
+  if (value > 0 && value < 1) return "Resistente";
+  return "Neutro";
 }
 
 function effectRank(trigger) {
@@ -409,12 +414,16 @@ function statusEntry(effect, multiplier = 1) {
   const source = String(effect?.source ?? "").toLowerCase();
 
   if (source === "damage") {
-    if (multiplier === 0) return null;
-    if (multiplier >= 4) level += 2;
-    else if (multiplier > 1) level += 1;
-    else if (multiplier <= 0.25) level -= 2;
-    else if (multiplier < 1) level -= 1;
-    level = Math.max(1, Math.min(6, level));
+    const delta = effectivenessTierDelta(multiplier);
+    if (delta === null) return null;
+
+    level += delta;
+
+    if (level <= 0) {
+      return null;
+    }
+
+    level = Math.min(6, level);
   }
 
   const markings = Array(6).fill(false);
@@ -2249,6 +2258,192 @@ function multiplierForActorType(
 }
 
 
+
+function activeTargetStatRows(actor) {
+  if (!actor) {
+    return [];
+  }
+
+  const rows = [];
+
+  const add = (
+    tag,
+    source
+  ) => {
+    if (
+      !tag
+      || tag.burned === true
+      || tag.expired === true
+      || tag.planned === true
+    ) {
+      return;
+    }
+
+    const name =
+      currentTagName(
+        tag
+      );
+
+    if (!name) {
+      return;
+    }
+
+    const isStatus =
+      tag.isStatus === true
+      ||
+      Number(
+        tag.value
+        ?? 0
+      ) > 0;
+
+    rows.push({
+      name,
+      source,
+
+      value:
+        isStatus
+          ? Math.max(
+              1,
+              Math.min(
+                6,
+                Number(
+                  tag.value
+                  ?? 1
+                ) || 1
+              )
+            )
+          : 1
+    });
+  };
+
+  for (
+    const tag
+    of actor.system
+      ?.floatingTagsAndStatuses
+      ?? []
+  ) {
+    add(
+      tag,
+      "floating"
+    );
+  }
+
+  const pokemonActor =
+    actor?.getFlag?.(
+      MODULE_ID,
+      "kind"
+    ) === "pokemon";
+
+  const combatProjection =
+    actor?.getFlag?.(
+      MODULE_ID,
+      "combatProjection"
+    ) === true;
+
+  /*
+   * Um treinador pode possuir vários Themes Pokémon.
+   * Esses Themes não podem defender o próprio treinador
+   * automaticamente só porque estão na ficha dele.
+   */
+  const items =
+    Array.from(
+      actor.items
+      ?? []
+    ).filter(
+      item =>
+        pokemonActor
+        ||
+        combatProjection
+        ||
+        item.getFlag?.(
+          MODULE_ID,
+          "pokemonTheme"
+        ) !== true
+    );
+
+  const sourceTheme =
+    sourceThemeForCombatActor(
+      actor
+    );
+
+  if (
+    sourceTheme
+    &&
+    !items.some(
+      item =>
+        item.id
+          === sourceTheme.id
+    )
+  ) {
+    items.push(
+      sourceTheme
+    );
+  }
+
+  for (
+    const item
+    of items
+  ) {
+    for (
+      const tag
+      of item.system?.powertags
+        ?? []
+    ) {
+      add(
+        tag,
+        "power-tag"
+      );
+    }
+
+    for (
+      const tag
+      of item.system?.weaknesstags
+        ?? []
+    ) {
+      add(
+        tag,
+        "weakness-tag"
+      );
+    }
+  }
+
+  return rows;
+}
+
+
+function targetStatTagValue(
+  rows,
+  name
+) {
+  const id =
+    moveIdentity(
+      name
+    );
+
+  return Math.max(
+    0,
+
+    ...(
+      rows
+      ?? []
+    )
+      .filter(
+        row =>
+          moveIdentity(
+            row?.name
+          ) === id
+      )
+      .map(
+        row =>
+          Number(
+            row?.value
+            ?? 1
+          ) || 1
+      )
+  );
+}
+
+
 function defensiveContextForMove(
   move,
   actor
@@ -2266,45 +2461,309 @@ function defensiveContextForMove(
         ? "special-defense"
         : null;
 
+  /*
+   * Moves de Efeito não recebem Defense/Sp. Defense por padrão.
+   * A oposição deles será resolvida por Tags ficcionalmente
+   * relevantes numa etapa posterior da reforma.
+   */
   if (!stat) {
     return null;
   }
 
-  const stats =
-    pokemonBaseStats(
+  const sourceTheme =
+    sourceThemeForCombatActor(
       actor
     );
 
-  if (!stats) {
-    return null;
-  }
+  const language =
+    actor?.getFlag?.(
+      MODULE_ID,
+      "contentLanguage"
+    )
+    ??
+    sourceTheme?.getFlag?.(
+      MODULE_ID,
+      "contentLanguage"
+    )
+    ??
+    "pt-BR";
 
-  const raw =
-    Number(
-      stats[stat]
-      ?? 0
+  const strongName =
+    statPowerText(
+      stat,
+      language
+    );
+
+  const weakName =
+    statWeaknessText(
+      stat,
+      language
+    );
+
+  const rows =
+    activeTargetStatRows(
+      actor
+    );
+
+  const strongValue =
+    targetStatTagValue(
+      rows,
+      strongName
+    );
+
+  const weakValue =
+    targetStatTagValue(
+      rows,
+      weakName
     );
 
   /*
-   * Mantemos isto deliberadamente conservador:
-   * Base Stat não vira uma escala de +1/+2/+3.
-   * Apenas uma defesa realmente notável gera uma Tag objetiva +1.
+   * A Tag é a representação LitM do Stat.
+   * Nunca somamos Base Stat + Tag correspondente.
    */
-  if (raw < 90) {
+  if (
+    strongValue
+    ||
+    weakValue
+  ) {
+    const modifier =
+      weakValue
+      - strongValue;
+
+    if (!modifier) {
+      return null;
+    }
+
+    return {
+      stat,
+      modifier,
+
+      value:
+        Math.abs(
+          modifier
+        ),
+
+      positive:
+        modifier > 0,
+
+      name:
+        modifier < 0
+          ? strongName
+          : weakName,
+
+      source:
+        "tag"
+    };
+  }
+
+  /*
+   * Fallback para Actors antigos que ainda não possuem
+   * as Tags derivadas dos Stats.
+   */
+  const raw =
+    Number(
+      pokemonBaseStats(
+        actor
+      )?.[
+        stat
+      ]
+      ?? 0
+    );
+
+  if (raw >= 90) {
+    return {
+      stat,
+
+      modifier:
+        -1,
+
+      value:
+        1,
+
+      positive:
+        false,
+
+      name:
+        strongName,
+
+      source:
+        "stat-fallback",
+
+      raw
+    };
+  }
+
+  if (
+    raw > 0
+    &&
+    raw <= 45
+  ) {
+    return {
+      stat,
+
+      modifier:
+        1,
+
+      value:
+        1,
+
+      positive:
+        true,
+
+      name:
+        weakName,
+
+      source:
+        "stat-fallback",
+
+      raw
+    };
+  }
+
+  return null;
+}
+
+
+function defensiveContextForTargets(
+  move,
+  targets
+) {
+  const rows =
+    (
+      targets
+      ?? []
+    ).map(
+      token => {
+        const context =
+          defensiveContextForMove(
+            move,
+            token?.actor
+          );
+
+        return {
+          token,
+          context,
+
+          modifier:
+            Number(
+              context?.modifier
+              ?? 0
+            )
+        };
+      }
+    );
+
+  if (!rows.length) {
     return null;
   }
 
+  /*
+   * Uma única rolagem com vários targets usa o alvo
+   * mais difícil. As defesas nunca são somadas.
+   *
+   * Se todos forem vulneráveis, a menor vantagem comum
+   * pode entrar como bônus.
+   */
+  const modifier =
+    Math.min(
+      ...rows.map(
+        row =>
+          row.modifier
+      )
+    );
+
+  if (!modifier) {
+    return null;
+  }
+
+  const chosen =
+    rows.find(
+      row =>
+        row.modifier
+          === modifier
+    )
+    ??
+    rows[0];
+
+  const targetName =
+    chosen.token?.name
+    ??
+    chosen.token?.actor?.name
+    ??
+    "Alvo";
+
+  const contextName =
+    chosen.context?.name
+    ??
+    "Defesa do alvo";
+
   return {
-    name:
-      stat === "defense"
-        ? "Defesa Física"
-        : "Defesa Especial",
+    modifier,
 
     value:
-      1,
+      Math.abs(
+        modifier
+      ),
 
-    raw
+    positive:
+      modifier > 0,
+
+    name:
+      rows.length === 1
+        ? (
+            targetName
+            + " · "
+            + contextName
+          )
+        : modifier < 0
+          ? (
+              "Alvo mais resistente: "
+              + targetName
+              + " · "
+              + contextName
+            )
+          : (
+              "Fraqueza defensiva comum: "
+              + contextName
+            ),
+
+    targetId:
+      chosen.token?.id
+      ?? null
   };
+}
+
+
+function priorityReactionContext(
+  move
+) {
+  const priority =
+    Number(
+      move?.priority
+      ?? 0
+    );
+
+  if (priority > 0) {
+    return {
+      modifier:
+        -1,
+
+      name:
+        "Golpe prioritário"
+    };
+  }
+
+  if (priority < 0) {
+    return {
+      modifier:
+        1,
+
+      name:
+        "Golpe lento"
+    };
+  }
+
+  return null;
 }
 
 
@@ -2832,41 +3291,55 @@ function decoratePokemonRollDialog(
       return;
     }
 
-    if (
-      reaction.accuracyBonus > 0
+    const reactionModifiers = [
+      {
+        name:
+          reaction.defenseName,
+
+        modifier:
+          Number(
+            reaction.defenseModifier
+            ?? 0
+          )
+      },
+
+      {
+        name:
+          reaction.priorityName,
+
+        modifier:
+          Number(
+            reaction.priorityModifier
+            ?? 0
+          )
+      }
+    ];
+
+    for (
+      const entry
+      of reactionModifiers
     ) {
+      if (
+        !entry.name
+        ||
+        !entry.modifier
+      ) {
+        continue;
+      }
+
       pushSyntheticRollStatus(
         app,
         {
           name:
-            "Golpe difícil de acertar",
+            entry.name,
 
           value:
-            reaction.accuracyBonus,
+            Math.abs(
+              entry.modifier
+            ),
 
           positive:
-            true,
-
-          source:
-            POKEMON_REACTION_AUTO_SOURCE
-        }
-      );
-    }
-
-    if (
-      reaction.defenseBonus > 0
-    ) {
-      pushSyntheticRollStatus(
-        app,
-        {
-          name:
-            reaction.defenseName,
-
-          value:
-            reaction.defenseBonus,
-
-          positive:
-            true,
+            entry.modifier > 0,
 
           source:
             POKEMON_REACTION_AUTO_SOURCE
@@ -2901,67 +3374,34 @@ function decoratePokemonRollDialog(
     return;
   }
 
-  const mechanics =
-    moveLitmProfile(
-      move
+  const targets =
+    targetDocuments();
+
+  const defense =
+    defensiveContextForTargets(
+      move,
+      targets
     );
 
   if (
-    mechanics.accuracyPenalty > 0
+    defense?.modifier
   ) {
     pushSyntheticRollStatus(
       app,
       {
         name:
-          mechanics.accuracyName
-          || "Acerto",
+          defense.name,
 
         value:
-          mechanics.accuracyPenalty,
+          defense.value,
 
         positive:
-          false,
+          defense.positive,
 
         source:
           POKEMON_MOVE_AUTO_SOURCE
       }
     );
-  }
-
-  const targets =
-    targetDocuments();
-
-  if (
-    targets.length === 1
-    &&
-    mechanics.damageClass
-      !== "status"
-  ) {
-    const defense =
-      defensiveContextForMove(
-        move,
-        targets[0].actor
-      );
-
-    if (defense) {
-      pushSyntheticRollStatus(
-        app,
-        {
-          name:
-            defense.name
-            + " do alvo",
-
-          value:
-            defense.value,
-
-          positive:
-            false,
-
-          source:
-            POKEMON_MOVE_AUTO_SOURCE
-        }
-      );
-    }
   }
 
   renderPokemonRollPackage(
@@ -3189,14 +3629,26 @@ async function offerChallengeReaction(
       return;
     }
 
-    proposedLevel =
-      Math.max(
-        1,
-        Math.min(
-          6,
-          originalLevel
-          + delta
+    const adjustedLevel =
+      originalLevel
+      + delta;
+
+    if (adjustedLevel <= 0) {
+      ui.notifications.info(
+        (
+          target.name
+          ?? targetActor.name
         )
+        + " resistiu ao impacto; não há Status de dano para reagir."
+      );
+
+      return;
+    }
+
+    proposedLevel =
+      Math.min(
+        6,
+        adjustedLevel
       );
   }
 
@@ -3204,6 +3656,11 @@ async function offerChallengeReaction(
     defensiveContextForMove(
       move,
       targetActor
+    );
+
+  const priorityContext =
+    priorityReactionContext(
+      move
     );
 
   const reaction = {
@@ -3262,15 +3719,30 @@ async function offerChallengeReaction(
         multiplier
       ),
 
-    accuracyBonus:
-      mechanics.accuracyPenalty,
-
-    defenseBonus:
-      defense?.value
-      ?? 0,
+    // defensiveContextForMove usa o ponto de vista do atacante;
+    // a Reaction inverte o sinal.
+    defenseModifier:
+      defense
+        ? -Number(
+            defense.modifier
+            ?? 0
+          )
+        : 0,
 
     defenseName:
       defense?.name
+        ? (
+            "Defesa: "
+            + defense.name
+          )
+        : "",
+
+    priorityModifier:
+      priorityContext?.modifier
+      ?? 0,
+
+    priorityName:
+      priorityContext?.name
       ?? ""
   };
 
@@ -6327,7 +6799,6 @@ function addPokemonDetailedSpendControls(
         Math.min(
           6,
           spent
-          + mechanics.impact
         )
       );
 
@@ -6373,19 +6844,29 @@ function addPokemonDetailedSpendControls(
               );
             }
 
+            const finalLevel =
+              baseLevel
+              + delta;
+
+            if (finalLevel <= 0) {
+              return (
+                (
+                  token.name
+                  ?? "Alvo"
+                )
+                + ": resiste · sem Status de dano"
+              );
+            }
+
             return (
               (
                 token.name
                 ?? "Alvo"
               )
               + ": ferido-"
-              + Math.max(
-                  1,
-                  Math.min(
-                    6,
-                    baseLevel
-                    + delta
-                  )
+              + Math.min(
+                  6,
+                  finalLevel
                 )
             );
           }
@@ -6396,12 +6877,6 @@ function addPokemonDetailedSpendControls(
       "Dano: "
       + spent
       + " Power"
-      + (
-          mechanics.impactText
-            ? " · "
-              + mechanics.impactText
-            : ""
-        )
       + (
           targetText
             ? " · "

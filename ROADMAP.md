@@ -40,7 +40,7 @@
 - [x] Metadata de tipo por Move
 - [x] Targeting e múltiplos alvos pelo target nativo do Foundry
 - [x] Prévia de fraqueza, resistência e imunidade por alvo
-- [x] Eficácia de tipo altera consequência/dano, nunca o Power da rolagem nativa do LitM
+- [x] Eficácia de tipo altera consequência/dano pós-rolagem por alvo, nunca o Power obtido na rolagem
 - [ ] Aprovação do GM antes da rolagem nativa
 - [x] Target → aplicação de Tags e Status estruturados no alvo
 - [x] Aplicação e empilhamento de Status conforme o modelo do LitM
@@ -50,6 +50,22 @@
 - [x] Challenge Bio com botão Área para apresentar ameaça antes da reação dos jogadores
 - [x] Sequencer opcional para áreas animadas e VFX de golpe; JB2A opcional para assets
 - [x] Fallback nativo obrigatório sem módulos externos
+
+## Reforma LitM-first — fila de produção
+- [x] Categoria do Move define a defesa relevante: Físico → Defesa; Especial → Defesa Especial
+- [x] Tags/Fraquezas derivadas dos Stats do target entram como modificadores quando relevantes
+- [x] Múltiplos targets usam o alvo mais difícil; defesas nunca são somadas
+- [x] Accuracy e Base Power ficam como referência, sem bônus/penalidade automático na rolagem ou no dano comprado
+- [x] Tipagem modifica o Status de dano depois da rolagem e resistência pode reduzir um resultado fraco a zero
+- [x] Prioridade não aumenta dano; prioridade positiva dificulta Reaction e prioridade negativa facilita Reaction
+- [ ] Might define a escala ficcional e substitui tiers de consequência derivados de Base Power nos Challenges
+- [ ] Converter chances secundárias em Raramente / Possivelmente / Frequentemente / Quase sempre / Sempre
+- [ ] Reestruturar Detailed Spend para intensidade/combinação de efeitos nunca exceder o Power gasto
+- [ ] Moves dependentes de Speed usam comparação contextual, sem reproduzir fórmula de Base Power
+- [ ] PP vira metadado de esforço/sustentabilidade e sugestão de Burn; sem contador de PP
+- [ ] Integrar Burn de Tag ao UX Pokémon para esforço extremo
+- [ ] Integrar Sacrifice nativo do LitM como clímax Pokémon, sem ultimate próprio
+- [ ] Expandir Reaction Roll com Speed, Tags relevantes e ameaças do Challenge
 
 ## Backlog visual
 - [ ] Recolher Pokémon com efeito cinematográfico de retorno à Pokébola
