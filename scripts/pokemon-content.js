@@ -1,7 +1,7 @@
 const MODULE_ID = "pokemon-litm-tools";
 
 export const POKEMON_LITM_SEMANTICS_REV =
-  "2026-09-08-litm-first-semantics-v2";
+  "2026-09-08-native-move-burn-v3";
 
 const TYPE_PTBR = {
   normal: "Normal",
@@ -159,7 +159,7 @@ const MOVE_PTBR = {
   "sunny-day": "Dia Ensolarado", crunch: "Mastigada", "mirror-coat": "Revestimento Espelho", "psych-up": "Autoestimular",
   "extreme-speed": "Velocidade Extrema", "ancient-power": "Poder Ancestral", "shadow-ball": "Bola Sombria",
   "future-sight": "Visão do Futuro", "rock-smash": "Quebra-Rocha", whirlpool: "Redemoinho", "beat-up": "Espancamento",
-  "seed-bomb": "Bomba de Sementes", "energy-ball": "Bola de Energia", "aqua-tail": "Cauda d'Água", "air-slash": "Corte de Ar",
+  "seed-bomb": "Bomba de Sementes", "energy-ball": "Bola de Energia", "electro-ball": "Bola Elétrica", "aqua-tail": "Cauda d'Água", "air-slash": "Corte de Ar",
   roost: "Poleiro", "brave-bird": "Pássaro Bravo", "leaf-storm": "Tempestade de Folhas", "power-whip": "Chicote Poderoso",
   "worry-seed": "Semente da Preocupação",
   "grassy-terrain": "Campo de Grama",
@@ -3834,7 +3834,7 @@ export function pokemonLitmSemanticsSelfTest(
   const checks = {
     revision:
       POKEMON_LITM_SEMANTICS_REV
-        === "2026-09-08-litm-first-semantics-v2",
+        === "2026-09-08-native-move-burn-v3",
 
     mightOrigin:
       mightConsequenceLevel(
@@ -3871,6 +3871,18 @@ export function pokemonLitmSemanticsSelfTest(
         language
       )?.mode
         === "faster",
+
+    electroBallTranslation:
+      moveLabel(
+        "electro-ball",
+        [],
+        language
+      )
+        === (
+          pt
+            ? "Bola Elétrica"
+            : "Electro Ball"
+        ),
 
     gyroBall:
       moveSpeedRule(

@@ -1527,6 +1527,126 @@ function stableMatchingSnapshot(
 }
 
 
+
+function floatingMechanicalSummary(
+  list,
+  identity
+) {
+  const matches =
+    (
+      Array.isArray(
+        list
+      )
+        ? list
+        : []
+    ).filter(
+      entry =>
+        sameFloatingEffectIdentity(
+          entry,
+          identity
+        )
+    );
+
+  if (
+    identity?.isStatus
+  ) {
+    let level = 0;
+
+    for (
+      const entry
+      of matches
+    ) {
+      const numeric =
+        Number(
+          entry?.value
+          ?? 0
+        );
+
+      let marked = 0;
+
+      const markings =
+        Array.isArray(
+          entry?.markings
+        )
+          ? entry.markings
+          : [];
+
+      for (
+        let index = 0;
+        index < markings.length;
+        index++
+      ) {
+        if (
+          markings[index]
+            === true
+        ) {
+          marked =
+            Math.max(
+              marked,
+              index + 1
+            );
+        }
+      }
+
+      level =
+        Math.max(
+          level,
+
+          Number.isFinite(
+            numeric
+          )
+            ? numeric
+            : 0,
+
+          marked
+        );
+    }
+
+    return {
+      name:
+        identity.name,
+
+      isStatus:
+        true,
+
+      positive:
+        identity.positive,
+
+      present:
+        matches.length > 0,
+
+      level
+    };
+  }
+
+  return {
+    name:
+      identity?.name
+      ?? "",
+
+    isStatus:
+      false,
+
+    positive:
+      identity?.positive
+        !== false,
+
+    present:
+      matches.length > 0,
+
+    count:
+      matches.length,
+
+    burned:
+      matches.some(
+        entry =>
+          entry?.burned
+            === true
+      )
+  };
+}
+
+
 async function applyExplicitEffectToActor(
   actor,
   effect,
@@ -1601,6 +1721,12 @@ async function applyExplicitEffectToActor(
 
             afterStable:
               stableMatchingSnapshot(
+                afterList,
+                identity
+              ),
+
+            afterMechanical:
+              floatingMechanicalSummary(
                 afterList,
                 identity
               )
@@ -1825,30 +1951,28 @@ async function undoExplicitEffectDirect(
         ?? []
       );
 
-    const currentStable =
-      stableMatchingSnapshot(
+    const currentMechanical =
+      floatingMechanicalSummary(
         current,
         row.undo.identity
       );
 
-    const expectedStable =
-      Array.isArray(
-        row.undo.afterStable
-      )
-        ? row.undo.afterStable
-        : stableMatchingSnapshot(
-            row.undo.after
-              ?? [],
-            row.undo.identity
-          );
+    const expectedMechanical =
+      row.undo.afterMechanical
+      ??
+      floatingMechanicalSummary(
+        row.undo.after
+          ?? [],
+        row.undo.identity
+      );
 
     if (
       JSON.stringify(
-        currentStable
+        currentMechanical
       )
       !==
       JSON.stringify(
-        expectedStable
+        expectedMechanical
       )
     ) {
       throw new Error(
@@ -3194,6 +3318,390 @@ function selectedMoveFromActorState(
 }
 
 
+
+function pokemonMoveBurnKey(
+  row
+) {
+  if (
+    !row?.item
+    ||
+    !Number.isInteger(
+      Number(
+        row?.binding
+          ?.tagIndex
+      )
+    )
+  ) {
+    return "";
+  }
+
+  return (
+    row.item.id
+    + ":"
+    + Number(
+        row.binding.tagIndex
+      )
+  );
+}
+
+
+function pokemonPreparedMoveTag(
+  app,
+  row
+) {
+  if (
+    !app
+    ||
+    !row?.item
+  ) {
+    return null;
+  }
+
+  const index =
+    Number(
+      row.binding
+        ?.tagIndex
+    );
+
+  return (
+    (
+      app.selectedTags
+      ?? []
+    ).find(
+      tag =>
+        tag?.powerTag
+          === true
+        &&
+        tag.themebookId
+          === row.item.id
+        &&
+        Number(
+          tag.index
+        ) === index
+    )
+    ?? null
+  );
+}
+
+
+function pokemonMoveBurnContext(
+  app,
+  actor,
+  move
+) {
+  if (
+    !app
+    ||
+    !actor
+    ||
+    !move?.id
+    ||
+    app.rollType
+      === "reaction"
+  ) {
+    return null;
+  }
+
+  const rows =
+    selectedMoveBindingsForActor(
+      actor
+    ).filter(
+      row =>
+        row?.move?.id
+          === move.id
+    );
+
+  if (
+    rows.length !== 1
+  ) {
+    return null;
+  }
+
+  const row =
+    rows[0];
+
+  const prepared =
+    pokemonPreparedMoveTag(
+      app,
+      row
+    );
+
+  if (!prepared) {
+    return null;
+  }
+
+  const mechanics =
+    moveLitmProfile(
+      move
+    );
+
+  const key =
+    pokemonMoveBurnKey(
+      row
+    );
+
+  return {
+    row,
+    prepared,
+    key,
+
+    effort:
+      mechanics.effort
+      ?? null,
+
+    available:
+      row.tag?.burned
+        !== true
+      &&
+      row.tag?.planned
+        !== true,
+
+    active:
+      prepared.toBurn
+        === true,
+
+    suggested:
+      mechanics.effort
+        ?.burnSuggested
+        === true
+  };
+}
+
+
+function restorePokemonMoveBurnIntent(
+  app,
+  actor,
+  move
+) {
+  const context =
+    pokemonMoveBurnContext(
+      app,
+      actor,
+      move
+    );
+
+  if (
+    !context
+    ||
+    !context.available
+  ) {
+    return context;
+  }
+
+  if (
+    app._pokemonMoveBurnIntent
+      !== context.key
+  ) {
+    return context;
+  }
+
+  /*
+   * O LitM permite apenas um Burn
+   * de Power Tag por rolagem.
+   */
+  for (
+    const tag
+    of app.selectedTags
+      ?? []
+  ) {
+    if (
+      tag !== context.prepared
+      &&
+      tag?.toBurn
+        === true
+    ) {
+      tag.toBurn =
+        false;
+    }
+  }
+
+  context.prepared.toBurn =
+    true;
+
+  context.active =
+    true;
+
+  return context;
+}
+
+
+function togglePokemonMoveBurn(
+  app,
+  actor,
+  move
+) {
+  const context =
+    pokemonMoveBurnContext(
+      app,
+      actor,
+      move
+    );
+
+  if (
+    !context
+    ||
+    !context.available
+  ) {
+    return;
+  }
+
+  if (
+    context.active
+  ) {
+    context.prepared.toBurn =
+      false;
+
+    app._pokemonMoveBurnIntent =
+      null;
+
+  } else {
+    /*
+     * Um único Burn por rolagem,
+     * conforme a matemática nativa do LitM.
+     */
+    for (
+      const tag
+      of app.selectedTags
+        ?? []
+    ) {
+      if (
+        tag?.toBurn
+          === true
+      ) {
+        tag.toBurn =
+          false;
+      }
+    }
+
+    context.prepared.toBurn =
+      true;
+
+    app._pokemonMoveBurnIntent =
+      context.key;
+  }
+
+  try {
+    app.render(
+      true,
+      {
+        focus:
+          false
+      }
+    );
+
+  } catch (
+    error
+  ) {
+    console.warn(
+      "Pokemon LITM Tools | Atualizando preview de Burn:",
+      error
+    );
+  }
+}
+
+
+function appendPokemonMoveBurnControl(
+  app,
+  actor,
+  move,
+  section
+) {
+  const context =
+    pokemonMoveBurnContext(
+      app,
+      actor,
+      move
+    );
+
+  if (
+    !context
+    ||
+    !context.available
+  ) {
+    return;
+  }
+
+  const block =
+    document.createElement(
+      "div"
+    );
+
+  block.className =
+    "pokemon-litm-move-burn";
+
+  block.dataset
+    .pokemonMoveBurn =
+      "true";
+
+  if (
+    context.active
+  ) {
+    block.classList.add(
+      "active"
+    );
+  }
+
+  const text =
+    document.createElement(
+      "small"
+    );
+
+  const effortText =
+    context.effort?.label
+      ? (
+          "Esforço: "
+          + context.effort.label
+          + ". "
+        )
+      : "";
+
+  text.textContent =
+    effortText
+    +
+    (
+      context.suggested
+        ? "Golpe exigente: forçar é uma opção narrativa apropriada. "
+        : "Você pode forçar esta técnica. "
+    )
+    +
+    "A Tag do golpe vale +3 em vez de +1 nesta rolagem e fica riscada depois.";
+
+  block.append(
+    text
+  );
+
+  const button =
+    actionButton(
+      context.active
+        ? "Não forçar o golpe"
+        : "Forçar golpe · Tag vale +3",
+
+      context.active
+        ? "fa-rotate-left"
+        : "fa-fire-flame-curved",
+
+      () =>
+        togglePokemonMoveBurn(
+          app,
+          actor,
+          move
+        )
+    );
+
+  button.dataset
+    .pokemonMoveBurnToggle =
+      "true";
+
+  block.append(
+    button
+  );
+
+  section.append(
+    block
+  );
+}
+
+
 function stripPokemonSyntheticRollTags(
   app
 ) {
@@ -3439,6 +3947,19 @@ function renderPokemonRollPackage(
   section.append(
     badges
   );
+
+  if (
+    !reaction
+    &&
+    move
+  ) {
+    appendPokemonMoveBurnControl(
+      app,
+      app.actor,
+      move,
+      section
+    );
+  }
 
   const automatic =
     (
@@ -3696,6 +4217,12 @@ function decoratePokemonRollDialog(
 
     return;
   }
+
+  restorePokemonMoveBurnIntent(
+    app,
+    actor,
+    move
+  );
 
   const targets =
     targetDocuments();
@@ -8767,6 +9294,290 @@ async function onDeleteRegion(region) {
     });
   } catch {}
 }
+
+
+export async function pokemonLitmCombatSelfTest() {
+  const checks = {};
+
+  try {
+    const module =
+      await importLitmModule(
+        "module/apps/dice-roll-app.mjs"
+      );
+
+    const DiceRollApp =
+      module?.DiceRollApp;
+
+    const normal =
+      DiceRollApp
+        ?.calculatePowerTags?.([
+          {
+            name:
+              "Move",
+
+            positive:
+              true,
+
+            value:
+              0,
+
+            toBurn:
+              false
+          }
+        ]);
+
+    const forced =
+      DiceRollApp
+        ?.calculatePowerTags?.([
+          {
+            name:
+              "Move",
+
+            positive:
+              true,
+
+            value:
+              0,
+
+            toBurn:
+              true
+          }
+        ]);
+
+    const twoBurns =
+      DiceRollApp
+        ?.calculatePowerTags?.([
+          {
+            name:
+              "Move A",
+
+            positive:
+              true,
+
+            value:
+              0,
+
+            toBurn:
+              true
+          },
+
+          {
+            name:
+              "Move B",
+
+            positive:
+              true,
+
+            value:
+              0,
+
+            toBurn:
+              true
+          }
+        ]);
+
+    checks.nativeBurnNormal =
+      Number(
+        normal?.positive
+        ?? 0
+      ) === 1;
+
+    checks.nativeBurnPlusThree =
+      Number(
+        forced?.positive
+        ?? 0
+      ) === 3;
+
+    /*
+     * O segundo Burn continua sendo Tag normal:
+     * 3 + 1 = 4.
+     */
+    checks.nativeSingleBurnLimit =
+      Number(
+        twoBurns?.positive
+        ?? 0
+      ) === 4;
+
+  } catch (
+    error
+  ) {
+    checks.nativeBurnNormal =
+      false;
+
+    checks.nativeBurnPlusThree =
+      false;
+
+    checks.nativeSingleBurnLimit =
+      false;
+
+    checks.nativeBurnError =
+      error?.message
+      ?? String(
+        error
+      );
+  }
+
+  const identity =
+    floatingEffectIdentity({
+      name:
+        "ferido",
+
+      value:
+        1,
+
+      isStatus:
+        true,
+
+      positive:
+        false
+    });
+
+  const baseStatus = {
+    name:
+      "ferido",
+
+    value:
+      1,
+
+    isStatus:
+      true,
+
+    positive:
+      false,
+
+    selected:
+      false,
+
+    toBurn:
+      false,
+
+    burned:
+      false,
+
+    markings: [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+
+    might:
+      0,
+
+    mightIcon:
+      "adventure"
+  };
+
+  const normalizedStatus = {
+    ...baseStatus,
+
+    selected:
+      true,
+
+    toBurn:
+      true,
+
+    mightIcon:
+      "greatness"
+  };
+
+  const laterAlteration = {
+    ...baseStatus,
+
+    value:
+      2,
+
+    markings: [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  };
+
+  const before =
+    floatingMechanicalSummary(
+      [
+        baseStatus
+      ],
+      identity
+    );
+
+  const normalized =
+    floatingMechanicalSummary(
+      [
+        normalizedStatus
+      ],
+      identity
+    );
+
+  const altered =
+    floatingMechanicalSummary(
+      [
+        laterAlteration
+      ],
+      identity
+    );
+
+  checks.undoIgnoresVisualNormalization =
+    JSON.stringify(
+      before
+    )
+    ===
+    JSON.stringify(
+      normalized
+    );
+
+  checks.undoDetectsLaterTierChange =
+    JSON.stringify(
+      before
+    )
+    !==
+    JSON.stringify(
+      altered
+    );
+
+  checks.moveBurnControlInstalled =
+    typeof appendPokemonMoveBurnControl
+      === "function";
+
+  const ok =
+    Object.entries(
+      checks
+    )
+      .filter(
+        (
+          [
+            key
+          ]
+        ) =>
+          key
+            !== "nativeBurnError"
+      )
+      .every(
+        (
+          [
+            ,
+            value
+          ]
+        ) =>
+          value
+            === true
+      );
+
+  return {
+    revision:
+      "2026-09-08-native-move-burn-v3",
+
+    checks,
+    ok
+  };
+}
+
 
 export function activatePokemonCombatEffects() {
   if (activated) return;

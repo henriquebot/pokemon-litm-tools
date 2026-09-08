@@ -36,6 +36,10 @@ import {
 } from "./pokemon-content.js";
 
 import {
+  migratePokemonChallengesLitmFirst
+} from "./pokemon-builder.js";
+
+import {
   activatePokemonCombatLayer,
   deployPokemonTheme,
   recollectPokemonTheme,
@@ -47,7 +51,8 @@ import {
   activatePokemonCombatEffects,
   startPokemonChallengeMoveArea,
   cleanupPokemonInstance,
-  deletePokemonCombatProjection
+  deletePokemonCombatProjection,
+  pokemonLitmCombatSelfTest
 } from "./pokemon-combat-effects.js";
 
 const MODULE_ID = "pokemon-litm-tools";
@@ -90,7 +95,9 @@ Hooks.once("init", () => {
     recollectPokemonTheme,
     startPokemonChallengeMoveArea,
     cleanupPokemonInstance,
-    deletePokemonCombatProjection
+    deletePokemonCombatProjection,
+    migratePokemonChallengesLitmFirst,
+    pokemonLitmCombatSelfTest
   };
 });
 
@@ -243,6 +250,20 @@ Hooks.once("ready", () => {
 
   activatePokemonCombatLayer();
   activatePokemonCombatEffects();
+
+  if (
+    game.user.isGM
+  ) {
+    void migratePokemonChallengesLitmFirst()
+      .catch(
+        error => {
+          console.error(
+            "Pokemon LITM Tools | Migração LitM-first dos Challenges:",
+            error
+          );
+        }
+      );
+  }
 
   activateTokenOutline();
 

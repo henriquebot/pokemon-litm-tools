@@ -21,7 +21,8 @@ import {
   formatThemeDescription,
   pokemonSpecialImprovements,
   moveLitmProfile,
-  pokemonGenusLabel
+  pokemonGenusLabel,
+  POKEMON_LITM_SEMANTICS_REV
 } from "./pokemon-content.js";
 
 import {
@@ -1518,6 +1519,498 @@ function pokemonThreats(data, review, config) {
 }
 
 
+
+function isPokemonChallengeActor(
+  actor
+) {
+  if (
+    !actor
+    ||
+    actor.type
+      !== "litm-npc"
+  ) {
+    return false;
+  }
+
+  const flags =
+    actor.flags?.[
+      MODULE_ID
+    ]
+    ?? {};
+
+  const roles =
+    Array.isArray(
+      actor.system?.roles
+    )
+      ? actor.system.roles
+      : [];
+
+  return (
+    flags.pokemonBuilder
+      === true
+    ||
+    flags.kind
+      === "pokemon"
+    ||
+    Number(
+      flags.pokemonId
+      ?? 0
+    ) > 0
+    ||
+    roles.some(
+      role =>
+        String(
+          role
+          ?? ""
+        ).toLocaleLowerCase()
+          === "pokémon"
+    )
+  );
+}
+
+
+function storedPokemonChallengeThreats(
+  actor
+) {
+  const flags =
+    actor.flags?.[
+      MODULE_ID
+    ]
+    ?? {};
+
+  const language =
+    flags.contentLanguage
+    ?? getPokemonContentLanguage();
+
+  const might =
+    flags.might
+    ?? "origin";
+
+  const storedMoves =
+    Array.isArray(
+      flags.moves
+    )
+      ? foundry.utils.deepClone(
+          flags.moves
+        )
+      : [];
+
+  const moves =
+    storedMoves.map(
+      move => {
+        if (
+          language !== "en"
+          &&
+          String(
+            move?.id
+            ?? ""
+          ) === "electro-ball"
+        ) {
+          return {
+            ...move,
+
+            name:
+              "Bola Elétrica (Electro Ball)",
+
+            englishName:
+              move?.englishName
+              || "Electro Ball"
+          };
+        }
+
+        return move;
+      }
+    );
+
+  const threats =
+    moves.map(
+      move => {
+        const displayName =
+          String(
+            move?.name
+            ?? move?.id
+            ?? "Golpe"
+          );
+
+        const threat =
+          buildMoveThreat(
+            move,
+            displayName,
+            might,
+            language
+          );
+
+        return {
+          name:
+            displayName,
+
+          description:
+            threat.description,
+
+          list:
+            threat.list
+        };
+      }
+    );
+
+  const ability =
+    flags.ability
+    && typeof flags.ability
+      === "object"
+      ? foundry.utils.deepClone(
+          flags.ability
+        )
+      : null;
+
+  const abilityThreat =
+    buildAbilityThreat(
+      ability,
+      language
+    );
+
+  if (
+    abilityThreat
+  ) {
+    threats.push({
+      name:
+        abilityThreat.name
+        +
+        (
+          ability?.englishName
+          &&
+          ability.englishName
+            !== abilityThreat.name
+            ? (
+                " ("
+                + ability.englishName
+                + ")"
+              )
+            : ""
+        ),
+
+      description:
+        abilityThreat.description,
+
+      list:
+        abilityThreat.list
+    });
+  }
+
+  if (
+    flags.encounter?.wild
+      === true
+  ) {
+    const escapeLevel =
+      Number(
+        flags.encounter
+          ?.escapeStatusLevel
+        ?? 0
+      )
+      ||
+      escapeStatusLevel(
+        flags.baseStats?.speed,
+        might
+      );
+
+    threats.unshift({
+      name:
+        language === "en"
+          ? "ESCAPE"
+          : "FUGIR",
+
+      description:
+        language === "en"
+          ? "The wild Pokémon looks for an opening to leave the confrontation."
+          : "O Pokémon selvagem procura uma abertura para abandonar o confronto.",
+
+      list: [
+        language === "en"
+          ? (
+              "When it threatens to flee, apply [/s escape-"
+              + escapeLevel
+              + "] against attempts to stop the escape."
+            )
+          : (
+              "Quando ameaçar fugir, aplique [/s fuga-"
+              + escapeLevel
+              + "] contra tentativas de impedir a fuga."
+            )
+      ]
+    });
+  }
+
+  return {
+    threats,
+    moves
+  };
+}
+
+
+export async function refreshPokemonChallengeSemantics(
+  actor,
+  {
+    force = false
+  } = {}
+) {
+  if (
+    !isPokemonChallengeActor(
+      actor
+    )
+  ) {
+    return {
+      updated:
+        false,
+
+      reason:
+        "not-pokemon-challenge"
+    };
+  }
+
+  const flags =
+    actor.flags?.[
+      MODULE_ID
+    ]
+    ?? {};
+
+  if (
+    !force
+    &&
+    flags.challengeSemanticsRevision
+      === POKEMON_LITM_SEMANTICS_REV
+  ) {
+    return {
+      updated:
+        false,
+
+      reason:
+        "current"
+    };
+  }
+
+  const {
+    threats,
+    moves
+  } =
+    storedPokemonChallengeThreats(
+      actor
+    );
+
+  if (
+    !threats.length
+  ) {
+    return {
+      updated:
+        false,
+
+      reason:
+        "no-stored-semantics"
+    };
+  }
+
+  const update = {
+    "system.threatsAndConsequences":
+      threats,
+
+    [
+      "flags."
+      + MODULE_ID
+      + ".challengeSemanticsRevision"
+    ]:
+      POKEMON_LITM_SEMANTICS_REV
+  };
+
+  if (
+    JSON.stringify(
+      moves
+    )
+    !==
+    JSON.stringify(
+      flags.moves
+      ?? []
+    )
+  ) {
+    update[
+      "flags."
+      + MODULE_ID
+      + ".moves"
+    ] =
+      moves;
+  }
+
+  await actor.update(
+    update
+  );
+
+  return {
+    updated:
+      true,
+
+    actorId:
+      actor.id,
+
+    name:
+      actor.name,
+
+    revision:
+      POKEMON_LITM_SEMANTICS_REV
+  };
+}
+
+
+export async function migratePokemonChallengesLitmFirst(
+  {
+    force = false,
+    notify = false
+  } = {}
+) {
+  if (
+    !game.user?.isGM
+  ) {
+    return {
+      updated:
+        0,
+
+      skipped:
+        0,
+
+      authority:
+        false
+    };
+  }
+
+  /*
+   * Evita dois GMs ativos executarem
+   * a mesma migração ao mesmo tempo.
+   */
+  const authority =
+    game.users
+      .filter(
+        user =>
+          user.active
+          &&
+          user.isGM
+      )
+      .sort(
+        (
+          a,
+          b
+        ) =>
+          a.id.localeCompare(
+            b.id
+          )
+      )[0]
+    ?? null;
+
+  if (
+    authority?.id
+      !== game.user.id
+  ) {
+    return {
+      updated:
+        0,
+
+      skipped:
+        0,
+
+      authority:
+        false
+    };
+  }
+
+  const actors =
+    game.actors.filter(
+      isPokemonChallengeActor
+    );
+
+  let updated = 0;
+  let skipped = 0;
+  const errors = [];
+
+  for (
+    const actor
+    of actors
+  ) {
+    try {
+      const result =
+        await refreshPokemonChallengeSemantics(
+          actor,
+          {
+            force
+          }
+        );
+
+      if (
+        result.updated
+      ) {
+        updated++;
+
+      } else {
+        skipped++;
+      }
+
+    } catch (
+      error
+    ) {
+      errors.push({
+        actorId:
+          actor.id,
+
+        name:
+          actor.name,
+
+        error:
+          error?.message
+          ?? String(
+            error
+          )
+      });
+    }
+  }
+
+  const result = {
+    revision:
+      POKEMON_LITM_SEMANTICS_REV,
+
+    total:
+      actors.length,
+
+    updated,
+    skipped,
+    errors,
+
+    authority:
+      true
+  };
+
+  console.log(
+    "Pokemon LITM Tools | Refresh semântico dos Challenges:",
+    result
+  );
+
+  if (
+    notify
+    &&
+    updated > 0
+  ) {
+    ui.notifications.info(
+      updated
+      + " Challenge(s) Pokémon atualizado(s) para as regras LitM-first."
+    );
+  }
+
+  if (
+    errors.length
+  ) {
+    console.warn(
+      "Pokemon LITM Tools | Challenges não atualizados:",
+      errors
+    );
+  }
+
+  return result;
+}
+
+
 function stripLinkedPokemonSection(html) {
   return String(html ?? "")
     .replace(/<section data-pokemon-litm-team="true">[\s\S]*?<\/section>/g, "")
@@ -1577,6 +2070,10 @@ async function createChallenge(entry, config, data, review, definition, existing
   const language = data.contentLanguage ?? getPokemonContentLanguage();
   const instanceId = existingActor?.getFlag(MODULE_ID, "pokemonInstanceId") || randomId();
   const flags = moduleMetadata(entry, definition, config, data, review, instanceId);
+
+  flags.challengeSemanticsRevision =
+    POKEMON_LITM_SEMANTICS_REV;
+
   flags.encounter = {
     wild: config.mode === "challenge",
     defeatedLimit: defeatedLimitFor(data.stats, config.might),

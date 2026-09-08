@@ -59,13 +59,15 @@
 - [x] Tipagem modifica o Status de dano depois da rolagem e resistência pode reduzir um resultado fraco a zero
 - [x] Prioridade não aumenta dano; prioridade positiva dificulta Reaction e prioridade negativa facilita Reaction
 - [x] Recharge e recoil são custos intrínsecos do Move e não consomem Power do sucesso
-- [x] Undo de efeito compara apenas estado mecânico estável e ignora normalização visual do LitM
+- [x] Undo de efeito compara resumo mecânico de identidade/tier e ignora normalização visual do LitM
+- [x] Burn aplicado no Combat Actor é sincronizado de volta ao Theme Pokémon original
+- [x] Challenges Pokémon antigos recebem refresh automático das Threats quando a revisão semântica muda
 - [x] Might define a escala ficcional e substitui tiers de consequência derivados de Base Power nos Challenges
 - [x] Converter chances secundárias em Raramente / Possivelmente / Frequentemente / Quase sempre / Sempre
 - [x] Reestruturar Detailed Spend para intensidade/combinação de efeitos nunca exceder o Power gasto
 - [x] Moves dependentes de Speed usam comparação contextual, sem reproduzir fórmula de Base Power
-- [x] PP vira metadado de esforço/sustentabilidade e prepara sugestão de Burn; sem contador de PP
-- [ ] Integrar Burn de Tag ao UX Pokémon para esforço extremo
+- [x] PP vira metadado de esforço/sustentabilidade e orienta o UX de Burn; sem contador de PP
+- [x] Integrar Burn de Tag ao UX Pokémon para esforço extremo usando a regra nativa do LitM (+3 em vez de +1 e Tag riscada após a rolagem)
 - [ ] Integrar Sacrifice nativo do LitM como clímax Pokémon, sem ultimate próprio
 - [ ] Expandir Reaction Roll com Speed, Tags relevantes e ameaças do Challenge
 

@@ -1452,6 +1452,165 @@ function onCombatActorDelete(actor) {
   });
 }
 
+
+function onCombatItemUpdate(
+  item,
+  changes
+) {
+  const actor =
+    item?.parent;
+
+  if (
+    !actor
+    ||
+    actor.documentName
+      !== "Actor"
+    ||
+    actor.getFlag(
+      MODULE_ID,
+      "combatProjection"
+    ) !== true
+    ||
+    item.getFlag?.(
+      MODULE_ID,
+      "combatSourceTheme"
+    ) !== true
+  ) {
+    return;
+  }
+
+  const changed =
+    changes?.system?.powertags
+      !== undefined
+    ||
+    Object.keys(
+      changes
+      ?? {}
+    ).some(
+      key =>
+        key.startsWith(
+          "system.powertags"
+        )
+    );
+
+  if (!changed) {
+    return;
+  }
+
+  const theme =
+    combatActorTheme(
+      actor
+    );
+
+  if (!theme) {
+    return;
+  }
+
+  const combatTags =
+    Array.isArray(
+      item.system?.powertags
+    )
+      ? item.system.powertags
+      : [];
+
+  const sourceTags =
+    Array.isArray(
+      theme.system?.powertags
+    )
+      ? foundry.utils.deepClone(
+          theme.system.powertags
+        )
+      : [];
+
+  let dirty =
+    false;
+
+  const length =
+    Math.min(
+      combatTags.length,
+      sourceTags.length
+    );
+
+  for (
+    let index = 0;
+    index < length;
+    index++
+  ) {
+    const combatTag =
+      combatTags[index];
+
+    const sourceTag =
+      sourceTags[index];
+
+    /*
+     * Nunca sincroniza por índice sozinho
+     * se os Themes deixarem de representar
+     * a mesma Tag.
+     */
+    if (
+      String(
+        combatTag?.name
+        ?? ""
+      )
+      !==
+      String(
+        sourceTag?.name
+        ?? ""
+      )
+    ) {
+      continue;
+    }
+
+    for (
+      const key
+      of [
+        "burned",
+        "toBurn",
+        "selected"
+      ]
+    ) {
+      const value =
+        combatTag?.[
+          key
+        ]
+        === true;
+
+      if (
+        (
+          sourceTag?.[
+            key
+          ]
+          === true
+        )
+        !== value
+      ) {
+        sourceTag[key] =
+          value;
+
+        dirty =
+          true;
+      }
+    }
+  }
+
+  if (!dirty) {
+    return;
+  }
+
+  void theme.update({
+    "system.powertags":
+      sourceTags
+  }).catch(
+    error => {
+      console.error(
+        "Pokemon LITM Tools | Sincronizando Burn do Combat Actor:",
+        error
+      );
+    }
+  );
+}
+
+
 export function activatePokemonCombatLayer() {
   if (activated) return;
   activated = true;
@@ -1459,5 +1618,6 @@ export function activatePokemonCombatLayer() {
   game.socket.on(SOCKET_NAME, onSocket);
   Hooks.on("renderTokenHUD", onRenderTokenHUD);
   Hooks.on("updateActor", onCombatActorUpdate);
+  Hooks.on("updateItem", onCombatItemUpdate);
   Hooks.on("deleteActor", onCombatActorDelete);
 }
