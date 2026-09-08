@@ -43,6 +43,9 @@ const POKEMON_MOVE_AUTO_SOURCE =
 const POKEMON_REACTION_AUTO_SOURCE =
   "pokemon-reaction-auto";
 
+const POKEMON_CONTEXT_SPEND_REV =
+  "2026-09-08-context-spend-v2";
+
 const litmModulePromises =
   new Map();
 
@@ -734,6 +737,7 @@ async function playMoveVfxLocal(sceneId, sourceTokenId, targetTokenIds, type) {
         ) {
           seq.effect()
             .file(path)
+            .tint(typeColor(type))
             .atLocation(
               tokenObject(source)
               ?? source
@@ -880,6 +884,7 @@ async function playMoveVfxAtPointLocal(
 
         seq.effect()
           .file(path)
+          .tint(typeColor(type))
           .atLocation(
             tokenObject(source)
             ?? source
@@ -1546,6 +1551,329 @@ async function removeFloatingStatusDirect(
 }
 
 
+
+
+// POKEMON_CONTEXT_SPEND_V2
+function floatingSpendState(entry) {
+  if (!entry) return { present: false };
+  const isStatus = entry?.isStatus === true || Number(entry?.value ?? 0) > 0;
+  const markings = Array(6).fill(false);
+  if (isStatus) {
+    if (Array.isArray(entry?.markings)) {
+      for (let i = 0; i < 6; i++) markings[i] = entry.markings[i] === true;
+    } else {
+      const tier = Math.max(1, Math.min(6, Number(entry?.value ?? 1) || 1));
+      markings[tier - 1] = true;
+    }
+  }
+  return {
+    present: true,
+    name: moveIdentity(entry?.name),
+    isStatus,
+    positive: entry?.positive !== false,
+    value: isStatus ? Math.max(1, Math.min(6, Number(entry?.value ?? 1) || 1)) : 0,
+    markings: isStatus ? markings : null
+  };
+}
+
+function sameFloatingSpendIdentity(entry, state) {
+  if (!entry || !state?.present) return false;
+  const current = floatingSpendState(entry);
+  return current.name === state.name
+    && current.isStatus === state.isStatus
+    && current.positive === state.positive;
+}
+
+function sameFloatingSpendState(a, b) {
+  if (!!a?.present !== !!b?.present) return false;
+  if (!a?.present) return true;
+  return a.name === b.name
+    && a.isStatus === b.isStatus
+    && a.positive === b.positive
+    && Number(a.value ?? 0) === Number(b.value ?? 0)
+    && JSON.stringify(a.markings ?? null) === JSON.stringify(b.markings ?? null);
+}
+
+async function sceneDataItemForSpend(sceneId) {
+  let item = game.items.find(candidate =>
+    candidate.type === "scene-data"
+    && candidate.system?.sceneKey === sceneId
+  ) ?? null;
+  if (item) return item;
+  const scene = game.scenes.get(sceneId);
+  if (!scene) throw new Error("Cena da consequência não encontrada.");
+  item = await Item.create({
+    name: "Scene Data: " + scene.name,
+    type: "scene-data",
+    flags: { mistmod: { hidden: true } }
+  });
+  await item.update({ "system.sceneKey": sceneId });
+  return item;
+}
+
+async function applyFloatingSpendDelta(document, effect, multiplier = 1) {
+  if (!document) throw new Error("Destino da consequência não encontrado.");
+  if (multiplier === 0 && String(effect?.target ?? "target").toLowerCase() !== "self") {
+    return { applied: false, immune: true };
+  }
+  const entry = statusEntry(effect, multiplier);
+  if (!entry) return { applied: false };
+  const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
+  const wanted = floatingSpendState(entry);
+  const beforeIndex = current.findIndex(row => sameFloatingSpendIdentity(row, wanted));
+  const beforeEntry = beforeIndex >= 0 ? foundry.utils.deepClone(current[beforeIndex]) : null;
+  const before = floatingSpendState(beforeEntry);
+  const next = stackFloating(current, entry);
+  const afterIndex = next.findIndex(row => sameFloatingSpendIdentity(row, wanted));
+  const afterEntry = afterIndex >= 0 ? foundry.utils.deepClone(next[afterIndex]) : null;
+  const after = floatingSpendState(afterEntry);
+  if (sameFloatingSpendState(before, after)) {
+    return { applied: false, unchanged: true };
+  }
+  await document.update({ "system.floatingTagsAndStatuses": next });
+  return {
+    applied: true,
+    documentId: document.id,
+    documentName: document.documentName,
+    before,
+    beforeEntry,
+    after,
+    afterEntry
+  };
+}
+
+async function removeFloatingTagSpendDelta(document, selector) {
+  const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
+  const wanted = {
+    present: true,
+    name: moveIdentity(selector?.name),
+    isStatus: false,
+    positive: selector?.positive !== false
+  };
+  const index = current.findIndex(row => sameFloatingSpendIdentity(row, wanted));
+  if (index < 0) return { applied: false, unchanged: true };
+  const beforeEntry = foundry.utils.deepClone(current[index]);
+  const before = floatingSpendState(beforeEntry);
+  current.splice(index, 1);
+  await document.update({ "system.floatingTagsAndStatuses": current });
+  return {
+    applied: true,
+    documentId: document.id,
+    documentName: document.documentName,
+    before,
+    beforeEntry,
+    after: { present: false, name: before.name, isStatus: false, positive: before.positive },
+    afterEntry: null
+  };
+}
+
+async function reduceFloatingStatusSpendDelta(document, selector, amount) {
+  const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
+  const wanted = {
+    present: true,
+    name: moveIdentity(selector?.name),
+    isStatus: true,
+    positive: selector?.positive !== false
+  };
+  const index = current.findIndex(row => sameFloatingSpendIdentity(row, wanted));
+  if (index < 0) return { applied: false, unchanged: true };
+  const beforeEntry = foundry.utils.deepClone(current[index]);
+  const before = floatingSpendState(beforeEntry);
+  const reduction = Math.max(1, Math.min(6, Number(amount ?? 1) || 1));
+  const nextTier = Math.max(0, before.value - reduction);
+  if (nextTier <= 0) {
+    current.splice(index, 1);
+  } else {
+    const nextEntry = foundry.utils.deepClone(current[index]);
+    const markings = Array(6).fill(false);
+    markings[nextTier - 1] = true;
+    nextEntry.value = nextTier;
+    nextEntry.isStatus = true;
+    nextEntry.markings = markings;
+    current[index] = nextEntry;
+  }
+  await document.update({ "system.floatingTagsAndStatuses": current });
+  const afterEntry = nextTier > 0 ? current[index] : null;
+  return {
+    applied: true,
+    documentId: document.id,
+    documentName: document.documentName,
+    before,
+    beforeEntry,
+    after: floatingSpendState(afterEntry),
+    afterEntry: afterEntry ? foundry.utils.deepClone(afterEntry) : null
+  };
+}
+
+function spendTargetDocument(scene, row) {
+  if (row?.targetKind === "scene") return game.items.get(row.documentId) ?? null;
+  if (row?.tokenId) return scene?.tokens?.get(row.tokenId)?.actor ?? null;
+  return row?.actorId ? game.actors.get(row.actorId) : null;
+}
+
+async function applyContextSpendDirect(payload) {
+  if (!isAuthority()) throw new Error("Somente o GM ativo pode aplicar consequências de Power.");
+  const scene = game.scenes.get(payload.sceneId);
+  if (!scene) throw new Error("Cena da rolagem não encontrada.");
+  const sourceActor = payload.sourceActorId ? game.actors.get(payload.sourceActorId) : null;
+  const move = sourceActor && payload.moveId
+    ? await resolveMoveForActor(sourceActor, payload.moveId)
+    : null;
+  const mode = String(payload.mode ?? "apply");
+  const destination = payload.destination ?? {};
+  const targets = [];
+
+  if (destination.kind === "scene") {
+    targets.push({ targetKind: "scene", document: await sceneDataItemForSpend(scene.id), tokenId: null, actorId: null });
+  } else if (destination.kind === "self") {
+    const token = scene.tokens.get(payload.sourceTokenId) ?? null;
+    const actor = token?.actor ?? sourceActor;
+    if (actor) targets.push({ targetKind: "actor", document: actor, tokenId: token?.id ?? null, actorId: actor.id });
+  } else {
+    for (const tokenId of destination.tokenIds ?? []) {
+      const token = scene.tokens.get(tokenId);
+      if (token?.actor) targets.push({ targetKind: "actor", document: token.actor, tokenId: token.id, actorId: token.actor.id });
+    }
+  }
+
+  if (!targets.length) throw new Error("Nenhum destino válido para a consequência.");
+
+  // Evita aplicar duas vezes no mesmo Actor quando dois tokens linked
+  // apontam para o mesmo documento. Challenges unlinked continuam únicos
+  // pelo tokenId, que é sua identidade real na cena.
+  const uniqueTargets = [];
+  const seenTargets = new Set();
+  for (const target of targets) {
+    const token = target.tokenId ? scene.tokens.get(target.tokenId) : null;
+    const key = target.targetKind === "scene"
+      ? "scene:" + target.document.id
+      : token?.actorLink === false
+        ? "token:" + target.tokenId
+        : "actor:" + target.actorId;
+    if (seenTargets.has(key)) continue;
+    seenTargets.add(key);
+    uniqueTargets.push(target);
+  }
+
+  const rows = [];
+  const skippedImmune = [];
+
+  try {
+    for (const target of uniqueTargets) {
+      let delta = null;
+      if (mode === "apply") {
+        let multiplier = 1;
+        if (target.targetKind === "actor" && move && payload.pokemonSuggested === true) {
+          multiplier = multiplierFor(target.document, move.type ?? "normal");
+          if (multiplier === 0) {
+            skippedImmune.push(target.tokenId ?? target.actorId);
+            continue;
+          }
+        } else if (target.targetKind === "actor" && move && String(payload.effect?.source ?? "") === "damage") {
+          multiplier = multiplierFor(target.document, move.type ?? "normal");
+        }
+        delta = await applyFloatingSpendDelta(target.document, payload.effect, multiplier);
+      } else if (mode === "remove-tag") {
+        delta = await removeFloatingTagSpendDelta(target.document, payload.selector);
+      } else if (mode === "reduce-status") {
+        delta = await reduceFloatingStatusSpendDelta(target.document, payload.selector, payload.amount);
+      }
+      if (!delta?.applied) continue;
+      rows.push({
+        ...delta,
+        targetKind: target.targetKind,
+        tokenId: target.tokenId,
+        actorId: target.actorId
+      });
+    }
+  } catch (error) {
+    if (rows.length) {
+      try {
+        await rollbackContextSpendDirect({ sceneId: scene.id, application: { rows } });
+      } catch (rollbackError) {
+        console.error("Pokemon LITM Tools | rollback de aplicação parcial:", rollbackError);
+      }
+    }
+    throw error;
+  }
+
+  return { rows, skippedImmune };
+}
+
+async function rollbackContextSpendDirect(payload) {
+  if (!isAuthority()) throw new Error("Somente o GM ativo pode reverter um gasto de Power.");
+  const scene = game.scenes.get(payload.sceneId);
+  if (!scene) throw new Error("Cena da rolagem não encontrada.");
+  const conflicts = [];
+  const plans = [];
+
+  // Fase 1: valida TODOS os destinos antes de escrever qualquer coisa.
+  for (const row of payload.application?.rows ?? []) {
+    const document = spendTargetDocument(scene, row);
+    if (!document) {
+      conflicts.push("destino ausente");
+      continue;
+    }
+    const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
+    const identity = row.after?.present ? row.after : row.before;
+    const index = current.findIndex(entry => sameFloatingSpendIdentity(entry, identity));
+    const currentState = floatingSpendState(index >= 0 ? current[index] : null);
+    if (!sameFloatingSpendState(currentState, row.after)) {
+      conflicts.push((row.before?.name || row.after?.name || "efeito") + " mudou desde o gasto");
+      continue;
+    }
+    plans.push({ document, row });
+  }
+
+  if (conflicts.length) {
+    throw new Error("Não foi possível reverter com segurança: " + conflicts.join("; ") + ".");
+  }
+
+  const completed = [];
+  try {
+    for (const plan of plans) {
+      const { document, row } = plan;
+      const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
+      const identity = row.after?.present ? row.after : row.before;
+      const index = current.findIndex(entry => sameFloatingSpendIdentity(entry, identity));
+
+      if (row.before?.present) {
+        if (index >= 0) current[index] = foundry.utils.deepClone(row.beforeEntry);
+        else current.push(foundry.utils.deepClone(row.beforeEntry));
+      } else if (index >= 0) {
+        current.splice(index, 1);
+      }
+
+      await document.update({ "system.floatingTagsAndStatuses": current });
+      completed.push(plan);
+    }
+  } catch (error) {
+    // Compensação: se uma escrita de rollback falhar, devolve os destinos
+    // já restaurados ao estado pós-gasto para evitar rollback parcial.
+    for (const plan of completed.reverse()) {
+      try {
+        const { document, row } = plan;
+        const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
+        const identity = row.before?.present ? row.before : row.after;
+        const index = current.findIndex(entry => sameFloatingSpendIdentity(entry, identity));
+        if (row.after?.present) {
+          if (index >= 0) current[index] = foundry.utils.deepClone(row.afterEntry);
+          else current.push(foundry.utils.deepClone(row.afterEntry));
+        } else if (index >= 0) {
+          current.splice(index, 1);
+        }
+        await document.update({ "system.floatingTagsAndStatuses": current });
+      } catch (compensationError) {
+        console.error("Pokemon LITM Tools | compensação de rollback:", compensationError);
+      }
+    }
+    throw error;
+  }
+
+  return { restored: plans.map(plan => plan.row.documentId) };
+}
+
+
 async function deletePokemonInstanceDocuments(instanceId) {
   const id = String(instanceId ?? "");
   if (!id) return false;
@@ -1647,6 +1975,8 @@ async function socketRequest(message) {
     else if (message.action === "apply-move") result = await applyMoveDirect(message.payload);
     else if (message.action === "apply-effect") result = await applyMoveEffectDirect(message.payload);
     else if (message.action === "apply-explicit") result = await applyExplicitEffectDirect(message.payload);
+    else if (message.action === "context-spend-apply") result = await applyContextSpendDirect(message.payload);
+    else if (message.action === "context-spend-rollback") result = await rollbackContextSpendDirect(message.payload);
     else if (message.action === "remove-status") result = await removeFloatingStatusDirect(message.payload);
     else if (message.action === "delete-combat") result = await deleteCombatProjectionDirect(message.payload);
     else if (message.action === "cleanup-instance") result = await cleanupPokemonInstanceDirect(message.payload);
@@ -1760,6 +2090,8 @@ function requestAuthority(action, payload) {
     if (action === "apply-move") return applyMoveDirect(payload);
     if (action === "apply-effect") return applyMoveEffectDirect(payload);
     if (action === "apply-explicit") return applyExplicitEffectDirect(payload);
+    if (action === "context-spend-apply") return applyContextSpendDirect(payload);
+    if (action === "context-spend-rollback") return rollbackContextSpendDirect(payload);
     if (action === "remove-status") return removeFloatingStatusDirect(payload);
     if (action === "delete-combat") return deleteCombatProjectionDirect(payload);
     if (action === "cleanup-instance") return cleanupPokemonInstanceDirect(payload);
@@ -6528,6 +6860,16 @@ function actionButton(label, icon, handler) {
 }
 
 
+
+function iconActionButton(title, icon, handler) {
+  const button = actionButton("", icon, handler);
+  button.classList.add("pokemon-chat-vfx-icon");
+  button.title = title;
+  button.setAttribute("aria-label", title);
+  return button;
+}
+
+
 async function addPokemonCharacterOtherActions(actor, root) {
   const panel = findOtherPanel(root);
   if (!panel) return;
@@ -7197,6 +7539,401 @@ function pokemonEffectPowerCost(
     preferred,
     available
   );
+}
+
+
+
+
+function contextSpendDestinationRows(sourceToken, frozenTargetIds, eligibleIds = null, allowScene = true) {
+  const rows = [];
+  const allowed = eligibleIds ? new Set(eligibleIds) : null;
+  const targets = targetDocuments(frozenTargetIds).filter(token => !allowed || allowed.has(token.id));
+  if (targets.length > 1) {
+    rows.push({ value: "all", label: "Todos os alvos válidos" });
+  }
+  for (const token of targets) {
+    rows.push({ value: "token:" + token.id, label: token.name ?? token.actor?.name ?? "Alvo" });
+  }
+  if (sourceToken) rows.push({ value: "self", label: "Usuário do golpe" });
+  if (allowScene) rows.push({ value: "scene", label: "Cena · Tags & Statuses" });
+  return rows;
+}
+
+function contextSpendDestinationHtml(rows, selected = null) {
+  return rows.map(row => '<option value="' + esc(row.value) + '"'
+    + (selected === row.value ? ' selected' : '') + '>' + esc(row.label) + '</option>').join("");
+}
+
+function contextSpendDestination(value, frozenTargetIds) {
+  if (value === "scene") return { kind: "scene" };
+  if (value === "self") return { kind: "self" };
+  if (value === "all") return { kind: "targets", tokenIds: [...frozenTargetIds] };
+  if (String(value).startsWith("token:")) return { kind: "targets", tokenIds: [String(value).slice(6)] };
+  return null;
+}
+
+function pokemonSuggestedEligibleIds(move, effect, frozenTargetIds) {
+  const targetKind = String(effect?.target ?? "target").toLowerCase();
+  if (targetKind !== "target") return [...frozenTargetIds];
+  return targetDocuments(frozenTargetIds)
+    .filter(token => multiplierFor(token.actor, move?.type ?? "normal") !== 0)
+    .map(token => token.id);
+}
+
+function pokemonSuggestedEffectAllowed(move, effect, frozenTargetIds) {
+  if (String(effect?.target ?? "target").toLowerCase() !== "target") return true;
+  if (!frozenTargetIds.length) return false;
+  return pokemonSuggestedEligibleIds(move, effect, frozenTargetIds).length > 0;
+}
+
+async function commitContextSpend(message, entry, applyPayload) {
+  const data = foundry.utils.deepClone(message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend"));
+  if (!data) throw new Error("A mensagem não possui Detailed Spend.");
+  const cost = Math.max(1, Number(entry.cost ?? 1) || 1);
+  if (detailedSpendRemaining(data) < cost) throw new Error("Power insuficiente.");
+
+  const application = await requestAuthority("context-spend-apply", applyPayload);
+  if (!(application?.rows?.length)) {
+    if (application?.skippedImmune?.length) throw new Error("O alvo é imune a este efeito do golpe.");
+    throw new Error("A consequência não alterou o destino selecionado.");
+  }
+
+  data.entries ??= [];
+  data.entries.push({
+    ...entry,
+    type: "pokemon-context",
+    cost,
+    pokemonApplied: true,
+    pokemonApplication: application
+  });
+
+  try {
+    await updateDetailedSpendMessage(message, data);
+  } catch (error) {
+    try {
+      await requestAuthority("context-spend-rollback", {
+        sceneId: applyPayload.sceneId,
+        application
+      });
+    } catch (rollbackError) {
+      console.error("Pokemon LITM Tools | rollback após falha do chat:", rollbackError);
+    }
+    throw error;
+  }
+}
+
+async function rollbackContextSpendEntry(message, index) {
+  const original = foundry.utils.deepClone(message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend"));
+  const entry = original?.entries?.[index];
+  if (!entry?.pokemonApplication) return false;
+  const sceneId = message.getFlag?.(MODULE_ID, "rollSceneId") ?? canvas?.scene?.id;
+  const next = foundry.utils.deepClone(original);
+  next.entries.splice(index, 1);
+
+  // Primeiro atualiza o ledger nativo. Se o rollback mecânico recusar
+  // (por conflito externo), a entrada é restaurada no chat.
+  await updateDetailedSpendMessage(message, next);
+  try {
+    await requestAuthority("context-spend-rollback", {
+      sceneId,
+      application: entry.pokemonApplication
+    });
+  } catch (error) {
+    try {
+      await updateDetailedSpendMessage(message, original);
+    } catch (restoreError) {
+      console.error("Pokemon LITM Tools | restaurando ledger após rollback recusado:", restoreError);
+    }
+    throw error;
+  }
+  return true;
+}
+
+async function chooseContextEffectSpend({ message, actor, move, sourceToken, frozenTargetIds, effect, label, pokemonSuggested = true }) {
+  const data = message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend");
+  const remaining = detailedSpendRemaining(data);
+  if (remaining <= 0) return;
+  const kind = String(effect?.kind ?? "status");
+  const targetKind = String(effect?.target ?? "target").toLowerCase();
+  const eligibleIds = pokemonSuggested
+    ? pokemonSuggestedEligibleIds(move, effect, frozenTargetIds)
+    : [...frozenTargetIds];
+  if (targetKind === "target" && !eligibleIds.length) return;
+
+  const destinations = targetKind === "self"
+    ? [{ value: "self", label: "Usuário do golpe" }]
+    : targetKind === "scene"
+      ? [{ value: "scene", label: "Cena · Tags & Statuses" }]
+      : contextSpendDestinationRows(sourceToken, frozenTargetIds, eligibleIds, !pokemonSuggested);
+
+  if (!destinations.length) throw new Error("Nenhum destino válido.");
+  const isTag = kind === "tag";
+  const maxLevel = isTag
+    ? 2
+    : String(effect?.source ?? "") === "damage"
+      ? remaining
+      : Math.min(remaining, Math.max(1, Number(effect?.level ?? 1) || 1));
+  if (isTag && remaining < 2) throw new Error("São necessários 2 Power para uma Tag.");
+  const levelOptions = isTag ? "" : Array.from({ length: maxLevel }, (_, i) => {
+    const level = i + 1;
+    return '<option value="' + level + '"' + (level === maxLevel ? ' selected' : '') + '>'
+      + level + ' Power → ' + esc(label) + '-' + level + '</option>';
+  }).join("");
+
+  const choice = await foundry.applications.api.DialogV2.input({
+    window: { title: label },
+    content: '<div class="pokemon-context-spend-dialog">'
+      + '<label>Destino<select name="destination">' + contextSpendDestinationHtml(destinations, destinations[0].value) + '</select></label>'
+      + (isTag ? '<p>Esta Tag custa 2 Power.</p>' : '<label>Power / tier<select name="level">' + levelOptions + '</select></label>')
+      + '</div>',
+    ok: { label: "Gastar e aplicar", icon: "fa-solid fa-check" },
+    modal: true
+  });
+  if (!choice) return;
+  const cost = isTag ? 2 : Math.max(1, Math.min(maxLevel, Number(choice.level ?? maxLevel) || maxLevel));
+  const appliedEffect = foundry.utils.deepClone(effect);
+  if (!isTag) appliedEffect.level = cost;
+  const destination = contextSpendDestination(choice.destination, eligibleIds);
+  if (!destination) throw new Error("Destino inválido.");
+  await commitContextSpend(message, {
+    cost,
+    label: label + (isTag ? "" : "-" + cost),
+    pokemonMoveId: move?.id ?? null
+  }, {
+    sceneId: canvas.scene.id,
+    sourceActorId: actor.id,
+    sourceTokenId: sourceToken?.id ?? null,
+    moveId: move?.id ?? null,
+    mode: "apply",
+    destination,
+    effect: appliedEffect,
+    pokemonSuggested
+  });
+}
+
+async function promptCustomContextSpend({ message, actor, move, sourceToken, frozenTargetIds, kind }) {
+  const data = message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend");
+  const remaining = detailedSpendRemaining(data);
+  const isTag = kind === "tag";
+  if (isTag && remaining < 2) throw new Error("São necessários 2 Power para uma Tag.");
+  if (!isTag && remaining < 1) return;
+  const destinations = contextSpendDestinationRows(sourceToken, frozenTargetIds, null, true);
+  const levelOptions = Array.from({ length: Math.min(6, remaining) }, (_, i) => {
+    const level = i + 1;
+    return '<option value="' + level + '">' + level + ' Power → tier ' + level + '</option>';
+  }).join("");
+  const choice = await foundry.applications.api.DialogV2.input({
+    window: { title: isTag ? "Criar Tag" : "Criar Status" },
+    content: '<div class="pokemon-context-spend-dialog">'
+      + '<label>Nome<input name="name" type="text" autofocus></label>'
+      + '<label>Destino<select name="destination">' + contextSpendDestinationHtml(destinations, destinations[0]?.value) + '</select></label>'
+      + (isTag ? '<p>Esta Tag custa 2 Power.</p>' : '<label>Power / tier<select name="level">' + levelOptions + '</select></label>')
+      + '<label class="pokemon-context-checkbox"><input name="negative" type="checkbox" checked> Efeito negativo</label>'
+      + '</div>',
+    ok: { label: "Gastar e aplicar", icon: "fa-solid fa-check" },
+    modal: true
+  });
+  if (!choice) return;
+  const name = String(choice.name ?? "").trim();
+  if (!name) throw new Error("Digite o nome da Tag ou Status.");
+  const cost = isTag ? 2 : Math.max(1, Math.min(6, remaining, Number(choice.level ?? 1) || 1));
+  const destination = contextSpendDestination(choice.destination, frozenTargetIds);
+  await commitContextSpend(message, {
+    cost,
+    label: name + (isTag ? "" : "-" + cost),
+    pokemonMoveId: move?.id ?? null
+  }, {
+    sceneId: canvas.scene.id,
+    sourceActorId: actor.id,
+    sourceTokenId: sourceToken?.id ?? null,
+    moveId: move?.id ?? null,
+    mode: "apply",
+    destination,
+    effect: {
+      target: destination.kind === "self" ? "self" : destination.kind === "scene" ? "scene" : "target",
+      kind: isTag ? "tag" : "status",
+      name,
+      level: isTag ? 1 : cost,
+      positive: ![true, "true", "on", "1", 1].includes(choice.negative),
+      source: "context-spend",
+      trigger: "principal"
+    },
+    pokemonSuggested: false
+  });
+}
+
+function currentFloatingSpendOptions(sourceToken, frozenTargetIds, wantStatus) {
+  const rows = [];
+  const addDocument = (label, destination, document) => {
+    for (const entry of document?.system?.floatingTagsAndStatuses ?? []) {
+      const state = floatingSpendState(entry);
+      if (!state.present || state.isStatus !== wantStatus) continue;
+      rows.push({ label: label + " · " + String(entry.name ?? "efeito") + (state.isStatus ? "-" + state.value : ""), destination, state });
+    }
+  };
+  for (const token of targetDocuments(frozenTargetIds)) {
+    addDocument(token.name ?? token.actor?.name ?? "Alvo", { kind: "targets", tokenIds: [token.id] }, token.actor);
+  }
+  if (sourceToken) addDocument("Usuário do golpe", { kind: "self" }, sourceToken.actor ?? sourceToken.document?.actor);
+  const sceneItem = game.items.find(item => item.type === "scene-data" && item.system?.sceneKey === canvas?.scene?.id);
+  if (sceneItem) addDocument("Cena", { kind: "scene" }, sceneItem);
+  return rows;
+}
+
+async function promptReduceExistingStatus({ message, actor, move, sourceToken, frozenTargetIds }) {
+  const remaining = detailedSpendRemaining(message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend"));
+  const rows = currentFloatingSpendOptions(sourceToken, frozenTargetIds, true).filter(row => row.state.value > 0);
+  if (!rows.length) throw new Error("Não há Status disponível para reduzir.");
+  const first = await foundry.applications.api.DialogV2.input({
+    window: { title: "Reduzir Status" },
+    content: '<div class="pokemon-context-spend-dialog"><label>Status<select name="index">'
+      + rows.map((row, index) => '<option value="' + index + '">' + esc(row.label) + '</option>').join("")
+      + '</select></label></div>',
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: true
+  });
+  if (!first) return;
+  const row = rows[Number(first.index)];
+  if (!row) return;
+  const max = Math.min(remaining, row.state.value);
+  const second = await foundry.applications.api.DialogV2.input({
+    window: { title: "Quanto reduzir?" },
+    content: '<div class="pokemon-context-spend-dialog"><label>Power<select name="amount">'
+      + Array.from({ length: max }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + ' Power</option>').join("")
+      + '</select></label></div>',
+    ok: { label: "Gastar e reduzir", icon: "fa-solid fa-check" }, modal: true
+  });
+  if (!second) return;
+  const amount = Math.max(1, Math.min(max, Number(second.amount ?? 1) || 1));
+  await commitContextSpend(message, {
+    cost: amount,
+    label: "Reduzir " + row.label,
+    pokemonMoveId: move?.id ?? null
+  }, {
+    sceneId: canvas.scene.id,
+    sourceActorId: actor.id,
+    sourceTokenId: sourceToken?.id ?? null,
+    moveId: move?.id ?? null,
+    mode: "reduce-status",
+    destination: row.destination,
+    selector: { name: row.state.name, positive: row.state.positive },
+    amount,
+    pokemonSuggested: false
+  });
+}
+
+async function promptRemoveExistingTag({ message, actor, move, sourceToken, frozenTargetIds }) {
+  const rows = currentFloatingSpendOptions(sourceToken, frozenTargetIds, false);
+  if (!rows.length) throw new Error("Não há Tag flutuante disponível para riscar/recuperar.");
+  const choice = await foundry.applications.api.DialogV2.input({
+    window: { title: "Riscar / recuperar Tag" },
+    content: '<div class="pokemon-context-spend-dialog"><label>Tag<select name="index">'
+      + rows.map((row, index) => '<option value="' + index + '">' + esc(row.label) + '</option>').join("")
+      + '</select></label></div>',
+    ok: { label: "Gastar 2 Power", icon: "fa-solid fa-check" }, modal: true
+  });
+  if (!choice) return;
+  const row = rows[Number(choice.index)];
+  if (!row) return;
+  await commitContextSpend(message, {
+    cost: 2,
+    label: "Riscar/recuperar " + row.label,
+    pokemonMoveId: move?.id ?? null
+  }, {
+    sceneId: canvas.scene.id,
+    sourceActorId: actor.id,
+    sourceTokenId: sourceToken?.id ?? null,
+    moveId: move?.id ?? null,
+    mode: "remove-tag",
+    destination: row.destination,
+    selector: { name: row.state.name, positive: row.state.positive },
+    pokemonSuggested: false
+  });
+}
+
+function pokemonSpendSuggestions(actor, move, frozenTargetIds) {
+  const suggestions = [];
+  if (Number(move?.power ?? 0) > 0 && String(move?.damageClass ?? "status") !== "status") {
+    const damage = { target: "target", kind: "status", name: "ferido", level: 1, positive: false, source: "damage", trigger: "principal" };
+    if (pokemonSuggestedEffectAllowed(move, damage, frozenTargetIds)) suggestions.push({ effect: damage, label: "Dano", narrative: "" });
+  }
+  effectsForMove(actor, move).forEach((effect, index) => {
+    if (effect?.intrinsic === true || String(effect?.source ?? "") === "damage") return;
+    if (!pokemonSuggestedEffectAllowed(move, effect, frozenTargetIds)) return;
+    suggestions.push({ effect, index, label: String(effect?.name ?? "efeito"), narrative: String(effect?.chanceNarrative ?? "").trim() });
+  });
+  return suggestions;
+}
+
+async function openNativePokemonStatusSpend(context) {
+  const { message, actor, move, sourceToken, frozenTargetIds } = context;
+  const suggestions = pokemonSpendSuggestions(actor, move, frozenTargetIds).filter(row => row.effect?.kind !== "tag");
+  const options = suggestions.map((row, index) => '<option value="suggestion:' + index + '">Sugestão: ' + esc(row.label) + '</option>');
+  options.push('<option value="custom">Criar Status personalizado…</option>');
+  options.push('<option value="reduce">Reduzir Status existente…</option>');
+  const choice = await foundry.applications.api.DialogV2.input({
+    window: { title: "Give / reduce a status" },
+    content: '<div class="pokemon-context-spend-dialog"><label>Consequência<select name="choice">' + options.join("") + '</select></label></div>',
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: true
+  });
+  if (!choice) return;
+  if (choice.choice === "custom") return promptCustomContextSpend({ ...context, kind: "status" });
+  if (choice.choice === "reduce") return promptReduceExistingStatus(context);
+  const index = Number(String(choice.choice).split(":")[1]);
+  const row = suggestions[index];
+  if (row) return chooseContextEffectSpend({ ...context, effect: row.effect, label: row.label, pokemonSuggested: true });
+}
+
+async function openNativePokemonTagSpend(context) {
+  const { actor, move, frozenTargetIds } = context;
+  const suggestions = pokemonSpendSuggestions(actor, move, frozenTargetIds).filter(row => row.effect?.kind === "tag");
+  const options = suggestions.map((row, index) => '<option value="suggestion:' + index + '">Sugestão: ' + esc(row.label) + '</option>');
+  options.push('<option value="custom">Criar Tag personalizada…</option>');
+  options.push('<option value="remove">Riscar / recuperar Tag existente…</option>');
+  const choice = await foundry.applications.api.DialogV2.input({
+    window: { title: "Add / scratch / recover a tag" },
+    content: '<div class="pokemon-context-spend-dialog"><label>Consequência<select name="choice">' + options.join("") + '</select></label></div>',
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: true
+  });
+  if (!choice) return;
+  if (choice.choice === "custom") return promptCustomContextSpend({ ...context, kind: "tag" });
+  if (choice.choice === "remove") return promptRemoveExistingTag(context);
+  const index = Number(String(choice.choice).split(":")[1]);
+  const row = suggestions[index];
+  if (row) return chooseContextEffectSpend({ ...context, effect: row.effect, label: row.label, pokemonSuggested: true });
+}
+
+function wirePokemonNativeSpendControls(context) {
+  const { message, root } = context;
+  if (!message.isAuthor && !game.user.isGM) return;
+  if (!root || root.dataset.pokemonContextSpendWired === "true") return;
+  root.dataset.pokemonContextSpendWired = "true";
+  root.addEventListener("click", event => {
+    const target = event.target instanceof Element ? event.target : null;
+    const undo = target?.closest?.("[data-spend-undo]");
+    if (undo) {
+      const index = Number(undo.dataset.spendUndo);
+      const entry = message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend")?.entries?.[index];
+      if (entry?.pokemonApplication) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void rollbackContextSpendEntry(message, index).catch(error => {
+          console.error("Pokemon LITM Tools | reverter gasto:", error);
+          ui.notifications.error(error?.message ?? "Não foi possível reverter o gasto.");
+        });
+      }
+      return;
+    }
+    const button = target?.closest?.("[data-spend-option]");
+    const option = button?.dataset?.spendOption;
+    if (option !== "status" && option !== "tag") return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const handler = option === "status" ? openNativePokemonStatusSpend : openNativePokemonTagSpend;
+    void handler(context).catch(error => {
+      console.error("Pokemon LITM Tools | gasto contextual:", error);
+      ui.notifications.error(error?.message ?? "Não foi possível gastar Power.");
+    });
+  }, true);
 }
 
 
@@ -8138,733 +8875,25 @@ function addPokemonDetailedSpendControls(
   sourceToken,
   frozenTargetIds
 ) {
-  const data =
-    message.getFlag?.(
-      LITM_SYSTEM_ID,
-      "detailedSpend"
-    );
+  const data = message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend");
+  if (!data || Number(data.consequenceResult ?? -1) < 0 || Number(data.total ?? 0) <= 0) return;
 
-  if (!data) {
-    return;
-  }
-
-  const editable =
-    message.isAuthor
-    ||
-    game.user.isGM;
-
-  const canSpend =
-    Number(
-      data.consequenceResult
-      ?? -1
-    ) >= 0
-    &&
-    Number(
-      data.total
-      ?? 0
-    ) > 0;
-
-  if (!canSpend) {
-    return;
-  }
-
-  const remaining =
-    detailedSpendRemaining(
-      data
-    );
-
-  const section =
-    document.createElement(
-      "div"
-    );
-
-  section.className =
-    "pokemon-litm-spend-panel";
-
-  const heading =
-    document.createElement(
-      "div"
-    );
-
-  heading.className =
-    "pokemon-litm-spend-heading";
-
-  heading.innerHTML =
-    "<strong>Sugestões</strong><span>"
-    + remaining
-    + " Power restante</span>"
-    + "<small>"
-    + esc(
-        move.name
-        ?? move.id
-      )
-    + "</small>";
-
-  section.append(
-    heading
-  );
-
-  const choices =
-    document.createElement(
-      "div"
-    );
-
-  choices.className =
-    "pokemon-litm-spend-options";
-
-  const mechanics =
-    moveLitmProfile(
-      move
-    );
-
-  const spendTargets =
-    targetDocuments(
-      frozenTargetIds
-    );
-
-  const immuneTargets =
-    immuneTargetsForMove(
-      move,
-      spendTargets
-    );
-
-  const allTargetsImmune =
-    spendTargets.length > 0
-    &&
-    immuneTargets.length
-      === spendTargets.length;
-
-  const immunityWarning =
-    createPokemonImmunityWarning(
-      move,
-      spendTargets
-    );
-
-  if (immunityWarning) {
-    section.append(
-      immunityWarning
-    );
-  }
-
-  if (
-    Number(
-      move.power
-      ?? 0
-    ) > 0
-    &&
-    mechanics.damageClass
-      !== "status"
-    &&
-    !allTargetsImmune
-  ) {
-    const damageButton =
-      actionButton(
-        "Dano +1 · 1 Power",
-        "fa-heart-crack",
-        () =>
-          spendPokemonPower(
-            message,
-            {
-              type:
-                "pokemon-damage",
-
-              pokemonMoveId:
-                move.id,
-
-              cost:
-                1,
-
-              label:
-                "Dano de "
-                + (
-                    move.name
-                    ?? move.id
-                  )
-            }
-          )
-      );
-
-    damageButton.disabled =
-      !editable
-      ||
-      remaining < 1;
-
-    choices.append(
-      damageButton
-    );
-  }
-
-  const effects =
-    effectsForMove(
-      actor,
-      move
-    );
-
-  effects.forEach(
-    (
-      effect,
-      index
-    ) => {
-      if (
-        String(
-          effect?.source
-          ?? ""
-        ) === "damage"
-        ||
-        effect?.intrinsic
-          === true
-      ) {
-        return;
-      }
-
-      const bought =
-        (
-          data.entries
-          ?? []
-        ).some(
-          entry =>
-            entry?.type
-              === "pokemon-effect"
-            &&
-            entry?.pokemonMoveId
-              === move.id
-            &&
-            Number(
-              entry?.pokemonEffectIndex
-            ) === index
-        );
-
-      const maxCost =
-        pokemonEffectPowerCost(
-          effect,
-          remaining
-        );
-
-      const minCost =
-        effect?.kind
-          === "tag"
-          ? 2
-          : 1;
-
-      const preferredLevel =
-        Math.max(
-          1,
-          Number(
-            effect?.level
-            ?? 1
-          )
-        );
-
-      const effectLabel =
-        String(
-          effect?.name
-          ?? "efeito"
-        );
-
-      const powerText =
-        effect?.kind
-          === "tag"
-          ? "2 Power"
-          : maxCost > 1
-            ? (
-                "1–"
-                + maxCost
-                + " Power"
-              )
-            : "1 Power";
-
-      const narrative =
-        String(
-          effect?.chanceNarrative
-          ?? ""
-        ).trim();
-
-      const option =
-        document.createElement(
-          "div"
-        );
-
-      option.className =
-        "pokemon-litm-suggestion-option";
-
-      if (narrative) {
-        const frequency =
-          document.createElement(
-            "small"
-          );
-
-        frequency.className =
-          "pokemon-litm-effect-frequency";
-
-        frequency.textContent =
-          narrative;
-
-        option.append(
-          frequency
-        );
-      }
-
-      const button =
-        actionButton(
-          effectLabel
-          + (
-              effect?.kind
-                === "tag"
-                ? ""
-                : (
-                    preferredLevel > 1
-                      ? " · até tier "
-                        + Math.min(
-                            preferredLevel,
-                            maxCost
-                          )
-                      : "-1"
-                  )
-            )
-          + " · "
-          + powerText,
-
-          effect?.kind
-            === "tag"
-            ? "fa-tag"
-            : "fa-burst",
-
-          async () => {
-            const purchase =
-              await choosePokemonEffectPurchase(
-                effect,
-                remaining
-              );
-
-            if (!purchase) {
-              return;
-            }
-
-            const suffix =
-              effect?.kind
-                === "tag"
-                ? ""
-                : (
-                    "-"
-                    + purchase.level
-                  );
-
-            await spendPokemonPower(
-              message,
-              {
-                type:
-                  "pokemon-effect",
-
-                pokemonMoveId:
-                  move.id,
-
-                pokemonEffectIndex:
-                  index,
-
-                pokemonEffectLevel:
-                  purchase.level,
-
-                cost:
-                  purchase.cost,
-
-                label:
-                  effectLabel
-                  + suffix
-              }
-            );
-          }
-        );
-
-      const needsTarget =
-        String(
-          effect?.target
-          ?? "target"
-        ).toLocaleLowerCase()
-          === "target";
-
-      button.disabled =
-        !editable
-        ||
-        bought
-        ||
-        remaining < minCost
-        ||
-        (
-          needsTarget
-          &&
-          !frozenTargetIds.length
-        );
-
-      option.append(
-        button
-      );
-
-      choices.append(
-        option
-      );
-    }
-  );
-
-  section.append(
-    choices
-  );
-
-  appendRecoverySuggestions({
-    section,
-    targetIds:
-      frozenTargetIds,
-    editable
-  });
-
+  // As sugestões Pokémon agora vivem DENTRO dos botões nativos de Spend
+  // Power. O painel extra não duplica mais opções no chat; aqui ficam apenas
+  // custos intrínsecos que não consomem Power (ex.: recarga).
+  const effects = effectsForMove(actor, move);
+  const intrinsicSection = document.createElement("div");
   appendPokemonIntrinsicEffects({
     message,
     actor,
     move,
-    section,
+    section: intrinsicSection,
     sourceToken,
-
-    targetIds:
-      frozenTargetIds,
-
+    targetIds: frozenTargetIds,
     effects,
-    editable
+    editable: message.isAuthor || game.user.isGM
   });
-
-  const purchased =
-    document.createElement(
-      "div"
-    );
-
-  purchased.className =
-    "pokemon-litm-spend-purchased";
-
-  const damageEntries =
-    (
-      data.entries
-      ?? []
-    ).filter(
-      entry =>
-        entry?.type
-          === "pokemon-damage"
-        &&
-        entry?.pokemonMoveId
-          === move.id
-    );
-
-  if (damageEntries.length) {
-    const spent =
-      damageEntries.reduce(
-        (
-          sum,
-          entry
-        ) =>
-          sum
-          + Number(
-              entry.cost
-              ?? 0
-            ),
-        0
-      );
-
-    const baseLevel =
-      Math.max(
-        1,
-        Math.min(
-          6,
-          spent
-        )
-      );
-
-    const row =
-      document.createElement(
-        "div"
-      );
-
-    row.className =
-      "pokemon-litm-purchased-row";
-
-    const text =
-      document.createElement(
-        "span"
-      );
-
-    const targetText =
-      targetDocuments(
-        frozenTargetIds
-      )
-        .map(
-          token => {
-            const multiplier =
-              multiplierFor(
-                token.actor,
-                move.type
-              );
-
-            const delta =
-              effectivenessTierDelta(
-                multiplier
-              );
-
-            if (
-              delta === null
-            ) {
-              return (
-                (
-                  token.name
-                  ?? "Alvo"
-                )
-                + ": imune"
-              );
-            }
-
-            const finalLevel =
-              baseLevel
-              + delta;
-
-            if (finalLevel <= 0) {
-              return (
-                (
-                  token.name
-                  ?? "Alvo"
-                )
-                + ": resiste · sem Status de dano"
-              );
-            }
-
-            return (
-              (
-                token.name
-                ?? "Alvo"
-              )
-              + ": ferido-"
-              + Math.min(
-                  6,
-                  finalLevel
-                )
-            );
-          }
-        )
-        .join(" · ");
-
-    text.textContent =
-      "Dano: "
-      + spent
-      + " Power"
-      + (
-          targetText
-            ? " · "
-              + targetText
-            : ""
-        );
-
-    row.append(
-      text
-    );
-
-    const applied =
-      damageEntries.every(
-        entry =>
-          entry.pokemonApplied
-            === true
-      );
-
-    if (
-      editable
-      &&
-      !applied
-    ) {
-      row.append(
-        actionButton(
-          "Aplicar dano",
-          "fa-heart-crack",
-          () =>
-            applyPurchasedMoveEffect({
-              message,
-              actor,
-              move,
-              sourceToken,
-
-              targetIds:
-                frozenTargetIds,
-
-              effect: {
-                target:
-                  "target",
-
-                kind:
-                  "status",
-
-                name:
-                  "ferido",
-
-                level:
-                  baseLevel,
-
-                positive:
-                  false,
-
-                source:
-                  "damage",
-
-                trigger:
-                  "principal"
-              },
-
-              predicate:
-                entry =>
-                  entry?.type
-                    === "pokemon-damage"
-                  &&
-                  entry?.pokemonMoveId
-                    === move.id
-            })
-        )
-      );
-
-    } else if (applied) {
-      row.append(
-        appliedStateControl()
-      );
-    }
-
-    purchased.append(
-      row
-    );
-  }
-
-  (
-    data.entries
-    ?? []
-  )
-    .filter(
-      entry =>
-        entry?.type
-          === "pokemon-effect"
-        &&
-        entry?.pokemonMoveId
-          === move.id
-    )
-    .forEach(
-      entry => {
-        const index =
-          Number(
-            entry.pokemonEffectIndex
-          );
-
-        const effect =
-          effects[index];
-
-        if (!effect) {
-          return;
-        }
-
-        const purchasedLevel =
-          Math.max(
-            1,
-            Math.min(
-              6,
-              Number(
-                entry.pokemonEffectLevel
-                ?? effect.level
-                ?? 1
-              )
-            )
-          );
-
-        const appliedEffect = {
-          ...foundry.utils.deepClone(
-            effect
-          ),
-
-          level:
-            purchasedLevel
-        };
-
-        const row =
-          document.createElement(
-            "div"
-          );
-
-        row.className =
-          "pokemon-litm-purchased-row";
-
-        const text =
-          document.createElement(
-            "span"
-          );
-
-        text.textContent =
-          entry.label;
-
-        row.append(
-          text
-        );
-
-        if (
-          editable
-          &&
-          entry.pokemonApplied
-            !== true
-        ) {
-          row.append(
-            actionButton(
-              "Aplicar",
-              "fa-check",
-              () =>
-                applyPurchasedMoveEffect({
-                  message,
-                  actor,
-                  move,
-                  sourceToken,
-
-                  targetIds:
-                    frozenTargetIds,
-
-                  effect:
-                    appliedEffect,
-
-                  predicate:
-                    candidate =>
-                      candidate?.type
-                        === "pokemon-effect"
-                      &&
-                      candidate?.pokemonMoveId
-                        === move.id
-                      &&
-                      Number(
-                        candidate
-                          .pokemonEffectIndex
-                      ) === index
-                })
-            )
-          );
-
-        } else if (
-          entry.pokemonApplied
-            === true
-        ) {
-          row.append(
-            appliedStateControl()
-          );
-        }
-
-        purchased.append(
-          row
-        );
-      }
-    );
-
-  if (
-    purchased.children.length
-  ) {
-    section.append(
-      purchased
-    );
-  }
-
-  panel.append(
-    section
-  );
+  if (intrinsicSection.children.length) panel.append(intrinsicSection);
 }
 
 
@@ -9250,253 +9279,72 @@ async function onRenderPokemonChatMessage(
   message,
   html
 ) {
-  const actor =
-    game.actors.get(
-      message?.speaker?.actor
-    );
+  const actor = game.actors.get(message?.speaker?.actor);
+  if (!actor) return;
+  if (!game.user.isGM && !actor.isOwner) return;
 
-  if (!actor) {
-    return;
-  }
+  const root = html instanceof HTMLElement
+    ? html
+    : html?.[0] instanceof HTMLElement
+      ? html[0]
+      : null;
+  if (!root) return;
 
-  if (
-    !game.user.isGM
-    &&
-    !actor.isOwner
-  ) {
-    return;
-  }
-
-  const root =
-    html instanceof HTMLElement
-      ? html
-      : html?.[0]
-          instanceof HTMLElement
-        ? html[0]
-        : null;
-
-  if (!root) {
-    return;
-  }
-
-  const reaction =
-    message.getFlag?.(
-      MODULE_ID,
-      "pokemonReaction"
-    );
-
+  const reaction = message.getFlag?.(MODULE_ID, "pokemonReaction");
   if (reaction) {
-    await addPokemonReactionResultPanel(
-      message,
-      root,
-      reaction
-    );
-
+    await addPokemonReactionResultPanel(message, root, reaction);
     return;
   }
 
-  const move =
-    await moveFromChatMessage(
-      message,
-      actor
-    );
+  const move = await moveFromChatMessage(message, actor);
+  if (!move) return;
+  if (root.querySelector("[data-pokemon-chat-actions]")) return;
 
-  if (!move) {
-    return;
-  }
+  const sceneId = message.getFlag?.(MODULE_ID, "rollSceneId");
+  const frozenTargetIds = message.getFlag?.(MODULE_ID, "rollTargetTokenIds") ?? [];
+  const panel = document.createElement("div");
+  panel.className = "pokemon-chat-move-actions";
+  panel.dataset.pokemonChatActions = "true";
 
-  if (
-    root.querySelector(
-      "[data-pokemon-chat-actions]"
-    )
-  ) {
-    return;
-  }
+  appendMoveMechanicsToChat(panel, move, frozenTargetIds);
 
-  const sceneId =
-    message.getFlag?.(
-      MODULE_ID,
-      "rollSceneId"
-    );
+  const immunityWarning = createPokemonImmunityWarning(move, targetDocuments(frozenTargetIds));
+  if (immunityWarning) panel.append(immunityWarning);
 
-  const frozenTargetIds =
-    message.getFlag?.(
-      MODULE_ID,
-      "rollTargetTokenIds"
-    )
-    ?? [];
+  const buttons = document.createElement("div");
+  buttons.className = "pokemon-chat-move-buttons pokemon-chat-vfx-buttons";
+  panel.append(buttons);
 
-  const panel =
-    document.createElement(
-      "div"
-    );
-
-  panel.className =
-    "pokemon-chat-move-actions";
-
-  panel.dataset
-    .pokemonChatActions =
-      "true";
-
-  const heading =
-    document.createElement(
-      "div"
-    );
-
-  heading.className =
-    "pokemon-chat-move-header";
-
-  heading.innerHTML =
-    '<i class="fa-solid fa-bolt"></i><strong>'
-    + esc(
-        move.name
-        ?? move.id
-      )
-    + "</strong>";
-
-  panel.append(
-    heading
-  );
-
-  appendMoveMechanicsToChat(
-    panel,
-    move,
-    frozenTargetIds
-  );
-
-  const buttons =
-    document.createElement(
-      "div"
-    );
-
-  buttons.className =
-    "pokemon-chat-move-buttons";
-
-  panel.append(
-    buttons
-  );
-
-  const sourceToken =
-    () => {
-      if (
-        sceneId
-        &&
-        sceneId !== canvas?.scene?.id
-      ) {
-        throw new Error(
-          "Abra a cena onde a rolagem foi feita."
-        );
-      }
-
-      const token =
-        sourceTokenForMessageActor(
-          actor,
-          move
-        );
-
-      if (!token) {
-        throw new Error(
-          "Token do Pokémon não encontrado."
-        );
-      }
-
-      return (
-        token.document
-        ?? token
-      );
-    };
+  const sourceToken = () => {
+    if (sceneId && sceneId !== canvas?.scene?.id) throw new Error("Abra a cena onde a rolagem foi feita.");
+    const token = sourceTokenForMessageActor(actor, move);
+    if (!token) throw new Error("Token do Pokémon não encontrado.");
+    return token.document ?? token;
+  };
 
   buttons.append(
-    actionButton(
-      "VFX Token",
-      "fa-wand-magic-sparkles",
-      async () => {
-        const source =
-          sourceToken();
-
-        const selfTarget =
-          [
-            "self",
-            "user",
-            "users-field"
-          ].includes(
-            String(
-              move?.target
-              ?? ""
-            ).toLocaleLowerCase()
-          );
-
-        const ids =
-          selfTarget
-            ? [source.id]
-            : targetDocuments()
-                .map(
-                  token =>
-                    token.id
-                );
-
-        if (!ids.length) {
-          throw new Error(
-            "Marque pelo menos um alvo."
-          );
-        }
-
-        await broadcastMoveVfx(
-          canvas.scene.id,
-          source.id,
-          ids,
-          move.type
-            ?? "normal"
-        );
-      }
-    ),
-
-    actionButton(
-      "VFX Área",
-      "fa-circle-nodes",
-      async () => {
-        const source =
-          sourceToken();
-
-        await placeMoveArea(
-          actor,
-          move,
-          "player",
-          source
-        );
-      }
-    )
+    iconActionButton("VFX no Token", "fa-wand-magic-sparkles", async () => {
+      const source = sourceToken();
+      const selfTarget = ["self", "user", "users-field"].includes(String(move?.target ?? "").toLowerCase());
+      const ids = selfTarget ? [source.id] : [...frozenTargetIds];
+      if (!ids.length) throw new Error("A rolagem não tinha alvo para reproduzir o VFX.");
+      await broadcastMoveVfx(canvas.scene.id, source.id, ids, move.type ?? "normal");
+    }),
+    iconActionButton("VFX em Área", "fa-circle-nodes", async () => {
+      const source = sourceToken();
+      await placeMoveArea(actor, move, "player", source);
+    })
   );
 
-  /*
-   * Como esta detecção é independente de detailedSpend,
-   * Quick Roll também recebe VFX Token / Área.
-   */
-  const detailed =
-    message.getFlag?.(
-      LITM_SYSTEM_ID,
-      "detailedSpend"
-    );
-
-  if (detailed) {
-    addPokemonDetailedSpendControls(
-      message,
-      actor,
-      move,
-      panel,
-      sourceToken(),
-      frozenTargetIds
-    );
+  const detailed = message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend");
+  if (detailed && (!sceneId || sceneId === canvas?.scene?.id)) {
+    const contextSourceToken = sourceToken();
+    const context = { message, root, actor, move, sourceToken: contextSourceToken, frozenTargetIds };
+    wirePokemonNativeSpendControls(context);
+    addPokemonDetailedSpendControls(message, actor, move, panel, contextSourceToken, frozenTargetIds);
   }
 
-  (
-    root.querySelector(
-      ".message-content"
-    )
-    ?? root
-  ).append(
-    panel
-  );
+  (root.querySelector(".message-content") ?? root).append(panel);
 }
 
 
@@ -9710,14 +9558,32 @@ export async function pokemonLitmCombatSelfTest() {
       );
 
   checks.immunityUxInstalled =
-    typeof createPokemonImmunityWarning
-      === "function"
-    &&
-    addPokemonDetailedSpendControls
-      .toString()
-      .includes(
-        "allTargetsImmune"
-      );
+    typeof createPokemonImmunityWarning === "function"
+    && typeof pokemonSuggestedEffectAllowed === "function"
+    && typeof pokemonSpendSuggestions === "function";
+
+  checks.contextSpendInstalled =
+    POKEMON_CONTEXT_SPEND_REV === "2026-09-08-context-spend-v2"
+    && typeof wirePokemonNativeSpendControls === "function"
+    && typeof commitContextSpend === "function";
+
+  checks.contextSpendRollbackInstalled =
+    typeof applyContextSpendDirect === "function"
+    && typeof rollbackContextSpendDirect === "function"
+    && requestAuthority.toString().includes("context-spend-rollback");
+
+  checks.nativeSpendContextMenusInstalled =
+    typeof openNativePokemonStatusSpend === "function"
+    && typeof openNativePokemonTagSpend === "function"
+    && typeof wirePokemonNativeSpendControls === "function";
+
+  checks.compactPokemonChatInstalled =
+    typeof iconActionButton === "function"
+    && !onRenderPokemonChatMessage.toString().includes("pokemon-chat-move-header");
+
+  checks.typeTintedVfxInstalled =
+    playMoveVfxLocal.toString().includes("tint(typeColor(type))")
+    && playMoveVfxAtPointLocal.toString().includes("tint(typeColor(type))");
 
   checks.moveBurnControlInstalled =
     typeof appendPokemonMoveBurnControl

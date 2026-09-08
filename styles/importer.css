@@ -3920,3 +3920,85 @@ has(
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+/* Pokemon Context Spend + compact chat v2 */
+.pokemon-chat-move-actions {
+  gap: 3px;
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.pokemon-chat-vfx-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+}
+
+.pokemon-chat-move-actions .pokemon-chat-vfx-icon {
+  width: 26px;
+  min-width: 26px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 26px;
+}
+
+.pokemon-chat-vfx-icon i {
+  margin: 0;
+}
+
+.pokemon-litm-spend-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.pokemon-litm-spend-heading small,
+.pokemon-chat-move-header {
+  display: none !important;
+}
+
+.pokemon-litm-spend-panel {
+  margin-top: 3px;
+  padding-top: 4px;
+  gap: 4px;
+}
+
+.pokemon-litm-immunity-warning {
+  padding: 5px 6px;
+  margin: 1px 0;
+  font-size: .78rem;
+}
+
+.pokemon-litm-suggestion-option {
+  gap: 2px;
+}
+
+.pokemon-litm-suggestion-option > button {
+  min-height: 24px;
+  padding: 3px 5px;
+}
+
+.pokemon-context-spend-dialog {
+  display: grid;
+  gap: 9px;
+  padding: 6px;
+}
+
+.pokemon-context-spend-dialog > label {
+  display: grid;
+  gap: 4px;
+}
+
+.pokemon-context-spend-dialog input,
+.pokemon-context-spend-dialog select {
+  width: 100%;
+  min-width: 0;
+}
+
+.pokemon-context-checkbox {
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center;
+}
