@@ -2551,6 +2551,340 @@ function defensiveContextForTargets(
 }
 
 
+
+const POKEMON_ATTACK_HINDERING_STATUS_IDS =
+  new Set([
+    "paralisado",
+    "paralyzed",
+    "paralysis",
+    "congelado",
+    "frozen",
+    "freeze",
+    "adormecido",
+    "asleep",
+    "sleep",
+    "preso",
+    "trapped",
+    "restrained",
+    "imobilizado",
+    "immobilized",
+    "atordoado",
+    "stunned",
+    "sonolento",
+    "drowsy"
+  ]);
+
+
+function attackHinderingStatusesForActor(
+  actor
+) {
+  const rows = [];
+
+  for (
+    const entry
+    of actor?.system
+      ?.floatingTagsAndStatuses
+      ?? []
+  ) {
+    const id =
+      moveIdentity(
+        entry?.name
+      );
+
+    const isStatus =
+      entry?.isStatus === true
+      ||
+      Number(
+        entry?.value
+        ?? 0
+      ) > 0;
+
+    if (
+      !isStatus
+      ||
+      entry?.positive !== false
+      ||
+      entry?.expired === true
+      ||
+      entry?.planned === true
+      ||
+      !POKEMON_ATTACK_HINDERING_STATUS_IDS.has(
+        id
+      )
+    ) {
+      continue;
+    }
+
+    rows.push({
+      name:
+        String(
+          entry?.name
+          ?? "Status desfavorável"
+        ),
+
+      value:
+        Math.max(
+          1,
+          Math.min(
+            6,
+            Number(
+              entry?.value
+              ?? 1
+            ) || 1
+          )
+        )
+    });
+  }
+
+  return rows.sort(
+    (
+      a,
+      b
+    ) =>
+      b.value
+      - a.value
+  );
+}
+
+
+function challengeStatusContextForTargets(
+  targets
+) {
+  const rows =
+    (
+      targets
+      ?? []
+    )
+      .filter(
+        token =>
+          !!token?.actor
+      )
+      .map(
+        token => ({
+          token,
+
+          status:
+            attackHinderingStatusesForActor(
+              token.actor
+            )[0]
+            ?? null
+        })
+      );
+
+  /*
+   * Uma rolagem contra vários alvos só recebe esta
+   * vantagem se TODOS estiverem prejudicados.
+   * Usa-se o menor tier comum, preservando o alvo
+   * mais difícil em vez de somar Status.
+   */
+  if (
+    !rows.length
+    ||
+    rows.some(
+      row =>
+        !row.status
+    )
+  ) {
+    return null;
+  }
+
+  const value =
+    Math.min(
+      ...rows.map(
+        row =>
+          row.status.value
+      )
+    );
+
+  if (
+    !Number.isFinite(
+      value
+    )
+    ||
+    value <= 0
+  ) {
+    return null;
+  }
+
+  const statusIds =
+    new Set(
+      rows.map(
+        row =>
+          moveIdentity(
+            row.status.name
+          )
+      )
+    );
+
+  const statusName =
+    statusIds.size === 1
+      ? rows[0].status.name
+      : "Status desfavorável";
+
+  const targetName =
+    rows[0].token?.name
+    ?? rows[0].token?.actor?.name
+    ?? "Alvo";
+
+  return {
+    value,
+    positive:
+      true,
+
+    name:
+      rows.length === 1
+        ? (
+            targetName
+            + " · "
+            + statusName
+          )
+        : (
+            "Alvos prejudicados · "
+            + statusName
+          )
+  };
+}
+
+
+function moveDealsTypedDamage(
+  move
+) {
+  return (
+    Number(
+      move?.power
+      ?? 0
+    ) > 0
+    &&
+    String(
+      move?.damageClass
+      ?? "status"
+    ).toLocaleLowerCase()
+      !== "status"
+  );
+}
+
+
+function immuneTargetsForMove(
+  move,
+  targets
+) {
+  if (
+    !moveDealsTypedDamage(
+      move
+    )
+  ) {
+    return [];
+  }
+
+  return (
+    targets
+    ?? []
+  ).filter(
+    token =>
+      multiplierForActorType(
+        token?.actor,
+        move?.type
+          ?? "normal"
+      ) === 0
+  );
+}
+
+
+function pokemonMoveTypeLabel(
+  move
+) {
+  const text =
+    String(
+      moveLitmProfile(
+        move
+        ?? {}
+      )?.typeText
+      ?? move?.type
+      ?? "tipo"
+    )
+      .replace(
+        /^Tipo:\s*/i,
+        ""
+      )
+      .trim();
+
+  return text
+    || "deste tipo";
+}
+
+
+function createPokemonImmunityWarning(
+  move,
+  targets
+) {
+  const immune =
+    immuneTargetsForMove(
+      move,
+      targets
+    );
+
+  if (!immune.length) {
+    return null;
+  }
+
+  const allImmune =
+    immune.length
+      === (
+        targets
+        ?? []
+      ).length;
+
+  const names =
+    immune
+      .map(
+        token =>
+          token?.name
+          ?? token?.actor?.name
+          ?? "Alvo"
+      )
+      .join(", ");
+
+  const warning =
+    document.createElement(
+      "div"
+    );
+
+  warning.className =
+    "pokemon-litm-immunity-warning";
+
+  warning.innerHTML =
+    '<i class="fa-solid fa-triangle-exclamation"></i> <strong>'
+    + esc(
+        names
+      )
+    + "</strong> "
+    + (
+        immune.length === 1
+          ? "é imune"
+          : "são imunes"
+      )
+    + " ao dano "
+    + esc(
+        pokemonMoveTypeLabel(
+          move
+        )
+      )
+    + ". "
+    + (
+        allImmune
+          ? "A rolagem continua válida para outras consequências ficcionais, mas dano não é uma consequência válida para "
+            + (
+                immune.length === 1
+                  ? "esse alvo."
+                  : "esses alvos."
+              )
+          : "A rolagem ainda pode causar dano nos demais alvos e gerar outras consequências ficcionais."
+      );
+
+  return warning;
+}
+
+
 function priorityReactionContext(
   move
 ) {
@@ -3235,22 +3569,31 @@ function appendPokemonMoveBurnControl(
 }
 
 
+
 function stripPokemonSyntheticRollTags(
   app
 ) {
-  app.selectedTags =
-    (
-      app.selectedTags
-      ?? []
-    ).filter(
-      tag =>
-        ![
-          POKEMON_MOVE_AUTO_SOURCE,
-          POKEMON_REACTION_AUTO_SOURCE
-        ].includes(
-          tag?.source
-        )
-    );
+  for (
+    const key
+    of [
+      "selectedTags",
+      "challengeTags"
+    ]
+  ) {
+    app[key] =
+      (
+        app[key]
+        ?? []
+      ).filter(
+        tag =>
+          ![
+            POKEMON_MOVE_AUTO_SOURCE,
+            POKEMON_REACTION_AUTO_SOURCE
+          ].includes(
+            tag?.source
+          )
+      );
+  }
 }
 
 
@@ -3275,7 +3618,15 @@ function pushSyntheticRollStatus(
       )
     );
 
-  app.selectedTags.push({
+  if (
+    !Array.isArray(
+      app.challengeTags
+    )
+  ) {
+    app.challengeTags = [];
+  }
+
+  app.challengeTags.push({
     name,
 
     positive:
@@ -3288,6 +3639,42 @@ function pushSyntheticRollStatus(
 
     isStatus:
       true,
+
+    isClickable:
+      false
+  });
+}
+
+
+function pushSyntheticRollTag(
+  app,
+  {
+    name,
+    positive,
+    source
+  }
+) {
+  if (
+    !Array.isArray(
+      app.challengeTags
+    )
+  ) {
+    app.challengeTags = [];
+  }
+
+  app.challengeTags.push({
+    name,
+
+    positive:
+      positive === true,
+
+    source,
+
+    value:
+      0,
+
+    isStatus:
+      false,
 
     isClickable:
       false
@@ -3482,6 +3869,106 @@ function mountPokemonRollSidePanel(
 }
 
 
+
+function renderPokemonAutomaticChallengeRows(
+  root,
+  automatic
+) {
+  if (!root) return;
+
+  const container =
+    Array.from(
+      root.querySelectorAll(
+        ".selected-tags-container"
+      )
+    ).find(
+      element =>
+        /Challenge Tags\s*\/\s*Status selected/i.test(
+          element.querySelector(
+            "label"
+          )?.textContent
+          ?? ""
+        )
+    );
+
+  if (!container) {
+    return;
+  }
+
+  container
+    .querySelectorAll(
+      "[data-pokemon-auto-challenge]"
+    )
+    .forEach(
+      element =>
+        element.remove()
+    );
+
+  for (
+    const tag
+    of automatic
+      ?? []
+  ) {
+    const row =
+      document.createElement(
+        "div"
+      );
+
+    row.className =
+      "tag "
+      + (
+          tag.positive
+            ? "positive"
+            : "negative"
+        )
+      + (
+          tag.isStatus
+            ? " status"
+            : ""
+        );
+
+    row.dataset
+      .pokemonAutoChallenge =
+        "true";
+
+    row.title =
+      "Aplicado automaticamente pelo Pokémon LITM Tools";
+
+    row.innerHTML =
+      '<span class="tag-icon"><i class="fa-solid '
+      + (
+          tag.positive
+            ? "fa-thumbs-up"
+            : "fa-thumbs-down"
+        )
+      + '"></i></span>'
+      + esc(
+          tag.name
+        )
+      + (
+          tag.isStatus
+          &&
+          Number(
+            tag.value
+            ?? 0
+          ) > 0
+            ? (
+                "-"
+                + Number(
+                    tag.value
+                  )
+              )
+            : ""
+        );
+
+    container.append(
+      row
+    );
+  }
+}
+
+
+
 function renderPokemonRollPackage(
   app,
   root,
@@ -3621,6 +4108,18 @@ function renderPokemonRollPackage(
     &&
     move
   ) {
+    const immunityWarning =
+      createPokemonImmunityWarning(
+        move,
+        targets
+      );
+
+    if (immunityWarning) {
+      section.append(
+        immunityWarning
+      );
+    }
+
     appendPokemonMoveBurnControl(
       app,
       app.actor,
@@ -3630,10 +4129,16 @@ function renderPokemonRollPackage(
   }
 
   const automatic =
-    (
-      app.selectedTags
-      ?? []
-    ).filter(
+    [
+      ...(
+        app.challengeTags
+        ?? []
+      ),
+      ...(
+        app.selectedTags
+        ?? []
+      )
+    ].filter(
       tag =>
         [
           POKEMON_MOVE_AUTO_SOURCE,
@@ -3687,9 +4192,13 @@ function renderPokemonRollPackage(
             ? "+"
             : "-"
         )
-        + Number(
-            tag.value
-            ?? 1
+        + (
+            tag.isStatus
+              ? Number(
+                  tag.value
+                  ?? 1
+                )
+              : 1
           )
         + " "
         + tag.name;
@@ -3707,6 +4216,11 @@ function renderPokemonRollPackage(
   mountPokemonRollSidePanel(
     root,
     section
+  );
+
+  renderPokemonAutomaticChallengeRows(
+    root,
+    automatic
   );
 
   const powerLabel =
@@ -3896,17 +4410,47 @@ function decoratePokemonRollDialog(
   if (
     defense?.modifier
   ) {
-    pushSyntheticRollStatus(
+    /*
+     * Defense/Sp. Defense vem de Tags LitM (ou do
+     * fallback equivalente) e portanto entra como Tag,
+     * não como Status. Assim ela pode coexistir com
+     * um Status como paralisado-1 sem violar a regra
+     * nativa de empilhamento de Status.
+     */
+    pushSyntheticRollTag(
       app,
       {
         name:
           defense.name,
 
-        value:
-          defense.value,
-
         positive:
           defense.positive,
+
+        source:
+          POKEMON_MOVE_AUTO_SOURCE
+      }
+    );
+  }
+
+  const challengeStatus =
+    challengeStatusContextForTargets(
+      targets
+    );
+
+  if (
+    challengeStatus?.value
+  ) {
+    pushSyntheticRollStatus(
+      app,
+      {
+        name:
+          challengeStatus.name,
+
+        value:
+          challengeStatus.value,
+
+        positive:
+          true,
 
         source:
           POKEMON_MOVE_AUTO_SOURCE
@@ -3924,14 +4468,11 @@ function decoratePokemonRollDialog(
   if (
     speed?.value
   ) {
-    pushSyntheticRollStatus(
+    pushSyntheticRollTag(
       app,
       {
         name:
           speed.name,
-
-        value:
-          speed.value,
 
         positive:
           speed.positive,
@@ -7676,6 +8217,35 @@ function addPokemonDetailedSpendControls(
       move
     );
 
+  const spendTargets =
+    targetDocuments(
+      frozenTargetIds
+    );
+
+  const immuneTargets =
+    immuneTargetsForMove(
+      move,
+      spendTargets
+    );
+
+  const allTargetsImmune =
+    spendTargets.length > 0
+    &&
+    immuneTargets.length
+      === spendTargets.length;
+
+  const immunityWarning =
+    createPokemonImmunityWarning(
+      move,
+      spendTargets
+    );
+
+  if (immunityWarning) {
+    section.append(
+      immunityWarning
+    );
+  }
+
   if (
     Number(
       move.power
@@ -7684,6 +8254,8 @@ function addPokemonDetailedSpendControls(
     &&
     mechanics.damageClass
       !== "status"
+    &&
+    !allTargetsImmune
   ) {
     const damageButton =
       actionButton(
@@ -9123,6 +9695,29 @@ export async function pokemonLitmCombatSelfTest() {
     &&
     typeof removeFloatingStatusDirect
       === "function";
+
+  checks.challengeAutoModifiersInstalled =
+    typeof pushSyntheticRollTag
+      === "function"
+    &&
+    typeof challengeStatusContextForTargets
+      === "function"
+    &&
+    pushSyntheticRollStatus
+      .toString()
+      .includes(
+        "challengeTags"
+      );
+
+  checks.immunityUxInstalled =
+    typeof createPokemonImmunityWarning
+      === "function"
+    &&
+    addPokemonDetailedSpendControls
+      .toString()
+      .includes(
+        "allTargetsImmune"
+      );
 
   checks.moveBurnControlInstalled =
     typeof appendPokemonMoveBurnControl

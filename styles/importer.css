@@ -3861,3 +3861,62 @@ has(
     grid-row: 1;
   }
 }
+
+
+/* Pokemon Roll Hotfix: Challenge modifiers + immunity UX */
+
+.pokemon-litm-immunity-warning {
+  display: block;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 5px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.pokemon-litm-immunity-warning > i {
+  margin-right: 4px;
+}
+
+.pokemon-litm-spend-options {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.pokemon-litm-suggestion-option {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pokemon-litm-suggestion-option > button {
+  width: 100%;
+  min-width: 0;
+  grid-column: auto;
+  grid-row: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.pokemon-litm-effect-frequency {
+  display: block;
+  min-width: 0;
+  grid-column: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.pokemon-litm-suggestion-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pokemon-litm-suggestion-row > button {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
