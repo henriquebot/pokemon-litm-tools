@@ -74,8 +74,11 @@ async function repairActor(actor) {
   };
 
   if (isPokemonVisual(flags)) {
+    // A geometria do Token continua usando a âncora central nativa do Foundry.
+    // O alinhamento "crescer da base para cima" é apenas visual e acontece
+    // no mesh renderizado em alignPokemonTokenArt().
     update["prototypeToken.texture.anchorX"] = 0.5;
-    update["prototypeToken.texture.anchorY"] = 1;
+    update["prototypeToken.texture.anchorY"] = 0.5;
   }
 
   if (visual.portrait) {
@@ -104,35 +107,98 @@ function tokenRepairUpdate(token) {
 
   if (isPokemonVisual(flags)) {
     update["texture.anchorX"] = 0.5;
-    update["texture.anchorY"] = 1;
+    update["texture.anchorY"] = 0.5;
   }
 
   if (visual.portrait) update[`flags.${MODULE_ID}.assets.portrait`] = visual.portrait;
   return update;
 }
 
+function tokenPixelSize(tokenObject) {
+  const document = tokenObject?.document ?? tokenObject;
+  const grid = Number(
+    tokenObject?.scene?.grid?.size
+    ?? document?.parent?.grid?.size
+    ?? canvas?.grid?.size
+    ?? canvas?.dimensions?.size
+    ?? 100
+  );
+
+  const width = Number(tokenObject?.w)
+    || Math.max(1, Number(document?.width ?? 1)) * grid;
+  const height = Number(tokenObject?.h)
+    || Math.max(1, Number(document?.height ?? 1)) * grid;
+
+  return { width, height };
+}
+
+function alignPokemonTokenArt(tokenObject) {
+  const document = tokenObject?.document ?? tokenObject;
+  if (!document) return;
+
+  const flags = tokenFlags(document);
+  if (!isPokemonVisual(flags)) return;
+
+  const mesh = tokenObject?.mesh ?? tokenObject?.icon ?? null;
+  if (!mesh || mesh.destroyed) return;
+
+  const { width, height } = tokenPixelSize(tokenObject);
+  const visual = visualData(flags);
+  const scaleY = Math.abs(Number(document?.texture?.scaleY ?? visual?.scale ?? 1)) || 1;
+
+  let artHeight = Number(mesh.height);
+  if (!Number.isFinite(artHeight) || artHeight <= 0) {
+    artHeight = height * scaleY;
+  }
+
+  try {
+    mesh.anchor?.set?.(0.5, 0.5);
+
+    // mesh.position é local ao Token. O centro horizontal continua no centro
+    // do footprint e a borda inferior da arte coincide com a base do Token.
+    mesh.position?.set?.(
+      width / 2,
+      height - artHeight / 2
+    );
+  } catch (error) {
+    console.warn("Pokemon LITM Tools | Alinhando arte do Token:", error);
+  }
+}
+
+function schedulePokemonTokenArt(tokenObject) {
+  if (!tokenObject) return;
+  requestAnimationFrame(() => alignPokemonTokenArt(tokenObject));
+  setTimeout(() => alignPokemonTokenArt(tokenObject), 50);
+}
+
 async function repairScene(scene) {
   if (!isAuthority() || !scene) return;
   const updates = scene.tokens.map(tokenRepairUpdate).filter(Boolean);
-  if (!updates.length) return;
 
-  await scene.updateEmbeddedDocuments("Token", updates, {
-    pokemonVisualRepair: true,
-    follower_updates: [],
-    animate: false
-  });
+  if (updates.length) {
+    await scene.updateEmbeddedDocuments("Token", updates, {
+      pokemonVisualRepair: true,
+      follower_updates: [],
+      animate: false
+    });
+  }
+
+  for (const token of canvas?.tokens?.placeables ?? []) {
+    schedulePokemonTokenArt(token);
+  }
 }
 
 async function repairOneToken(token) {
   if (!isAuthority() || !token?.parent) return;
   const update = tokenRepairUpdate(token);
-  if (!update) return;
-
-  await token.parent.updateEmbeddedDocuments("Token", [update], {
-    pokemonVisualRepair: true,
-    follower_updates: [],
-    animate: false
-  });
+  if (update) {
+    await token.parent.updateEmbeddedDocuments("Token", [update], {
+      pokemonVisualRepair: true,
+      follower_updates: [],
+      animate: false
+    });
+  }
+  schedulePokemonTokenArt(token.object ?? canvas?.tokens?.get?.(token.id));
 }
 
 async function repairWorldActors() {
@@ -161,10 +227,31 @@ export function activatePokemonVisualStability() {
 
   Hooks.on("canvasReady", canvasInstance => {
     void repairScene(canvasInstance?.scene ?? canvas?.scene);
+    for (const token of canvas?.tokens?.placeables ?? []) schedulePokemonTokenArt(token);
   });
+
+  Hooks.on("drawToken", tokenObject => schedulePokemonTokenArt(tokenObject));
+  Hooks.on("refreshToken", tokenObject => schedulePokemonTokenArt(tokenObject));
 
   Hooks.on("createToken", (token, options) => {
     if (!options?.pokemonVisualRepair) void repairOneToken(token);
+    else schedulePokemonTokenArt(token.object ?? canvas?.tokens?.get?.(token.id));
+  });
+
+  Hooks.on("updateToken", (token, changes, options) => {
+    if (!options?.pokemonVisualRepair && isAuthority()) {
+      const moduleChanges = changes?.flags?.[MODULE_ID];
+      if (
+        moduleChanges?.assets !== undefined
+        || moduleChanges?.animation !== undefined
+        || moduleChanges?.tokenScale !== undefined
+        || changes?.texture !== undefined
+      ) {
+        void repairOneToken(token);
+        return;
+      }
+    }
+    schedulePokemonTokenArt(token.object ?? canvas?.tokens?.get?.(token.id));
   });
 
   Hooks.on("updateActor", (actor, changes, options) => {

@@ -55,6 +55,11 @@ import {
   pokemonLitmCombatSelfTest
 } from "./pokemon-combat-effects.js";
 
+import {
+  activatePokemonGuidedFlow,
+  pokemonGuidedFlowSelfTest
+} from "./pokemon-guided-flow.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
@@ -97,7 +102,8 @@ Hooks.once("init", () => {
     cleanupPokemonInstance,
     deletePokemonCombatProjection,
     migratePokemonChallengesLitmFirst,
-    pokemonLitmCombatSelfTest
+    pokemonLitmCombatSelfTest,
+    pokemonGuidedFlowSelfTest
   };
 });
 
@@ -249,6 +255,7 @@ Hooks.on(
 Hooks.once("ready", () => {
 
   activatePokemonCombatLayer();
+  activatePokemonGuidedFlow();
   activatePokemonCombatEffects();
 
   if (

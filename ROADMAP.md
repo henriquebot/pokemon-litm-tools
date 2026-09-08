@@ -75,6 +75,10 @@
 - [x] Tags flutuantes riscadas por Spend permanecem na ficha como queimadas/cinzas e podem ser recuperadas; o X vermelho restaura o estado anterior
 - [x] Challenge Pokémon usa FERIDO/WOUND como Limit de dano, deixando derrotado como consequência do Limit atingido
 - [x] Pokémon com todos os targets imunes ao tipo do Move não recebe modificador automático de Defesa/Defesa Especial daquele ataque
+- [x] Discover guiado: jogador pergunta, GM revela a informação e o resultado fica registrado em mini-card
+- [x] Extra Feat guiado e Tag de uso único restrita ao último Power, com queima automática após uso
+- [x] Consequência guiada do GM em Detailed Rolls com consequência: Challenges ativos, Ameaça/Consequência, alvos e tier
+- [x] Efetividade de Challenge contra Actor é limitada a +1 / 0 / -1 tier ou imunidade, evitando empurrar consequência comum para tier 5/6 só por tipagem
 - [ ] Integrar Sacrifice nativo do LitM como clímax Pokémon, sem ultimate próprio
 - [ ] Expandir Reaction Roll com Speed, Tags relevantes e ameaças do Challenge
 
@@ -82,10 +86,11 @@
 - [ ] Recolher Pokémon com efeito cinematográfico de retorno à Pokébola
 - [ ] VFX automático de golpes por moveId via Pokémon Showdown como provider principal, preparado para futuras gerações
 - [ ] JB2A, Eskie e outros packs de VFX permanecem apenas opcionais/fallback
+- [x] JB2A resolve variante compatível com a cor do tipo no próprio caminho do Database; assets genéricos sem variante correta caem no fallback nativo em vez de receber tint sobre uma animação já colorida
 
 ## Backlog — Configurações do módulo
 - [ ] Tabelas configuráveis pelo mestre: auditar listas relevantes hoje presas no código/JSON e expor nas Configurações do módulo as decisões de design/balanceamento/nomenclatura que façam sentido personalizar, sempre com defaults e “Restaurar padrões”. Incluir Tipo → fase/Limit de Boss, DEF/SDEF/SPD → fase/Limit, frequência narrativa de efeitos, Might → consequência-base, efetividade → ajuste de tier, Tags derivadas de Stats, condições reconhecidas, faixas de esforço/PP, cores/VFX por tipo e sugestões de consequências/efeitos.
-- [ ] Boss em Fases: botão no header do Challenge Pokémon; manter o Challenge atual como fase final e gerar uma Fase 1 por DEF/SDEF/SPD ou por obstáculo temático de Tipo quando houver uma proposta ficcional forte. Defaults de nome/Limit devem ser editáveis nas Configurações do módulo.
+- [x] Boss em Fases: botão no header do Challenge Pokémon; mantém o Challenge atual como fase final, gera Fase 1 por Tipo ou DEF/SDEF/SPD, permite editar nome/Limit/tier antes de criar e oferece avanço para Fase 2 ao superar o Limit. A edição global dos defaults continua na fila de Configurações.
 - [ ] Opção de mundo para rolar a chance percentual original dos efeitos secundários (ex.: Paralisia (10%) → 1d100), mantendo o modo narrativo como padrão; permitir ocultar a rolagem do chat e desativar Dice So Nice/dados 3D separadamente.
 - [ ] Fazer uma auditoria completa de regras, automações e comportamentos atualmente fixos para decidir o que deve virar opção configurável do módulo, com defaults sensatos e escopo correto (mundo ou cliente). Revisar especialmente combate (ex.: exigir Rolagem Detalhada ao usar Tag de Golpe), targeting, consequências do Narrador, visibilidade, aplicação automática de efeitos, followers, VFX/áreas, interface e comportamentos padrão.
 - [ ] Guia Effects nas Configurações: editar VFX por golpe, testar, restaurar padrão e exportar presets modificados para JSON versionável no Git.

@@ -71,16 +71,56 @@ const TYPE_COLORS = {
 };
 
 const JB2A_PATHS = {
-  fire: ["jb2a.fire_bolt.orange", "jb2a.fire_bolt"],
-  ice: ["jb2a.ray_of_frost", "jb2a.ice_shard"],
-  electric: ["jb2a.lightning_bolt", "jb2a.chain_lightning"],
-  poison: ["jb2a.poison_spray"],
-  psychic: ["jb2a.energy_beam"],
-  grass: ["jb2a.energy_beam", "jb2a.entangle"],
+  fire: ["jb2a.fire_bolt"],
   water: ["jb2a.water_bolt"],
+  electric: ["jb2a.lightning_bolt", "jb2a.chain_lightning"],
+  grass: ["jb2a.energy_beam", "jb2a.entangle"],
+  ice: ["jb2a.ray_of_frost", "jb2a.ice_shard"],
   fighting: ["jb2a.unarmed_strike"],
+  poison: ["jb2a.poison_spray", "jb2a.energy_beam"],
+  ground: ["jb2a.boulder_toss", "jb2a.bullet.01"],
+  flying: ["jb2a.gust_of_wind", "jb2a.bullet.01"],
+  psychic: ["jb2a.energy_beam"],
+  bug: ["jb2a.energy_beam", "jb2a.bullet.01"],
+  rock: ["jb2a.boulder_toss", "jb2a.bullet.01"],
+  ghost: ["jb2a.eldritch_blast", "jb2a.energy_beam"],
+  dragon: ["jb2a.energy_beam"],
+  dark: ["jb2a.eldritch_blast", "jb2a.energy_beam"],
+  steel: ["jb2a.bullet.01"],
+  fairy: ["jb2a.energy_beam"],
   normal: ["jb2a.bullet.01"]
 };
+
+const JB2A_TYPE_COLOR_KEYS = {
+  fire: ["orange", "red", "fire"],
+  water: ["blue", "water"],
+  electric: ["yellow", "orange", "electric"],
+  grass: ["green", "nature"],
+  ice: ["blue", "cyan", "ice", "frost"],
+  fighting: ["red", "orange", "physical"],
+  poison: ["purple", "green", "poison"],
+  ground: ["brown", "orange", "earth"],
+  flying: ["white", "blue", "wind"],
+  psychic: ["pink", "purple", "magenta"],
+  bug: ["green", "yellow"],
+  rock: ["brown", "orange", "stone"],
+  ghost: ["purple", "dark", "ghost"],
+  dragon: ["purple", "blue", "dragon"],
+  dark: ["dark", "purple", "black"],
+  steel: ["white", "silver", "blue"],
+  fairy: ["pink", "purple", "rainbow"],
+  normal: ["white", "physical"]
+};
+
+const JB2A_INHERENT_TYPE_PATHS = new Set([
+  "jb2a.fire_bolt",
+  "jb2a.water_bolt",
+  "jb2a.ray_of_frost",
+  "jb2a.ice_shard",
+  "jb2a.poison_spray",
+  "jb2a.gust_of_wind",
+  "jb2a.boulder_toss"
+]);
 
 function authorityGM() {
   return game.users
@@ -385,6 +425,15 @@ function multiplierFor(actor, moveType) {
   );
 }
 
+export function challengeConsequenceTierDelta(multiplier) {
+  const value = Number(multiplier ?? 1);
+  if (!Number.isFinite(value)) return 0;
+  if (value === 0) return null;
+  if (value > 1) return 1;
+  if (value > 0 && value < 1) return -1;
+  return 0;
+}
+
 function matchupLabel(multiplier) {
   const value = Number(multiplier ?? 1);
   if (value === 0) return "Imune";
@@ -519,54 +568,50 @@ function sequenceAvailable() {
     && typeof globalThis.Sequence === "function";
 }
 
-function databasePath(candidates) {
-  if (!sequenceAvailable()) {
-    return null;
-  }
+function databasePath(candidates, type = "normal") {
+  if (!sequenceAvailable()) return null;
 
-  const database =
-    globalThis
-      .Sequencer
-      ?.Database;
+  const database = globalThis.Sequencer?.Database;
+  const entryExists = database?.entryExists;
+  const getPathsUnder = database?.getPathsUnder;
+  const colors = JB2A_TYPE_COLOR_KEYS[String(type ?? "normal")] ?? [];
 
-  const entryExists =
-    database
-      ?.entryExists;
-
-  for (
-    const path
-    of candidates
-      ?? []
-  ) {
+  const exists = path => {
     try {
-      if (
-        typeof entryExists
-          === "function"
-      ) {
-        if (
-          entryExists.call(
-            database,
-            path
-          )
-        ) {
-          return path;
-        }
-
-        continue;
+      if (typeof entryExists === "function") {
+        return entryExists.call(database, path) === true;
       }
+      return !!database?.getEntry?.(path, { softFail: true });
+    } catch {
+      return false;
+    }
+  };
 
-      if (
-        database
-          ?.getEntry
-          ?.(path, {
-            softFail:
-              true
-          })
-      ) {
-        return path;
+  for (const root of candidates ?? []) {
+    let discovered = [];
+    try {
+      if (typeof getPathsUnder === "function") {
+        const found = getPathsUnder.call(database, root, true);
+        if (Array.isArray(found)) discovered = found;
+        else if (found && typeof found[Symbol.iterator] === "function") discovered = [...found];
       }
-
     } catch {}
+
+    const typed = discovered.find(path => {
+      const lower = String(path).toLowerCase();
+      return colors.some(color => lower.includes(color));
+    });
+    if (typed && exists(typed)) return typed;
+
+    for (const color of colors) {
+      const explicit = root + "." + color;
+      if (exists(explicit)) return explicit;
+    }
+
+    // Assets cujo próprio nome já representa claramente o tipo podem ser
+    // usados sem recoloração. Para assets genéricos, se não existir variante
+    // da cor correta, caímos no pulso nativo da cor do tipo.
+    if (JB2A_INHERENT_TYPE_PATHS.has(root) && exists(root)) return root;
   }
 
   return null;
@@ -704,7 +749,8 @@ async function playMoveVfxLocal(sceneId, sourceTokenId, targetTokenIds, type) {
     const path =
       databasePath(
         JB2A_PATHS[type]
-        ?? []
+        ?? [],
+        type
       );
 
     const externalTargets =
@@ -737,7 +783,7 @@ async function playMoveVfxLocal(sceneId, sourceTokenId, targetTokenIds, type) {
         ) {
           seq.effect()
             .file(path)
-            .tint(typeColor(type))
+
             .atLocation(
               tokenObject(source)
               ?? source
@@ -864,7 +910,8 @@ async function playMoveVfxAtPointLocal(
     const path =
       databasePath(
         JB2A_PATHS[type]
-        ?? []
+        ?? [],
+        type
       );
 
     if (
@@ -884,7 +931,7 @@ async function playMoveVfxAtPointLocal(
 
         seq.effect()
           .file(path)
-          .tint(typeColor(type))
+
           .atLocation(
             tokenObject(source)
             ?? source
@@ -1756,6 +1803,91 @@ async function toggleFloatingTagSpendDelta(
   };
 }
 
+function themeTagSpendState(entry, field) {
+  if (!entry) return { present: false };
+  return floatingSpendState({
+    ...entry,
+    isStatus: false,
+    value: 0,
+    positive: field === "powertags"
+  });
+}
+
+function themeTagSpendDocument(actor, selector) {
+  if (!actor || selector?.storage !== "theme") return null;
+  const item = actor.items?.get?.(selector.itemId) ?? null;
+  const field = selector.field === "weaknesstags" ? "weaknesstags" : "powertags";
+  const index = Number(selector.index);
+  if (!item || !Number.isInteger(index) || index < 0) return null;
+  return { item, field, index };
+}
+
+async function toggleThemeTagSpendDelta(actor, selector) {
+  const resolved = themeTagSpendDocument(actor, selector);
+  if (!resolved) return { applied: false, unchanged: true };
+  const { item, field, index } = resolved;
+  const current = foundry.utils.deepClone(item.system?.[field] ?? []);
+  const beforeEntry = current[index] ? foundry.utils.deepClone(current[index]) : null;
+  if (!beforeEntry) return { applied: false, unchanged: true };
+
+  const expectedName = moveIdentity(selector?.name);
+  if (expectedName && moveIdentity(beforeEntry?.name) !== expectedName) {
+    return { applied: false, unchanged: true };
+  }
+
+  const before = themeTagSpendState(beforeEntry, field);
+  const afterEntry = foundry.utils.deepClone(beforeEntry);
+  afterEntry.burned = beforeEntry?.burned !== true;
+  afterEntry.selected = false;
+  afterEntry.toBurn = false;
+  current[index] = afterEntry;
+  await item.update({ ["system." + field]: current });
+
+  return {
+    applied: true,
+    storage: "theme",
+    documentId: item.id,
+    documentName: "Item",
+    themeItemId: item.id,
+    themeField: field,
+    themeIndex: index,
+    before,
+    beforeEntry,
+    after: themeTagSpendState(afterEntry, field),
+    afterEntry: foundry.utils.deepClone(afterEntry)
+  };
+}
+
+function themeSpendOptionsForActor(label, destination, actor) {
+  const rows = [];
+  for (const item of actor?.items ?? []) {
+    if (item.type !== "themebook") continue;
+    for (const field of ["powertags", "weaknesstags"]) {
+      const positive = field === "powertags";
+      const tags = Array.isArray(item.system?.[field]) ? item.system[field] : [];
+      tags.forEach((entry, index) => {
+        if (!entry?.name || entry?.planned === true || entry?.expired === true) return;
+        const state = themeTagSpendState(entry, field);
+        rows.push({
+          label: label + " · " + item.name + " · " + String(entry.name),
+          action: state.burned ? "Recuperar" : "Riscar",
+          destination,
+          state,
+          selector: {
+            storage: "theme",
+            itemId: item.id,
+            field,
+            index,
+            name: state.name,
+            positive
+          }
+        });
+      });
+    }
+  }
+  return rows;
+}
+
 async function reduceFloatingStatusSpendDelta(document, selector, amount) {
   const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
   const wanted = {
@@ -1798,6 +1930,61 @@ function spendTargetDocument(scene, row) {
   if (row?.targetKind === "scene") return game.items.get(row.documentId) ?? null;
   if (row?.tokenId) return scene?.tokens?.get(row.tokenId)?.actor ?? null;
   return row?.actorId ? game.actors.get(row.actorId) : null;
+}
+
+function spendRollbackPlan(scene, row) {
+  const targetActor = row?.tokenId
+    ? scene?.tokens?.get(row.tokenId)?.actor ?? null
+    : row?.actorId
+      ? game.actors.get(row.actorId) ?? null
+      : null;
+
+  if (row?.storage === "theme") {
+    const item = targetActor?.items?.get?.(row.themeItemId) ?? null;
+    const field = row.themeField === "weaknesstags" ? "weaknesstags" : "powertags";
+    const index = Number(row.themeIndex);
+    if (!item || !Number.isInteger(index) || index < 0) return null;
+    const current = foundry.utils.deepClone(item.system?.[field] ?? []);
+    const currentState = themeTagSpendState(current[index] ?? null, field);
+    return { kind: "theme", document: item, field, index, current, currentState, row };
+  }
+
+  const document = row?.targetKind === "scene"
+    ? game.items.get(row.documentId) ?? null
+    : targetActor;
+  if (!document) return null;
+  const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
+  const identity = row.after?.present ? row.after : row.before;
+  const index = current.findIndex(entry => sameFloatingSpendIdentity(entry, identity));
+  const currentState = floatingSpendState(index >= 0 ? current[index] : null);
+  return { kind: "floating", document, index, current, currentState, row };
+}
+
+async function writeSpendRollbackState(plan, stateName) {
+  const row = plan.row;
+  const wanted = row?.[stateName];
+  const wantedEntry = row?.[stateName + "Entry"];
+
+  if (plan.kind === "theme") {
+    const current = foundry.utils.deepClone(plan.document.system?.[plan.field] ?? []);
+    if (!wanted?.present || !wantedEntry) {
+      throw new Error("Tag de Theme ausente durante rollback.");
+    }
+    current[plan.index] = foundry.utils.deepClone(wantedEntry);
+    await plan.document.update({ ["system." + plan.field]: current });
+    return;
+  }
+
+  const current = foundry.utils.deepClone(plan.document.system?.floatingTagsAndStatuses ?? []);
+  const identity = row.after?.present ? row.after : row.before;
+  const index = current.findIndex(entry => sameFloatingSpendIdentity(entry, identity));
+  if (wanted?.present) {
+    if (index >= 0) current[index] = foundry.utils.deepClone(wantedEntry);
+    else current.push(foundry.utils.deepClone(wantedEntry));
+  } else if (index >= 0) {
+    current.splice(index, 1);
+  }
+  await plan.document.update({ "system.floatingTagsAndStatuses": current });
 }
 
 
@@ -1897,7 +2084,9 @@ async function applyContextSpendDirect(payload) {
         );
         delta = await applyFloatingSpendDelta(target.document, targetEffect, multiplier);
       } else if (mode === "toggle-tag" || mode === "remove-tag") {
-        delta = await toggleFloatingTagSpendDelta(target.document, payload.selector);
+        delta = payload.selector?.storage === "theme" && target.targetKind === "actor"
+          ? await toggleThemeTagSpendDelta(target.document, payload.selector)
+          : await toggleFloatingTagSpendDelta(target.document, payload.selector);
       } else if (mode === "reduce-status") {
         delta = await reduceFloatingStatusSpendDelta(target.document, payload.selector, payload.amount);
       }
@@ -1930,22 +2119,18 @@ async function rollbackContextSpendDirect(payload) {
   const conflicts = [];
   const plans = [];
 
-  // Fase 1: valida TODOS os destinos antes de escrever qualquer coisa.
+  // Fase 1: valida todos os destinos antes de escrever qualquer coisa.
   for (const row of payload.application?.rows ?? []) {
-    const document = spendTargetDocument(scene, row);
-    if (!document) {
+    const plan = spendRollbackPlan(scene, row);
+    if (!plan) {
       conflicts.push("destino ausente");
       continue;
     }
-    const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
-    const identity = row.after?.present ? row.after : row.before;
-    const index = current.findIndex(entry => sameFloatingSpendIdentity(entry, identity));
-    const currentState = floatingSpendState(index >= 0 ? current[index] : null);
-    if (!sameFloatingSpendState(currentState, row.after)) {
+    if (!sameFloatingSpendState(plan.currentState, row.after)) {
       conflicts.push((row.before?.name || row.after?.name || "efeito") + " mudou desde o gasto");
       continue;
     }
-    plans.push({ document, row });
+    plans.push(plan);
   }
 
   if (conflicts.length) {
@@ -1955,37 +2140,15 @@ async function rollbackContextSpendDirect(payload) {
   const completed = [];
   try {
     for (const plan of plans) {
-      const { document, row } = plan;
-      const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
-      const identity = row.after?.present ? row.after : row.before;
-      const index = current.findIndex(entry => sameFloatingSpendIdentity(entry, identity));
-
-      if (row.before?.present) {
-        if (index >= 0) current[index] = foundry.utils.deepClone(row.beforeEntry);
-        else current.push(foundry.utils.deepClone(row.beforeEntry));
-      } else if (index >= 0) {
-        current.splice(index, 1);
-      }
-
-      await document.update({ "system.floatingTagsAndStatuses": current });
+      await writeSpendRollbackState(plan, "before");
       completed.push(plan);
     }
   } catch (error) {
-    // Compensação: se uma escrita de rollback falhar, devolve os destinos
-    // já restaurados ao estado pós-gasto para evitar rollback parcial.
+    // Se uma escrita falhar, recoloca os destinos já restaurados no estado
+    // pós-gasto. O ledger só é removido quando todo o rollback é seguro.
     for (const plan of completed.reverse()) {
       try {
-        const { document, row } = plan;
-        const current = foundry.utils.deepClone(document.system?.floatingTagsAndStatuses ?? []);
-        const identity = row.before?.present ? row.before : row.after;
-        const index = current.findIndex(entry => sameFloatingSpendIdentity(entry, identity));
-        if (row.after?.present) {
-          if (index >= 0) current[index] = foundry.utils.deepClone(row.afterEntry);
-          else current.push(foundry.utils.deepClone(row.afterEntry));
-        } else if (index >= 0) {
-          current.splice(index, 1);
-        }
-        await document.update({ "system.floatingTagsAndStatuses": current });
+        await writeSpendRollbackState(plan, "after");
       } catch (compensationError) {
         console.error("Pokemon LITM Tools | compensação de rollback:", compensationError);
       }
@@ -1993,7 +2156,9 @@ async function rollbackContextSpendDirect(payload) {
     throw error;
   }
 
-  return { restored: plans.map(plan => plan.row.documentId) };
+  return {
+    restored: plans.map(plan => plan.row.documentId ?? plan.row.actorId ?? plan.row.tokenId)
+  };
 }
 
 
@@ -2103,6 +2268,7 @@ async function socketRequest(message) {
     else if (message.action === "remove-status") result = await removeFloatingStatusDirect(message.payload);
     else if (message.action === "delete-combat") result = await deleteCombatProjectionDirect(message.payload);
     else if (message.action === "cleanup-instance") result = await cleanupPokemonInstanceDirect(message.payload);
+    else if (message.action === "guided-consequence") result = await applyGuidedChallengeConsequenceDirect(message.payload);
     else return;
 
     game.socket.emit(SOCKET_NAME, {
@@ -2218,6 +2384,7 @@ function requestAuthority(action, payload) {
     if (action === "remove-status") return removeFloatingStatusDirect(payload);
     if (action === "delete-combat") return deleteCombatProjectionDirect(payload);
     if (action === "cleanup-instance") return cleanupPokemonInstanceDirect(payload);
+    if (action === "guided-consequence") return applyGuidedChallengeConsequenceDirect(payload);
   }
 
   const requestId = randomId();
@@ -5181,7 +5348,7 @@ async function offerChallengeReaction(
       );
 
     const delta =
-      effectivenessTierDelta(
+      challengeConsequenceTierDelta(
         multiplier
       );
 
@@ -5644,63 +5811,117 @@ async function applyChallengeEffect(
 ) {
   if (!game.user.isGM) return;
 
-  const targetKind =
-    String(
-      effect?.target
-      ?? "target"
-    )
-      .toLowerCase();
-
-  if (
-    targetKind === "scene"
-  ) {
+  const targetKind = String(effect?.target ?? "target").toLowerCase();
+  if (targetKind === "scene") {
     ui.notifications.info(
       "Este efeito altera o campo. Use a Area como referencia visual e resolva o efeito na ficcao."
     );
-
     return;
   }
 
-  if (
-    targetKind === "self"
-  ) {
-    await applyEffectsToActor(
-      sourceActor,
-      [effect],
-      1,
-      3
-    );
-
+  if (targetKind === "self") {
+    await applyEffectsToActor(sourceActor, [effect], 1, 3);
     return;
   }
 
-  const targets =
-    targetDocuments();
-
+  const targets = targetDocuments();
   if (!targets.length) {
-    ui.notifications.warn(
-      "Marque pelo menos um alvo antes de aplicar o efeito."
-    );
-
+    ui.notifications.warn("Marque pelo menos um alvo antes de aplicar o efeito.");
     return;
   }
 
-  for (
-    const token
-    of targets
-  ) {
-    if (!token.actor) continue;
+  const sourceToken = sourceTokenForActor(sourceActor);
+  await applyGuidedChallengeConsequence({
+    sceneId: canvas.scene.id,
+    sourceActorId: sourceActor.id,
+    sourceTokenId: sourceToken?.id ?? null,
+    moveId: move?.id ?? null,
+    targetTokenIds: targets.map(token => token.id),
+    effect: foundry.utils.deepClone(effect)
+  });
+}
 
-    await applyEffectsToActor(
-      token.actor,
-      [effect],
-      multiplierFor(
-        token.actor,
-        move?.type ?? "normal"
-      ),
-      3
-    );
+async function applyGuidedChallengeConsequenceDirect(payload) {
+  if (!isAuthority()) throw new Error("Somente o GM ativo pode aplicar consequências guiadas.");
+  const scene = game.scenes.get(payload.sceneId);
+  if (!scene) throw new Error("Cena da consequência não encontrada.");
+
+  const sourceToken = payload.sourceTokenId ? scene.tokens.get(payload.sourceTokenId) ?? null : null;
+  const sourceActor = sourceToken?.actor
+    ?? (payload.sourceActorId ? game.actors.get(payload.sourceActorId) : null);
+  const move = sourceActor && payload.moveId
+    ? await resolveMoveForActor(sourceActor, payload.moveId)
+    : null;
+  const effect = foundry.utils.deepClone(payload.effect ?? {});
+  if (!effect?.name) throw new Error("Consequência inválida.");
+
+  const baseLevel = Math.max(1, Math.min(6, Number(effect.level ?? 1) || 1));
+  const report = [];
+
+  for (const tokenId of payload.targetTokenIds ?? []) {
+    const token = scene.tokens.get(tokenId);
+    const actor = token?.actor ?? null;
+    if (!actor) continue;
+
+    let multiplier = 1;
+    let delta = 0;
+    if (move) {
+      multiplier = multiplierFor(actor, move.type ?? "normal");
+      if (multiplier === 0) {
+        report.push({
+          actorId: actor.id,
+          tokenId: token.id,
+          targetName: token.name ?? actor.name,
+          multiplier,
+          multiplierLabel: matchupLabel(multiplier),
+          immune: true,
+          applied: []
+        });
+        continue;
+      }
+      if (String(effect.source ?? "") === "damage") {
+        delta = challengeConsequenceTierDelta(multiplier) ?? 0;
+      }
+    }
+
+    const finalLevel = baseLevel + delta;
+    if (finalLevel <= 0) {
+      report.push({
+        actorId: actor.id,
+        tokenId: token.id,
+        targetName: token.name ?? actor.name,
+        multiplier,
+        multiplierLabel: matchupLabel(multiplier),
+        resisted: true,
+        applied: []
+      });
+      continue;
+    }
+
+    const finalEffect = {
+      ...effect,
+      level: Math.min(6, finalLevel),
+      source: String(effect.source ?? "") === "damage"
+        ? "guided-challenge-damage"
+        : effect.source
+    };
+    const applied = await applyEffectsToActor(actor, [finalEffect], 1, 3);
+    report.push({
+      actorId: actor.id,
+      tokenId: token.id,
+      targetName: token.name ?? actor.name,
+      multiplier,
+      multiplierLabel: move ? matchupLabel(multiplier) : "",
+      finalLevel: finalEffect.level,
+      applied
+    });
   }
+
+  return { report };
+}
+
+export function applyGuidedChallengeConsequence(payload) {
+  return requestAuthority("guided-consequence", payload);
 }
 
 
@@ -7745,7 +7966,7 @@ function pokemonSuggestedEffectAllowed(move, effect, frozenTargetIds) {
   return pokemonSuggestedEligibleIds(move, effect, frozenTargetIds).length > 0;
 }
 
-async function commitContextSpend(message, entry, applyPayload) {
+export async function commitContextSpend(message, entry, applyPayload) {
   const data = foundry.utils.deepClone(message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend"));
   if (!data) throw new Error("A mensagem não possui Detailed Spend.");
   const cost = Math.max(1, Number(entry.cost ?? 1) || 1);
@@ -7933,25 +8154,45 @@ function currentFloatingSpendOptions(sourceToken, frozenTargetIds, wantStatus) {
     for (const entry of document?.system?.floatingTagsAndStatuses ?? []) {
       const state = floatingSpendState(entry);
       if (!state.present || state.isStatus !== wantStatus) continue;
-      const action =
-        state.isStatus
-          ? ""
-          : state.burned
-            ? "Recuperar"
-            : "Riscar";
+      const action = state.isStatus ? "" : state.burned ? "Recuperar" : "Riscar";
       rows.push({
         label: label + " · " + String(entry.name ?? "efeito") + (state.isStatus ? "-" + state.value : ""),
         action,
         destination,
-        state
+        state,
+        selector: {
+          storage: "floating",
+          name: state.name,
+          positive: state.positive
+        }
       });
     }
+
+    if (!wantStatus && document?.documentName === "Actor") {
+      rows.push(...themeSpendOptionsForActor(label, destination, document));
+    }
   };
+
   for (const token of targetDocuments(frozenTargetIds)) {
-    addDocument(token.name ?? token.actor?.name ?? "Alvo", { kind: "targets", tokenIds: [token.id] }, token.actor);
+    addDocument(
+      token.name ?? token.actor?.name ?? "Alvo",
+      { kind: "targets", tokenIds: [token.id] },
+      token.actor
+    );
   }
-  if (sourceToken) addDocument("Usuário do golpe", { kind: "self" }, sourceToken.actor ?? sourceToken.document?.actor);
-  const sceneItem = game.items.find(item => item.type === "scene-data" && item.system?.sceneKey === canvas?.scene?.id);
+
+  if (sourceToken) {
+    addDocument(
+      "Usuário do golpe",
+      { kind: "self" },
+      sourceToken.actor ?? sourceToken.document?.actor
+    );
+  }
+
+  const sceneItem = game.items.find(item =>
+    item.type === "scene-data"
+    && item.system?.sceneKey === canvas?.scene?.id
+  );
   if (sceneItem) addDocument("Cena", { kind: "scene" }, sceneItem);
   return rows;
 }
@@ -7998,106 +8239,55 @@ async function promptReduceExistingStatus({ message, actor, move, sourceToken, f
 }
 
 async function promptRemoveExistingTag({ message, actor, move, sourceToken, frozenTargetIds }) {
-  const remaining =
-    detailedSpendRemaining(
-      message.getFlag?.(
-        LITM_SYSTEM_ID,
-        "detailedSpend"
-      )
-    );
+  const remaining = detailedSpendRemaining(
+    message.getFlag?.(LITM_SYSTEM_ID, "detailedSpend")
+  );
 
   if (remaining < 2) {
-    throw new Error(
-      "São necessários 2 Power para riscar ou recuperar uma Tag."
-    );
+    throw new Error("São necessários 2 Power para riscar ou recuperar uma Tag.");
   }
 
-  const rows =
-    currentFloatingSpendOptions(
-      sourceToken,
-      frozenTargetIds,
-      false
-    );
-
+  const rows = currentFloatingSpendOptions(sourceToken, frozenTargetIds, false);
   if (!rows.length) {
-    throw new Error(
-      "Não há Tag flutuante disponível para riscar/recuperar."
-    );
+    throw new Error("Não há Tag disponível para riscar/recuperar.");
   }
 
-  const choice =
-    await foundry.applications.api.DialogV2.input({
-      window: {
-        title: "Riscar / recuperar Tag"
-      },
-      content:
-        '<div class="pokemon-context-spend-dialog"><label>Tag<select name="index">'
-        + rows.map(
-            (row, index) =>
-              '<option value="'
-              + index
-              + '">'
-              + esc(
-                  row.action
-                  + ": "
-                  + row.label
-                )
-              + '</option>'
-          ).join("")
-        + '</select></label></div>',
-      ok: {
-        label: "Gastar 2 Power",
-        icon: "fa-solid fa-check"
-      },
-      modal: true
-    });
-
+  const choice = await foundry.applications.api.DialogV2.input({
+    window: { title: "Riscar / recuperar Tag" },
+    content:
+      '<div class="pokemon-context-spend-dialog"><label>Tag<select name="index">'
+      + rows.map((row, index) =>
+          '<option value="' + index + '">' + esc(row.action + ": " + row.label) + '</option>'
+        ).join("")
+      + '</select></label></div>',
+    ok: { label: "Gastar 2 Power", icon: "fa-solid fa-check" },
+    modal: true
+  });
   if (!choice) return;
 
-  const row =
-    rows[
-      Number(
-        choice.index
-      )
-    ];
-
+  const row = rows[Number(choice.index)];
   if (!row) return;
 
   await commitContextSpend(
     message,
     {
       cost: 2,
-      label:
-        row.action
-        + " "
-        + row.label,
-      pokemonMoveId:
-        move?.id
-        ?? null
+      label: row.action + " " + row.label,
+      pokemonMoveId: move?.id ?? null
     },
     {
-      sceneId:
-        canvas.scene.id,
-      sourceActorId:
-        actor.id,
-      sourceTokenId:
-        sourceToken?.id
-        ?? null,
-      moveId:
-        move?.id
-        ?? null,
-      mode:
-        "toggle-tag",
-      destination:
-        row.destination,
-      selector: {
-        name:
-          row.state.name,
-        positive:
-          row.state.positive
-      },
-      pokemonSuggested:
-        false
+      sceneId: canvas.scene.id,
+      sourceActorId: actor.id,
+      sourceTokenId: sourceToken?.id ?? null,
+      moveId: move?.id ?? null,
+      mode: "toggle-tag",
+      destination: row.destination,
+      selector: foundry.utils.deepClone(row.selector ?? {
+        storage: "floating",
+        name: row.state.name,
+        positive: row.state.positive
+      }),
+      pokemonSuggested: false
     }
   );
 }
@@ -8189,7 +8379,7 @@ function wirePokemonNativeSpendControls(context) {
 }
 
 
-async function spendPokemonPower(
+export async function spendPokemonPower(
   message,
   entry
 ) {
@@ -9834,8 +10024,10 @@ export async function pokemonLitmCombatSelfTest() {
     && !onRenderPokemonChatMessage.toString().includes("pokemon-chat-move-header");
 
   checks.typeTintedVfxInstalled =
-    playMoveVfxLocal.toString().includes("tint(typeColor(type))")
-    && playMoveVfxAtPointLocal.toString().includes("tint(typeColor(type))");
+    playMoveVfxLocal.toString().includes("databasePath")
+    && playMoveVfxAtPointLocal.toString().includes("databasePath")
+    && !playMoveVfxLocal.toString().includes("tint(typeColor(type))")
+    && !playMoveVfxAtPointLocal.toString().includes("tint(typeColor(type))");
 
   checks.moveBurnControlInstalled =
     typeof appendPokemonMoveBurnControl
@@ -9917,6 +10109,22 @@ export async function pokemonLitmCombatSelfTest() {
         "allTargetsImmuneToMove"
       );
 
+  checks.themeTagScratchInstalled =
+    typeof toggleThemeTagSpendDelta === "function"
+    && typeof themeSpendOptionsForActor === "function";
+
+  checks.challengeConsequenceCapInstalled =
+    challengeConsequenceTierDelta(4) === 1
+    && challengeConsequenceTierDelta(2) === 1
+    && challengeConsequenceTierDelta(1) === 0
+    && challengeConsequenceTierDelta(0.5) === -1
+    && challengeConsequenceTierDelta(0.25) === -1
+    && challengeConsequenceTierDelta(0) === null;
+
+  checks.guidedConsequenceInstalled =
+    typeof applyGuidedChallengeConsequence === "function"
+    && requestAuthority.toString().includes("guided-consequence");
+
   const ok =
     Object.entries(
       checks
@@ -9937,7 +10145,7 @@ export async function pokemonLitmCombatSelfTest() {
 
   return {
     revision:
-      "2026-09-08-foundation-pulla-v4",
+      "2026-09-08-guided-hotfix-v1",
 
     checks,
     ok
