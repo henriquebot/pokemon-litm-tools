@@ -3690,36 +3690,12 @@ has(
 }
 
 
-/* Pokémon Detailed Spend — aplicação reversível */
+/* Pokémon Detailed Spend — aplicação confirmada */
 .pokemon-litm-applied-state {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  margin-left: 6px;
-}
-
-.pokemon-litm-undo-applied {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  min-width: 18px;
-  height: 16px;
-  min-height: 16px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  line-height: 1;
-  opacity: 0.7;
-  cursor: pointer;
-}
-
-.pokemon-litm-undo-applied:hover {
-  opacity: 1;
+  opacity: .72;
 }
 
 
@@ -3747,4 +3723,141 @@ has(
   box-shadow:
     inset 0 0 0 1px
     var(--color-border-highlight);
+}
+
+
+
+/* Pokemon Roll Side Panel + Compact Chat v0.8.0 */
+.pokemon-litm-roll-window {
+  width: min(780px, 96vw) !important;
+  max-width: 96vw;
+}
+
+.pokemon-litm-roll-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, .85fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.pokemon-litm-roll-native,
+.pokemon-litm-roll-side {
+  min-width: 0;
+}
+
+.pokemon-litm-roll-side.pokemon-litm-roll-package {
+  margin: 0;
+  padding: 10px;
+  align-self: start;
+}
+
+.pokemon-litm-roll-side .pokemon-litm-mechanic-badges {
+  gap: 4px;
+}
+
+.pokemon-chat-move-actions {
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 5px;
+}
+
+.pokemon-chat-move-header {
+  min-height: 20px;
+}
+
+.pokemon-chat-matchup-badges {
+  margin: 0;
+}
+
+.pokemon-chat-move-actions .pokemon-litm-mechanic-badge {
+  padding: 2px 5px;
+  font-size: .72rem;
+}
+
+.pokemon-chat-move-actions button {
+  min-height: 26px;
+  padding: 3px 6px;
+}
+
+.pokemon-litm-spend-panel {
+  display: grid;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.pokemon-litm-spend-heading {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  align-items: baseline;
+}
+
+.pokemon-litm-spend-heading small {
+  grid-column: 1 / -1;
+  opacity: .7;
+}
+
+.pokemon-litm-spend-options {
+  display: grid;
+  gap: 4px;
+}
+
+.pokemon-litm-suggestion-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 6px;
+  align-items: center;
+}
+
+.pokemon-litm-suggestion-option > button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.pokemon-litm-effect-frequency {
+  grid-column: 1;
+  opacity: .82;
+  line-height: 1.2;
+}
+
+.pokemon-litm-recovery-suggestions,
+.pokemon-litm-intrinsic-costs {
+  display: grid;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgb(255 255 255 / .09);
+}
+
+.pokemon-litm-suggestion-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.pokemon-litm-suggestion-row > span {
+  min-width: 0;
+  font-size: .78rem;
+  line-height: 1.2;
+}
+
+.pokemon-litm-applied-state {
+  display: inline-flex;
+  align-items: center;
+  opacity: .72;
+}
+
+@media (max-width: 760px) {
+  .pokemon-litm-roll-window {
+    width: min(560px, 96vw) !important;
+  }
+
+  .pokemon-litm-roll-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pokemon-litm-roll-side {
+    grid-row: 1;
+  }
 }

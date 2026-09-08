@@ -59,7 +59,7 @@
 - [x] Tipagem modifica o Status de dano depois da rolagem e resistência pode reduzir um resultado fraco a zero
 - [x] Prioridade não aumenta dano; prioridade positiva dificulta Reaction e prioridade negativa facilita Reaction
 - [x] Recharge e recoil são custos intrínsecos do Move e não consomem Power do sucesso
-- [x] Undo de efeito compara resumo mecânico de identidade/tier e ignora normalização visual do LitM
+- [x] Undo de aplicação removido: correções posteriores ficam a cargo das ferramentas normais do LitM, evitando snapshots frágeis em Actors sintéticos
 - [x] Burn aplicado no Combat Actor é sincronizado de volta ao Theme Pokémon original
 - [x] Challenges Pokémon antigos recebem refresh automático das Threats quando a revisão semântica muda
 - [x] Might define a escala ficcional e substitui tiers de consequência derivados de Base Power nos Challenges
@@ -68,6 +68,10 @@
 - [x] Moves dependentes de Speed usam comparação contextual, sem reproduzir fórmula de Base Power
 - [x] PP vira metadado de esforço/sustentabilidade e orienta o UX de Burn; sem contador de PP
 - [x] Integrar Burn de Tag ao UX Pokémon para esforço extremo usando a regra nativa do LitM (+3 em vez de +1 e Tag riscada após a rolagem)
+- [x] Pokémon Roll Side Panel em duas colunas para Quick, Detailed e Reaction Roll, com fallback responsivo
+- [x] Compact Pokémon Chat Cards: metadata redundante removida do chat e resolução mais curta
+- [x] Suggested Consequences no Detailed Spend, separando frequência narrativa do botão que aplica o efeito mecânico
+- [x] Quando um alvo já possui Status negativo passageiro, sugerir narrativamente que ele se recuperou e oferecer remoção explícita do Status
 - [ ] Integrar Sacrifice nativo do LitM como clímax Pokémon, sem ultimate próprio
 - [ ] Expandir Reaction Roll com Speed, Tags relevantes e ameaças do Challenge
 
@@ -77,6 +81,7 @@
 - [ ] JB2A, Eskie e outros packs de VFX permanecem apenas opcionais/fallback
 
 ## Backlog — Configurações do módulo
+- [ ] Opção de mundo para rolar a chance percentual original dos efeitos secundários (ex.: Paralisia (10%) → 1d100), mantendo o modo narrativo como padrão; permitir ocultar a rolagem do chat e desativar Dice So Nice/dados 3D separadamente.
 - [ ] Fazer uma auditoria completa de regras, automações e comportamentos atualmente fixos para decidir o que deve virar opção configurável do módulo, com defaults sensatos e escopo correto (mundo ou cliente). Revisar especialmente combate (ex.: exigir Rolagem Detalhada ao usar Tag de Golpe), targeting, consequências do Narrador, visibilidade, aplicação automática de efeitos, followers, VFX/áreas, interface e comportamentos padrão.
 - [ ] Guia Effects nas Configurações: editar VFX por golpe, testar, restaurar padrão e exportar presets modificados para JSON versionável no Git.
 - [ ] Hierarquia de VFX: override do mundo → preset oficial do golpe → preset do tipo → fallback nativo.
