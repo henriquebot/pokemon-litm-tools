@@ -18,7 +18,8 @@ import {
   fetchPokeJson,
   pokemonGenusLabel,
   statPowerText,
-  statWeaknessText
+  statWeaknessText,
+  moveSpeedRule
 } from "./pokemon-content.js";
 
 const MODULE_ID = "pokemon-litm-tools";
@@ -1405,6 +1406,127 @@ function restoreMatchingFloatingEffects(
 }
 
 
+function stableFloatingEffectState(
+  entry
+) {
+  const identity =
+    floatingEffectIdentity(
+      entry
+    );
+
+  const markings =
+    Array.isArray(
+      entry?.markings
+    )
+      ? entry.markings
+      : [];
+
+  let markedLevel = 0;
+
+  for (
+    let index = 0;
+    index < markings.length;
+    index++
+  ) {
+    if (
+      markings[index]
+        === true
+    ) {
+      markedLevel =
+        Math.max(
+          markedLevel,
+          index + 1
+        );
+    }
+  }
+
+  const numericLevel =
+    Number(
+      entry?.value
+      ?? 0
+    );
+
+  const level =
+    identity.isStatus
+      ? Math.max(
+          Number.isFinite(
+            numericLevel
+          )
+            ? numericLevel
+            : 0,
+          markedLevel
+        )
+      : 0;
+
+  return {
+    name:
+      identity.name,
+
+    isStatus:
+      identity.isStatus,
+
+    positive:
+      identity.positive,
+
+    level,
+
+    /*
+     * selected, toBurn, mightIcon etc.
+     * são estado de UI/normalização e não
+     * devem bloquear Undo.
+     */
+    burned:
+      identity.isStatus
+        ? false
+        : entry?.burned
+            === true,
+
+    expired:
+      entry?.expired
+        === true
+  };
+}
+
+
+function stableMatchingSnapshot(
+  list,
+  identity
+) {
+  return (
+    (
+      Array.isArray(
+        list
+      )
+        ? list
+        : []
+    )
+      .filter(
+        entry =>
+          sameFloatingEffectIdentity(
+            entry,
+            identity
+          )
+      )
+      .map(
+        stableFloatingEffectState
+      )
+      .sort(
+        (
+          a,
+          b
+        ) =>
+          JSON.stringify(
+            a
+          ).localeCompare(
+            JSON.stringify(
+              b
+            )
+          )
+      )
+  );
+}
+
+
 async function applyExplicitEffectToActor(
   actor,
   effect,
@@ -1475,7 +1597,13 @@ async function applyExplicitEffectToActor(
         ? {
             identity,
             before,
-            after
+            after,
+
+            afterStable:
+              stableMatchingSnapshot(
+                afterList,
+                identity
+              )
           }
         : null
   };
@@ -1697,20 +1825,30 @@ async function undoExplicitEffectDirect(
         ?? []
       );
 
-    const currentMatching =
-      matchingFloatingEffects(
+    const currentStable =
+      stableMatchingSnapshot(
         current,
         row.undo.identity
       );
 
+    const expectedStable =
+      Array.isArray(
+        row.undo.afterStable
+      )
+        ? row.undo.afterStable
+        : stableMatchingSnapshot(
+            row.undo.after
+              ?? [],
+            row.undo.identity
+          );
+
     if (
       JSON.stringify(
-        currentMatching
+        currentStable
       )
       !==
       JSON.stringify(
-        row.undo.after
-        ?? []
+        expectedStable
       )
     ) {
       throw new Error(
@@ -2190,14 +2328,36 @@ function pokemonBaseStats(
       "characterPokemonProfile"
     );
 
-  return (
+  if (
     profile?.baseStats
     &&
     typeof profile.baseStats
       === "object"
-  )
-    ? profile.baseStats
-    : null;
+  ) {
+    return profile.baseStats;
+  }
+
+  const sourceTheme =
+    sourceThemeForCombatActor(
+      actor
+    );
+
+  const themeStats =
+    sourceTheme?.getFlag?.(
+      MODULE_ID,
+      "baseStats"
+    );
+
+  if (
+    themeStats
+    &&
+    typeof themeStats
+      === "object"
+  ) {
+    return themeStats;
+  }
+
+  return null;
 }
 
 
@@ -2767,6 +2927,167 @@ function priorityReactionContext(
 }
 
 
+function speedContextForMove(
+  move,
+  sourceActor,
+  targets
+) {
+  const language =
+    sourceActor?.getFlag?.(
+      MODULE_ID,
+      "contentLanguage"
+    )
+    ?? "pt-BR";
+
+  const rule =
+    move?.speedRule
+    ??
+    moveSpeedRule(
+      move?.id,
+      language
+    );
+
+  if (
+    !rule
+    ||
+    !targets?.length
+  ) {
+    return null;
+  }
+
+  const sourceSpeed =
+    Number(
+      pokemonBaseStats(
+        sourceActor
+      )?.speed
+    );
+
+  if (
+    !Number.isFinite(
+      sourceSpeed
+    )
+  ) {
+    return null;
+  }
+
+  const threshold =
+    Math.max(
+      1,
+      Number(
+        rule.threshold
+        ?? 20
+      )
+    );
+
+  const rows =
+    targets.map(
+      token => {
+        const targetSpeed =
+          Number(
+            pokemonBaseStats(
+              token?.actor
+            )?.speed
+          );
+
+        if (
+          !Number.isFinite(
+            targetSpeed
+          )
+        ) {
+          return {
+            token,
+            qualifies:
+              false,
+            difference:
+              0
+          };
+        }
+
+        const difference =
+          rule.mode
+            === "slower"
+            ? (
+                targetSpeed
+                - sourceSpeed
+              )
+            : (
+                sourceSpeed
+                - targetSpeed
+              );
+
+        return {
+          token,
+          targetSpeed,
+          difference,
+
+          qualifies:
+            difference
+              >= threshold
+        };
+      }
+    );
+
+  /*
+   * Uma única rolagem contra vários targets
+   * só recebe a vantagem se a relação de Speed
+   * fizer sentido contra todos eles.
+   */
+  if (
+    !rows.length
+    ||
+    !rows.every(
+      row =>
+        row.qualifies
+    )
+  ) {
+    return null;
+  }
+
+  const hardest =
+    rows
+      .slice()
+      .sort(
+        (
+          a,
+          b
+        ) =>
+          a.difference
+          - b.difference
+      )[0];
+
+  return {
+    value:
+      1,
+
+    positive:
+      true,
+
+    name:
+      (
+        move?.name
+        ?? move?.id
+        ?? "Golpe"
+      )
+      + " · "
+      + (
+          rule.rollLabel
+          ?? (
+            rule.mode
+              === "slower"
+              ? "Mais lento que o alvo"
+              : "Mais rápido que o alvo"
+          )
+        ),
+
+    targetId:
+      hardest?.token?.id
+      ?? null,
+
+    rule
+  };
+}
+
+
 function selectedMoveBindingsForActor(
   actor
 ) {
@@ -3257,7 +3578,9 @@ function decoratePokemonRollDialog(
   root
 ) {
   if (
-    !isLitmDiceRollApp(app)
+    !isLitmDiceRollApp(
+      app
+    )
     ||
     !root
   ) {
@@ -3397,6 +3720,34 @@ function decoratePokemonRollDialog(
 
         positive:
           defense.positive,
+
+        source:
+          POKEMON_MOVE_AUTO_SOURCE
+      }
+    );
+  }
+
+  const speed =
+    speedContextForMove(
+      move,
+      actor,
+      targets
+    );
+
+  if (
+    speed?.value
+  ) {
+    pushSyntheticRollStatus(
+      app,
+      {
+        name:
+          speed.name,
+
+        value:
+          speed.value,
+
+        positive:
+          speed.positive,
 
         source:
           POKEMON_MOVE_AUTO_SOURCE
@@ -6071,16 +6422,52 @@ async function updateDetailedSpendMessage(
 
 
 function pokemonEffectPowerCost(
-  effect
+  effect,
+  availablePower = 6
 ) {
-  return Math.max(
-    1,
-    Math.min(
-      3,
-      effectRank(
-        effect?.trigger
+  if (
+    effect?.intrinsic
+      === true
+  ) {
+    return 0;
+  }
+
+  if (
+    effect?.kind
+      === "tag"
+  ) {
+    return 2;
+  }
+
+  const preferred =
+    Math.max(
+      1,
+      Math.min(
+        6,
+        Number(
+          effect?.level
+          ?? 1
+        )
+        || 1
       )
-    )
+    );
+
+  const available =
+    Math.max(
+      1,
+      Math.min(
+        6,
+        Number(
+          availablePower
+          ?? 1
+        )
+        || 1
+      )
+    );
+
+  return Math.min(
+    preferred,
+    available
   );
 }
 
@@ -6517,6 +6904,491 @@ function appendMoveMechanicsToChat(
 }
 
 
+async function choosePokemonEffectPurchase(
+  effect,
+  remaining
+) {
+  if (
+    effect?.intrinsic
+      === true
+  ) {
+    return null;
+  }
+
+  if (
+    effect?.kind
+      === "tag"
+  ) {
+    if (
+      remaining < 2
+    ) {
+      return null;
+    }
+
+    return {
+      level:
+        null,
+
+      cost:
+        2
+    };
+  }
+
+  const maxLevel =
+    pokemonEffectPowerCost(
+      effect,
+      remaining
+    );
+
+  if (
+    maxLevel <= 1
+  ) {
+    return {
+      level:
+        1,
+
+      cost:
+        1
+    };
+  }
+
+  const options =
+    Array.from(
+      {
+        length:
+          maxLevel
+      },
+      (
+        _,
+        index
+      ) => {
+        const level =
+          index + 1;
+
+        return (
+          '<option value="'
+          + level
+          + '"'
+          + (
+              level === maxLevel
+                ? " selected"
+                : ""
+            )
+          + ">"
+          + level
+          + " Power → "
+          + String(
+              effect?.name
+              ?? "efeito"
+            )
+          + "-"
+          + level
+          + "</option>"
+        );
+      }
+    ).join(
+      ""
+    );
+
+  const choice =
+    await foundry.applications.api.DialogV2.input({
+      window: {
+        title:
+          "Intensidade do efeito"
+      },
+
+      content:
+        '<div style="display:grid;gap:8px;padding:8px">'
+        + "<p>Quanto Power deseja gastar neste efeito?</p>"
+        + '<select name="level">'
+        + options
+        + "</select>"
+        + "</div>",
+
+      ok: {
+        label:
+          "Confirmar",
+
+        icon:
+          "fa-solid fa-check"
+      },
+
+      modal:
+        true
+    });
+
+  if (!choice) {
+    return null;
+  }
+
+  const level =
+    Math.max(
+      1,
+      Math.min(
+        maxLevel,
+        Number(
+          choice.level
+          ?? maxLevel
+        )
+      )
+    );
+
+  return {
+    level,
+
+    cost:
+      level
+  };
+}
+
+
+function pokemonIntrinsicApplicationKey(
+  move,
+  index
+) {
+  return (
+    String(
+      move?.id
+      ?? "move"
+    )
+    + ":"
+    + Number(
+        index
+        ?? 0
+      )
+  );
+}
+
+
+function pokemonIntrinsicApplications(
+  message
+) {
+  const raw =
+    message?.getFlag?.(
+      MODULE_ID,
+      "pokemonIntrinsicApplications"
+    );
+
+  return (
+    raw
+    &&
+    typeof raw
+      === "object"
+  )
+    ? foundry.utils.deepClone(
+        raw
+      )
+    : {};
+}
+
+
+async function writePokemonIntrinsicApplications(
+  message,
+  applications
+) {
+  if (
+    Object.keys(
+      applications
+      ?? {}
+    ).length
+  ) {
+    await message.setFlag(
+      MODULE_ID,
+      "pokemonIntrinsicApplications",
+      applications
+    );
+
+  } else {
+    await message.unsetFlag(
+      MODULE_ID,
+      "pokemonIntrinsicApplications"
+    );
+  }
+}
+
+
+async function applyPokemonIntrinsicEffect({
+  message,
+  actor,
+  move,
+  sourceToken,
+  targetIds,
+  effect,
+  index
+}) {
+  const applications =
+    pokemonIntrinsicApplications(
+      message
+    );
+
+  const key =
+    pokemonIntrinsicApplicationKey(
+      move,
+      index
+    );
+
+  if (
+    applications[key]
+  ) {
+    return;
+  }
+
+  const sceneId =
+    canvas?.scene?.id;
+
+  if (!sceneId) {
+    throw new Error(
+      "Cena ativa não encontrada."
+    );
+  }
+
+  const application =
+    await requestAuthority(
+      "apply-explicit",
+      {
+        sceneId,
+
+        sourceActorId:
+          actor.id,
+
+        sourceTokenId:
+          sourceToken?.id
+          ?? null,
+
+        moveId:
+          move.id,
+
+        targetTokenIds:
+          targetIds
+          ?? [],
+
+        effect:
+          foundry.utils.deepClone(
+            effect
+          )
+      }
+    );
+
+  applications[key] = {
+    sceneId,
+    application
+  };
+
+  await writePokemonIntrinsicApplications(
+    message,
+    applications
+  );
+}
+
+
+async function undoPokemonIntrinsicEffect({
+  message,
+  move,
+  index
+}) {
+  const applications =
+    pokemonIntrinsicApplications(
+      message
+    );
+
+  const key =
+    pokemonIntrinsicApplicationKey(
+      move,
+      index
+    );
+
+  const record =
+    applications[key];
+
+  if (
+    !record?.application
+  ) {
+    return;
+  }
+
+  await requestAuthority(
+    "undo-explicit",
+    {
+      sceneId:
+        record.sceneId
+        ?? canvas?.scene?.id,
+
+      application:
+        record.application
+    }
+  );
+
+  delete applications[key];
+
+  await writePokemonIntrinsicApplications(
+    message,
+    applications
+  );
+}
+
+
+function appendPokemonIntrinsicEffects({
+  message,
+  actor,
+  move,
+  section,
+  sourceToken,
+  targetIds,
+  effects,
+  editable
+}) {
+  const intrinsic =
+    (
+      effects
+      ?? []
+    )
+      .map(
+        (
+          effect,
+          index
+        ) => ({
+          effect,
+          index
+        })
+      )
+      .filter(
+        row =>
+          row.effect?.intrinsic
+            === true
+      );
+
+  if (
+    !intrinsic.length
+  ) {
+    return;
+  }
+
+  const applications =
+    pokemonIntrinsicApplications(
+      message
+    );
+
+  const block =
+    document.createElement(
+      "div"
+    );
+
+  block.className =
+    "pokemon-litm-spend-purchased";
+
+  const hint =
+    document.createElement(
+      "small"
+    );
+
+  hint.innerHTML =
+    "<strong>Custos intrínsecos do golpe</strong>"
+    + " · não consomem Power";
+
+  block.append(
+    hint
+  );
+
+  for (
+    const row
+    of intrinsic
+  ) {
+    const effect =
+      row.effect;
+
+    const key =
+      pokemonIntrinsicApplicationKey(
+        move,
+        row.index
+      );
+
+    const applied =
+      !!applications[key];
+
+    const line =
+      document.createElement(
+        "div"
+      );
+
+    line.className =
+      "pokemon-litm-purchased-row";
+
+    const label =
+      document.createElement(
+        "span"
+      );
+
+    label.textContent =
+      "Custo: "
+      + String(
+          effect?.name
+          ?? "efeito"
+        )
+      + (
+          effect?.kind
+            === "tag"
+            ? ""
+            : (
+                "-"
+                + Number(
+                    effect?.level
+                    ?? 1
+                  )
+              )
+        );
+
+    line.append(
+      label
+    );
+
+    const button =
+      actionButton(
+        applied
+          ? "Desfazer custo"
+          : "Aplicar custo",
+
+        applied
+          ? "fa-rotate-left"
+          : "fa-check",
+
+        () =>
+          applied
+            ? undoPokemonIntrinsicEffect({
+                message,
+                move,
+                index:
+                  row.index
+              })
+            : applyPokemonIntrinsicEffect({
+                message,
+                actor,
+                move,
+                sourceToken,
+                targetIds,
+                effect,
+                index:
+                  row.index
+              })
+      );
+
+    button.disabled =
+      !editable;
+
+    line.append(
+      button
+    );
+
+    block.append(
+      line
+    );
+  }
+
+  section.append(
+    block
+  );
+}
+
+
 function addPokemonDetailedSpendControls(
   message,
   actor,
@@ -6665,14 +7537,12 @@ function addPokemonDetailedSpendControls(
           effect?.source
           ?? ""
         ) === "damage"
+        ||
+        effect?.intrinsic
+          === true
       ) {
         return;
       }
-
-      const cost =
-        pokemonEffectPowerCost(
-          effect
-        );
 
       const bought =
         (
@@ -6691,32 +7561,103 @@ function addPokemonDetailedSpendControls(
             ) === index
         );
 
-      const suffix =
-        effect?.kind === "tag"
-          ? ""
-          : "-"
-            + Number(
-                effect?.level
-                ?? 1
-              );
+      const maxCost =
+        pokemonEffectPowerCost(
+          effect,
+          remaining
+        );
+
+      const minCost =
+        effect?.kind
+          === "tag"
+          ? 2
+          : 1;
+
+      const preferredLevel =
+        Math.max(
+          1,
+          Number(
+            effect?.level
+            ?? 1
+          )
+        );
+
+      const effectLabel =
+        String(
+          effect?.name
+          ?? "efeito"
+        );
+
+      const powerText =
+        effect?.kind
+          === "tag"
+          ? "2 Power"
+          : maxCost > 1
+            ? (
+                "1–"
+                + maxCost
+                + " Power"
+              )
+            : "1 Power";
+
+      const narrative =
+        String(
+          effect?.chanceNarrative
+          ?? ""
+        ).trim();
 
       const button =
         actionButton(
-          String(
-            effect?.name
-            ?? "efeito"
-          )
-          + suffix
+          effectLabel
+          + (
+              effect?.kind
+                === "tag"
+                ? ""
+                : (
+                    preferredLevel > 1
+                      ? " · até tier "
+                        + Math.min(
+                            preferredLevel,
+                            maxCost
+                          )
+                      : "-1"
+                  )
+            )
           + " · "
-          + cost
-          + " Power",
+          + powerText
+          + (
+              narrative
+                ? " · "
+                  + narrative
+                : ""
+            ),
 
-          effect?.kind === "tag"
+          effect?.kind
+            === "tag"
             ? "fa-tag"
             : "fa-burst",
 
-          () =>
-            spendPokemonPower(
+          async () => {
+            const purchase =
+              await choosePokemonEffectPurchase(
+                effect,
+                remaining
+              );
+
+            if (!purchase) {
+              return;
+            }
+
+            const suffix =
+              effect?.kind
+                === "tag"
+                ? ""
+                : (
+                    "-"
+                    + purchase.level
+                  );
+
+            await spendPokemonPower(
               message,
               {
                 type:
@@ -6728,16 +7669,18 @@ function addPokemonDetailedSpendControls(
                 pokemonEffectIndex:
                   index,
 
-                cost,
+                pokemonEffectLevel:
+                  purchase.level,
+
+                cost:
+                  purchase.cost,
 
                 label:
-                  String(
-                    effect?.name
-                    ?? "efeito"
-                  )
+                  effectLabel
                   + suffix
               }
-            )
+            );
+          }
         );
 
       button.disabled =
@@ -6745,7 +7688,7 @@ function addPokemonDetailedSpendControls(
         ||
         bought
         ||
-        remaining < cost;
+        remaining < minCost;
 
       choices.append(
         button
@@ -6756,6 +7699,20 @@ function addPokemonDetailedSpendControls(
   section.append(
     choices
   );
+
+  appendPokemonIntrinsicEffects({
+    message,
+    actor,
+    move,
+    section,
+    sourceToken,
+
+    targetIds:
+      frozenTargetIds,
+
+    effects,
+    editable
+  });
 
   const purchased =
     document.createElement(
@@ -7005,6 +7962,28 @@ function addPokemonDetailedSpendControls(
           return;
         }
 
+        const purchasedLevel =
+          Math.max(
+            1,
+            Math.min(
+              6,
+              Number(
+                entry.pokemonEffectLevel
+                ?? effect.level
+                ?? 1
+              )
+            )
+          );
+
+        const appliedEffect = {
+          ...foundry.utils.deepClone(
+            effect
+          ),
+
+          level:
+            purchasedLevel
+        };
+
         const row =
           document.createElement(
             "div"
@@ -7045,7 +8024,8 @@ function addPokemonDetailedSpendControls(
                   targetIds:
                     frozenTargetIds,
 
-                  effect,
+                  effect:
+                    appliedEffect,
 
                   predicate:
                     candidate =>

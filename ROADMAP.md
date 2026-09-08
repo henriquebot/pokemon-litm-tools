@@ -58,11 +58,13 @@
 - [x] Accuracy e Base Power ficam como referência, sem bônus/penalidade automático na rolagem ou no dano comprado
 - [x] Tipagem modifica o Status de dano depois da rolagem e resistência pode reduzir um resultado fraco a zero
 - [x] Prioridade não aumenta dano; prioridade positiva dificulta Reaction e prioridade negativa facilita Reaction
-- [ ] Might define a escala ficcional e substitui tiers de consequência derivados de Base Power nos Challenges
-- [ ] Converter chances secundárias em Raramente / Possivelmente / Frequentemente / Quase sempre / Sempre
-- [ ] Reestruturar Detailed Spend para intensidade/combinação de efeitos nunca exceder o Power gasto
-- [ ] Moves dependentes de Speed usam comparação contextual, sem reproduzir fórmula de Base Power
-- [ ] PP vira metadado de esforço/sustentabilidade e sugestão de Burn; sem contador de PP
+- [x] Recharge e recoil são custos intrínsecos do Move e não consomem Power do sucesso
+- [x] Undo de efeito compara apenas estado mecânico estável e ignora normalização visual do LitM
+- [x] Might define a escala ficcional e substitui tiers de consequência derivados de Base Power nos Challenges
+- [x] Converter chances secundárias em Raramente / Possivelmente / Frequentemente / Quase sempre / Sempre
+- [x] Reestruturar Detailed Spend para intensidade/combinação de efeitos nunca exceder o Power gasto
+- [x] Moves dependentes de Speed usam comparação contextual, sem reproduzir fórmula de Base Power
+- [x] PP vira metadado de esforço/sustentabilidade e prepara sugestão de Burn; sem contador de PP
 - [ ] Integrar Burn de Tag ao UX Pokémon para esforço extremo
 - [ ] Integrar Sacrifice nativo do LitM como clímax Pokémon, sem ultimate próprio
 - [ ] Expandir Reaction Roll com Speed, Tags relevantes e ameaças do Challenge

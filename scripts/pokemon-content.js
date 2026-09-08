@@ -1,5 +1,8 @@
 const MODULE_ID = "pokemon-litm-tools";
 
+export const POKEMON_LITM_SEMANTICS_REV =
+  "2026-09-08-litm-first-semantics-v2";
+
 const TYPE_PTBR = {
   normal: "Normal",
   fire: "Fogo",
@@ -2729,16 +2732,6 @@ function statusMarkup(name, level) {
   return `[/s ${String(name).trim().toLocaleLowerCase().replace(/\s+/g, "-")}-${level}]`;
 }
 
-function damageStatusLevel(power) {
-  const value = Number(power ?? 0);
-  if (value >= 150) return 5;
-  if (value >= 110) return 4;
-  if (value >= 80) return 3;
-  if (value >= 40) return 2;
-  return value > 0 ? 1 : 0;
-}
-
-
 export function moveImpact(
   power
 ) {
@@ -3132,6 +3125,24 @@ export function moveLitmProfile(
           )
         : "";
 
+  const effort =
+    moveEffortProfile(
+      move?.pp,
+      language
+    );
+
+  const effortText =
+    effort
+      ? (
+          (
+            language === "en"
+              ? "Effort: "
+              : "Esforço: "
+          )
+          + effort.label
+        )
+      : "";
+
   return {
     type:
       move?.type
@@ -3175,11 +3186,15 @@ export function moveLitmProfile(
     priority,
     priorityText,
 
+    effort,
+    effortText,
+
     // Base Power e Accuracy continuam como metadados de referência.
     badges: [
       typeBadge,
       classBadge,
       targetBadge,
+      effortText,
       priorityText
     ].filter(Boolean)
   };
@@ -3271,6 +3286,19 @@ export async function loadPokemonMoveProfile(
     power: Number(detail.power ?? 0),
     accuracy: detail.accuracy == null ? null : Number(detail.accuracy),
     pp: Number(detail.pp ?? 0),
+
+    effort:
+      moveEffortProfile(
+        detail.pp,
+        language
+      ),
+
+    speedRule:
+      moveSpeedRule(
+        detail.name,
+        language
+      ),
+
     target: detail.target?.name ?? "selected-pokemon",
     priority: Number(detail.priority ?? 0),
     effectChance: Number(detail.effect_chance ?? 0),
@@ -3304,10 +3332,50 @@ export async function loadPokemonMoveProfile(
       "https://pokemondb.net/move/" + encodeURIComponent(detail.name)
   };
 
-  move.shortDescription = moveShortDescription(move, move.name, language);
-  move.description = move.shortDescription;
-  move.effects = buildMoveEffects(move, might, language);
-  move.vfx = String(move.type ?? "normal") + "-move";
+  move.shortDescription =
+    moveShortDescription(
+      move,
+      move.name,
+      language
+    );
+
+  move.effects =
+    buildMoveEffects(
+      move,
+      might,
+      language
+    );
+
+  move.secondaryNarratives =
+    [
+      ...new Set(
+        move.effects
+          .map(
+            effect =>
+              String(
+                effect?.chanceNarrative
+                ?? ""
+              ).trim()
+          )
+          .filter(Boolean)
+      )
+    ];
+
+  move.description =
+    [
+      move.shortDescription,
+      ...move.secondaryNarratives
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  move.vfx =
+    String(
+      move.type
+      ?? "normal"
+    )
+    + "-move";
+
   return move;
 }
 
@@ -3317,6 +3385,542 @@ function statStatusName(stat, direction, language) {
   if (language === "en") return `${label}-${direction > 0 ? "raised" : "lowered"}`;
   return `${label}-${direction > 0 ? "aumentado" : "reduzido"}`;
 }
+
+
+const MIGHT_CONSEQUENCE_LEVEL = {
+  origin: 2,
+  adventure: 3,
+  greatness: 4
+};
+
+
+export function mightConsequenceLevel(
+  might
+) {
+  return (
+    MIGHT_CONSEQUENCE_LEVEL[
+      String(
+        might
+        ?? "adventure"
+      ).toLocaleLowerCase()
+    ]
+    ?? 3
+  );
+}
+
+
+export function moveEffortProfile(
+  pp,
+  language =
+    getPokemonContentLanguage()
+) {
+  const value =
+    Number(
+      pp
+      ?? 0
+    );
+
+  if (
+    !Number.isFinite(
+      value
+    )
+    ||
+    value <= 0
+  ) {
+    return null;
+  }
+
+  let id;
+
+  if (
+    value >= 25
+  ) {
+    id =
+      "sustainable";
+
+  } else if (
+    value >= 15
+  ) {
+    id =
+      "moderate";
+
+  } else if (
+    value >= 10
+  ) {
+    id =
+      "demanding";
+
+  } else {
+    id =
+      "very-demanding";
+  }
+
+  const labels =
+    language === "en"
+      ? {
+          sustainable:
+            "Sustainable",
+          moderate:
+            "Moderate",
+          demanding:
+            "Demanding",
+          "very-demanding":
+            "Very demanding"
+        }
+      : {
+          sustainable:
+            "Sustentável",
+          moderate:
+            "Moderado",
+          demanding:
+            "Exigente",
+          "very-demanding":
+            "Muito exigente"
+        };
+
+  return {
+    id,
+
+    label:
+      labels[id],
+
+    pp:
+      value,
+
+    /*
+     * Apenas metadata.
+     * Burn continua sendo decisão LitM,
+     * não consumo automático de PP.
+     */
+    burnSuggested:
+      value <= 10
+  };
+}
+
+
+const SPEED_MOVE_RULES = {
+  "electro-ball": {
+    mode:
+      "faster",
+
+    pt:
+      "Favorece um usuário claramente mais rápido que o alvo.",
+
+    en:
+      "Favors a user that is clearly faster than the target.",
+
+    rollPt:
+      "Mais rápido que o alvo",
+
+    rollEn:
+      "Faster than the target"
+  },
+
+  "gyro-ball": {
+    mode:
+      "slower",
+
+    pt:
+      "Favorece um usuário claramente mais lento que o alvo.",
+
+    en:
+      "Favors a user that is clearly slower than the target.",
+
+    rollPt:
+      "Mais lento que o alvo",
+
+    rollEn:
+      "Slower than the target"
+  }
+};
+
+
+export function moveSpeedRule(
+  moveId,
+  language =
+    getPokemonContentLanguage()
+) {
+  const id =
+    String(
+      moveId
+      ?? ""
+    )
+      .trim()
+      .toLocaleLowerCase();
+
+  const rule =
+    SPEED_MOVE_RULES[
+      id
+    ];
+
+  if (!rule) {
+    return null;
+  }
+
+  return {
+    id,
+
+    mode:
+      rule.mode,
+
+    label:
+      language === "en"
+        ? rule.en
+        : rule.pt,
+
+    rollLabel:
+      language === "en"
+        ? rule.rollEn
+        : rule.rollPt,
+
+    /*
+     * Não reproduzimos a fórmula
+     * de Base Power do videogame.
+     */
+    threshold:
+      20
+  };
+}
+
+
+function narrativeChanceProfile(
+  chance,
+  guaranteed = false,
+  language =
+    getPokemonContentLanguage()
+) {
+  const value =
+    Number(
+      chance
+      ?? 0
+    );
+
+  if (
+    !guaranteed
+    &&
+    (
+      !Number.isFinite(
+        value
+      )
+      ||
+      value <= 0
+    )
+  ) {
+    return null;
+  }
+
+  let rank;
+
+  if (
+    guaranteed
+    ||
+    value >= 100
+  ) {
+    rank = 5;
+
+  } else if (
+    value <= 10
+  ) {
+    rank = 1;
+
+  } else if (
+    value <= 30
+  ) {
+    rank = 2;
+
+  } else if (
+    value <= 60
+  ) {
+    rank = 3;
+
+  } else {
+    rank = 4;
+  }
+
+  const labels =
+    language === "en"
+      ? {
+          1: "Rarely",
+          2: "Possibly",
+          3: "Often",
+          4: "Almost always",
+          5: "Always"
+        }
+      : {
+          1: "Raramente",
+          2: "Possivelmente",
+          3: "Frequentemente",
+          4: "Quase sempre",
+          5: "Sempre"
+        };
+
+  return {
+    rank,
+
+    label:
+      labels[rank],
+
+    chance:
+      value
+  };
+}
+
+
+function narrativeChanceText(
+  chance,
+  guaranteed,
+  verbPt,
+  verbEn,
+  language
+) {
+  const profile =
+    narrativeChanceProfile(
+      chance,
+      guaranteed,
+      language
+    );
+
+  if (!profile) {
+    return "";
+  }
+
+  return (
+    profile.label
+    + " "
+    + (
+        language === "en"
+          ? verbEn
+          : verbPt
+      )
+  );
+}
+
+
+function ailmentNarrativeText(
+  ailment,
+  chance,
+  guaranteed,
+  language
+) {
+  const id =
+    String(
+      ailment
+      ?? ""
+    )
+      .trim()
+      .toLocaleLowerCase();
+
+  const pt = {
+    paralysis:
+      "paralisa",
+    burn:
+      "queima",
+    poison:
+      "envenena",
+    "badly-poisoned":
+      "envenena gravemente",
+    sleep:
+      "faz dormir",
+    freeze:
+      "congela",
+    confusion:
+      "confunde"
+  };
+
+  const en = {
+    paralysis:
+      "paralyzes",
+    burn:
+      "burns",
+    poison:
+      "poisons",
+    "badly-poisoned":
+      "badly poisons",
+    sleep:
+      "puts the target to sleep",
+    freeze:
+      "freezes",
+    confusion:
+      "confuses"
+  };
+
+  const fallbackPt =
+    "causa "
+    + (
+        AILMENT_PTBR[id]
+        ?? id
+        ?? "um efeito"
+      );
+
+  const fallbackEn =
+    "causes "
+    + (
+        id
+        || "an effect"
+      );
+
+  return narrativeChanceText(
+    chance,
+    guaranteed,
+    pt[id]
+      ?? fallbackPt,
+    en[id]
+      ?? fallbackEn,
+    language
+  );
+}
+
+
+function flinchNarrativeText(
+  chance,
+  language
+) {
+  return narrativeChanceText(
+    chance,
+    false,
+    "faz hesitar",
+    "causes hesitation",
+    language
+  );
+}
+
+
+function statChangeNarrativeText(
+  stat,
+  amount,
+  chance,
+  guaranteed,
+  language
+) {
+  const label =
+    statLabel(
+      stat,
+      language
+    )
+      .toLocaleLowerCase();
+
+  const positive =
+    Number(
+      amount
+      ?? 0
+    ) > 0;
+
+  return narrativeChanceText(
+    chance,
+    guaranteed,
+    (
+      positive
+        ? "aumenta "
+        : "reduz "
+    )
+      + label,
+    (
+      positive
+        ? "raises "
+        : "lowers "
+    )
+      + label,
+    language
+  );
+}
+
+
+export function pokemonLitmSemanticsSelfTest(
+  language = "pt-BR"
+) {
+  const pt =
+    language !== "en";
+
+  const checks = {
+    revision:
+      POKEMON_LITM_SEMANTICS_REV
+        === "2026-09-08-litm-first-semantics-v2",
+
+    mightOrigin:
+      mightConsequenceLevel(
+        "origin"
+      ) === 2,
+
+    mightAdventure:
+      mightConsequenceLevel(
+        "adventure"
+      ) === 3,
+
+    mightGreatness:
+      mightConsequenceLevel(
+        "greatness"
+      ) === 4,
+
+    ppLow:
+      moveEffortProfile(
+        5,
+        language
+      )?.id
+        === "very-demanding",
+
+    ppHigh:
+      moveEffortProfile(
+        30,
+        language
+      )?.id
+        === "sustainable",
+
+    electroBall:
+      moveSpeedRule(
+        "electro-ball",
+        language
+      )?.mode
+        === "faster",
+
+    gyroBall:
+      moveSpeedRule(
+        "gyro-ball",
+        language
+      )?.mode
+        === "slower",
+
+    rareParalysis:
+      ailmentNarrativeText(
+        "paralysis",
+        10,
+        false,
+        language
+      )
+        === (
+          pt
+            ? "Raramente paralisa"
+            : "Rarely paralyzes"
+        ),
+
+    certainBurn:
+      ailmentNarrativeText(
+        "burn",
+        100,
+        true,
+        language
+      )
+        === (
+          pt
+            ? "Sempre queima"
+            : "Always burns"
+        )
+  };
+
+  return {
+    revision:
+      POKEMON_LITM_SEMANTICS_REV,
+
+    checks,
+
+    ok:
+      Object.values(
+        checks
+      ).every(
+        Boolean
+      )
+  };
+}
+
 
 function consequenceTier(chance, guaranteed = false) {
   const value = Number(chance ?? 0);
@@ -3340,338 +3944,1207 @@ function tierText(tier, language) {
   }[tier] ?? "Consequência";
 }
 
-export function buildMoveThreat(move, displayName, might, language = getPokemonContentLanguage()) {
-  const power = Number(move.power ?? 0);
-  const meta = move.meta ?? {};
-  const rule = SPECIAL_MOVE_RULES[move.id] ?? {};
-  const effectRule = MOVE_EFFECT_RULES[move.id] ?? null;
-  const description = moveShortDescription(move, displayName, language);
+export function buildMoveThreat(
+  move,
+  displayName,
+  might,
+  language =
+    getPokemonContentLanguage()
+) {
+  const meta =
+    move?.meta
+    ?? {};
+
+  const rule =
+    SPECIAL_MOVE_RULES[
+      move?.id
+    ]
+    ?? {};
+
+  const effectRule =
+    MOVE_EFFECT_RULES[
+      move?.id
+    ]
+    ?? null;
+
+  const description =
+    moveShortDescription(
+      move,
+      displayName,
+      language
+    );
+
   const consequences = [];
 
-  const add = (text, tier = "principal") => {
-    if (!text) return;
-    consequences.push(`${tierText(tier, language)} — ${text}`);
+  const add = (
+    text,
+    tier = "principal"
+  ) => {
+    if (!text) {
+      return;
+    }
+
+    consequences.push(
+      tierText(
+        tier,
+        language
+      )
+      + " — "
+      + text
+    );
   };
 
-  if (power > 0 && move.damageClass !== "status") {
-    const level = damageStatusLevel(power);
-    if (level > 0) {
-      add(language === "en"
-        ? `A solid hit can leave the target ${statusMarkup("wounded", level)}.`
-        : `Um acerto sólido pode deixar o alvo ${statusMarkup("ferido", level)}.`);
-    }
-  }
+  /*
+   * A categoria informa que o Move causa dano.
+   * O Base Power deixa de definir o tier.
+   * A escala vem do Might do Pokémon.
+   */
+  if (
+    String(
+      move?.damageClass
+      ?? "status"
+    ) !== "status"
+  ) {
+    const level =
+      mightConsequenceLevel(
+        might
+      );
 
-  const ailment = meta.ailment;
-  if (ailment && ailment !== "none" && ailment !== "unknown") {
-    const status = language === "en" ? ailment : (AILMENT_PTBR[ailment] ?? ailment);
-    const chance = Number(meta.ailmentChance ?? move.effectChance ?? 0);
-    const guaranteed = move.damageClass === "status" || chance >= 100;
-    const level = guaranteed ? 3 : 2;
     add(
       language === "en"
-        ? `Can leave the target ${statusMarkup(status, level)}.`
-        : `Pode deixar o alvo ${statusMarkup(status, level)}.`,
-      consequenceTier(chance, guaranteed)
+        ? (
+            "A solid hit can leave the target "
+            + statusMarkup(
+                "wounded",
+                level
+              )
+            + "."
+          )
+        : (
+            "Um acerto sólido pode deixar o alvo "
+            + statusMarkup(
+                "ferido",
+                level
+              )
+            + "."
+          )
     );
   }
 
-  if (Number(meta.flinchChance) > 0) {
-    add(
-      language === "en"
-        ? `Can leave the target ${statusMarkup("hesitation-on-next-move", 2)}. The Status expires after the next relevant action.`
-        : `Pode deixar o alvo ${statusMarkup("hesitacao-no-proximo-movimento", 2)}. O Status expira após a próxima ação relevante.`,
-      consequenceTier(meta.flinchChance)
-    );
-  }
+  const ailment =
+    meta.ailment;
 
-  if (Number(meta.drain) < 0) {
-    const recoilLevel = Number(meta.drain) <= -50 ? 2 : 1;
-    add(language === "en"
-      ? `The user suffers ${statusMarkup("hurt-by-recoil", recoilLevel)}.`
-      : `O próprio Pokémon recebe ${statusMarkup("ferido-pelo-recuo", recoilLevel)}.`);
-  }
-
-  if (Number(meta.healing) > 0 || Number(meta.drain) > 0) {
-    add(language === "en"
-      ? `The user can become ${statusMarkup("recovered", 2)}.`
-      : `O Pokémon pode receber ${statusMarkup("recuperado", 2)}.`);
-  }
-
-  for (const change of move.statChanges ?? []) {
-    const amount = Number(change.change ?? 0);
-    if (!amount) continue;
-    const selfTarget = String(move.target ?? "").includes("user");
-    const level = Math.min(4, Math.max(1, Math.abs(amount) + 1));
-    const status = statStatusName(change.stat, amount, language);
-    const chance = Number(meta.statChance ?? move.effectChance ?? 0);
-    const text = selfTarget
-      ? (language === "en"
-          ? `The Pokémon can become ${statusMarkup(status, level)}.`
-          : `O Pokémon pode ficar ${statusMarkup(status, level)}.`)
-      : (language === "en"
-          ? `Can leave the target ${statusMarkup(status, level)}.`
-          : `Pode deixar o alvo ${statusMarkup(status, level)}.`);
-    add(text, consequenceTier(chance, chance <= 0));
-  }
-
-  if (rule.trap) {
-    add(language === "en"
-      ? `Can leave the target ${statusMarkup("trapped", 2)}.`
-      : `Pode deixar o alvo ${statusMarkup("preso", 2)}.`);
-  }
-  if (rule.recharge) {
-    add(language === "en"
-      ? `After using it, the Pokémon becomes ${statusMarkup("recovering", 2)}.`
-      : `Depois de usar o golpe, o Pokémon fica ${statusMarkup("recuperando-se", 2)}.`);
-  }
-  if (rule.statusPt || rule.statusEn) {
-    add(language === "en"
-      ? `Can leave the target ${statusMarkup(rule.statusEn ?? rule.statusPt, rule.statusLevel ?? 2)}.`
-      : `Pode deixar o alvo ${statusMarkup(rule.statusPt ?? rule.statusEn, rule.statusLevel ?? 2)}.`);
-  }
-  if (rule.selfPt || rule.selfEn) {
-    add(language === "en"
-      ? `The Pokémon can become ${statusMarkup(rule.selfEn ?? rule.selfPt, rule.selfLevel ?? 2)}.`
-      : `O Pokémon pode ficar ${statusMarkup(rule.selfPt ?? rule.selfEn, rule.selfLevel ?? 2)}.`);
-  }
-
-  if (effectRule?.statusPt || effectRule?.statusEn) {
+  if (
+    ailment
+    &&
+    ailment !== "none"
+    &&
+    ailment !== "unknown"
+  ) {
     const status =
       language === "en"
-        ? (effectRule.statusEn ?? effectRule.statusPt)
-        : (effectRule.statusPt ?? effectRule.statusEn);
-    const level = Number(effectRule.level ?? 2);
-    const target = effectRule.target ?? "target";
+        ? ailment
+        : (
+            AILMENT_PTBR[
+              ailment
+            ]
+            ?? ailment
+          );
 
-    if (target === "self") {
+    const chance =
+      Number(
+        meta.ailmentChance
+        ||
+        move?.effectChance
+        ||
+        0
+      );
+
+    const guaranteed =
+      move?.damageClass
+        === "status"
+      ||
+      chance >= 100;
+
+    const narrative =
+      ailmentNarrativeText(
+        ailment,
+        chance,
+        guaranteed,
+        language
+      );
+
+    add(
+      (
+        narrative
+          ? narrative + ". "
+          : ""
+      )
+      +
+      (
+        language === "en"
+          ? (
+              "Can leave the target "
+              + statusMarkup(
+                  status,
+                  guaranteed
+                    ? 3
+                    : 2
+                )
+              + "."
+            )
+          : (
+              "Pode deixar o alvo "
+              + statusMarkup(
+                  status,
+                  guaranteed
+                    ? 3
+                    : 2
+                )
+              + "."
+            )
+      )
+    );
+  }
+
+  if (
+    Number(
+      meta.flinchChance
+      ?? 0
+    ) > 0
+  ) {
+    const narrative =
+      flinchNarrativeText(
+        meta.flinchChance,
+        language
+      );
+
+    add(
+      (
+        narrative
+          ? narrative + ". "
+          : ""
+      )
+      +
+      (
+        language === "en"
+          ? (
+              "Can leave the target "
+              + statusMarkup(
+                  "hesitation-on-next-move",
+                  2
+                )
+              + "."
+            )
+          : (
+              "Pode deixar o alvo "
+              + statusMarkup(
+                  "hesitacao-no-proximo-movimento",
+                  2
+                )
+              + "."
+            )
+      )
+    );
+  }
+
+  if (
+    Number(
+      meta.drain
+      ?? 0
+    ) < 0
+  ) {
+    const recoilLevel =
+      Number(
+        meta.drain
+      ) <= -50
+        ? 2
+        : 1;
+
+    add(
+      language === "en"
+        ? (
+            "Intrinsic cost — the user suffers "
+            + statusMarkup(
+                "hurt-by-recoil",
+                recoilLevel
+              )
+            + "."
+          )
+        : (
+            "Custo intrínseco — o próprio Pokémon recebe "
+            + statusMarkup(
+                "ferido-pelo-recuo",
+                recoilLevel
+              )
+            + "."
+          )
+    );
+  }
+
+  if (
+    Number(
+      meta.healing
+      ?? 0
+    ) > 0
+    ||
+    Number(
+      meta.drain
+      ?? 0
+    ) > 0
+  ) {
+    add(
+      language === "en"
+        ? (
+            "The user can become "
+            + statusMarkup(
+                "recovered",
+                2
+              )
+            + "."
+          )
+        : (
+            "O Pokémon pode receber "
+            + statusMarkup(
+                "recuperado",
+                2
+              )
+            + "."
+          )
+    );
+  }
+
+  for (
+    const change
+    of move?.statChanges
+      ?? []
+  ) {
+    const amount =
+      Number(
+        change.change
+        ?? 0
+      );
+
+    if (!amount) {
+      continue;
+    }
+
+    const selfTarget =
+      String(
+        move?.target
+        ?? ""
+      ).includes(
+        "user"
+      );
+
+    const level =
+      Math.min(
+        4,
+        Math.max(
+          1,
+          Math.abs(
+            amount
+          ) + 1
+        )
+      );
+
+    const status =
+      statStatusName(
+        change.stat,
+        amount,
+        language
+      );
+
+    const chance =
+      Number(
+        meta.statChance
+        ||
+        move?.effectChance
+        ||
+        0
+      );
+
+    const guaranteed =
+      chance <= 0
+      ||
+      chance >= 100;
+
+    const narrative =
+      statChangeNarrativeText(
+        change.stat,
+        amount,
+        chance,
+        guaranteed,
+        language
+      );
+
+    const effectText =
+      selfTarget
+        ? (
+            language === "en"
+              ? (
+                  "The Pokémon can become "
+                  + statusMarkup(
+                      status,
+                      level
+                    )
+                  + "."
+                )
+              : (
+                  "O Pokémon pode ficar "
+                  + statusMarkup(
+                      status,
+                      level
+                    )
+                  + "."
+                )
+          )
+        : (
+            language === "en"
+              ? (
+                  "Can leave the target "
+                  + statusMarkup(
+                      status,
+                      level
+                    )
+                  + "."
+                )
+              : (
+                  "Pode deixar o alvo "
+                  + statusMarkup(
+                      status,
+                      level
+                    )
+                  + "."
+                )
+          );
+
+    add(
+      (
+        narrative
+          ? narrative + ". "
+          : ""
+      )
+      + effectText
+    );
+  }
+
+  if (
+    rule.trap
+  ) {
+    add(
+      language === "en"
+        ? (
+            "Can leave the target "
+            + statusMarkup(
+                "trapped",
+                2
+              )
+            + "."
+          )
+        : (
+            "Pode deixar o alvo "
+            + statusMarkup(
+                "preso",
+                2
+              )
+            + "."
+          )
+    );
+  }
+
+  if (
+    rule.recharge
+  ) {
+    add(
+      language === "en"
+        ? (
+            "Intrinsic cost — after using it, the Pokémon becomes "
+            + statusMarkup(
+                "recovering",
+                2
+              )
+            + "."
+          )
+        : (
+            "Custo intrínseco — depois de usar o golpe, o Pokémon fica "
+            + statusMarkup(
+                "recuperando-se",
+                2
+              )
+            + "."
+          )
+    );
+  }
+
+  if (
+    rule.statusPt
+    ||
+    rule.statusEn
+  ) {
+    add(
+      language === "en"
+        ? (
+            "Can leave the target "
+            + statusMarkup(
+                rule.statusEn
+                ?? rule.statusPt,
+                rule.statusLevel
+                ?? 2
+              )
+            + "."
+          )
+        : (
+            "Pode deixar o alvo "
+            + statusMarkup(
+                rule.statusPt
+                ?? rule.statusEn,
+                rule.statusLevel
+                ?? 2
+              )
+            + "."
+          )
+    );
+  }
+
+  if (
+    rule.selfPt
+    ||
+    rule.selfEn
+  ) {
+    add(
+      language === "en"
+        ? (
+            "The Pokémon can become "
+            + statusMarkup(
+                rule.selfEn
+                ?? rule.selfPt,
+                rule.selfLevel
+                ?? 2
+              )
+            + "."
+          )
+        : (
+            "O Pokémon pode ficar "
+            + statusMarkup(
+                rule.selfPt
+                ?? rule.selfEn,
+                rule.selfLevel
+                ?? 2
+              )
+            + "."
+          )
+    );
+  }
+
+  if (
+    effectRule?.statusPt
+    ||
+    effectRule?.statusEn
+  ) {
+    const status =
+      language === "en"
+        ? (
+            effectRule.statusEn
+            ?? effectRule.statusPt
+          )
+        : (
+            effectRule.statusPt
+            ?? effectRule.statusEn
+          );
+
+    const level =
+      Number(
+        effectRule.level
+        ?? 2
+      );
+
+    const target =
+      effectRule.target
+      ?? "target";
+
+    if (
+      target === "self"
+    ) {
       add(
         language === "en"
-          ? `The Pokémon can become ${statusMarkup(status, level)}.`
-          : `O Pokémon pode ficar ${statusMarkup(status, level)}.`
+          ? (
+              "The Pokémon can become "
+              + statusMarkup(
+                  status,
+                  level
+                )
+              + "."
+            )
+          : (
+              "O Pokémon pode ficar "
+              + statusMarkup(
+                  status,
+                  level
+                )
+              + "."
+            )
       );
-    } else if (target === "scene") {
+
+    } else if (
+      target === "scene"
+    ) {
       add(
         language === "en"
-          ? `Changes the battlefield: ${statusMarkup(status, level)}.`
-          : `Altera o campo: ${statusMarkup(status, level)}.`
+          ? (
+              "Changes the battlefield: "
+              + statusMarkup(
+                  status,
+                  level
+                )
+              + "."
+            )
+          : (
+              "Altera o campo: "
+              + statusMarkup(
+                  status,
+                  level
+                )
+              + "."
+            )
       );
+
     } else {
       add(
         language === "en"
-          ? `Can leave the target ${statusMarkup(status, level)}.`
-          : `Pode deixar o alvo ${statusMarkup(status, level)}.`
+          ? (
+              "Can leave the target "
+              + statusMarkup(
+                  status,
+                  level
+                )
+              + "."
+            )
+          : (
+              "Pode deixar o alvo "
+              + statusMarkup(
+                  status,
+                  level
+                )
+              + "."
+            )
       );
     }
   }
 
-  if (!consequences.length) {
-    add(language === "en"
-      ? `Creates an opening or complication appropriate to ${displayName}.`
-      : `Cria uma abertura ou complicação coerente com ${displayName}.`);
+  if (
+    !consequences.length
+  ) {
+    add(
+      language === "en"
+        ? (
+            "Creates an opening or complication appropriate to "
+            + displayName
+            + "."
+          )
+        : (
+            "Cria uma abertura ou complicação coerente com "
+            + displayName
+            + "."
+          )
+    );
   }
 
-  return { description, list: [...new Set(consequences)] };
+  return {
+    description,
+
+    list:
+      [
+        ...new Set(
+          consequences
+        )
+      ]
+  };
 }
 
 
-export function buildMoveEffects(move, might, language = getPokemonContentLanguage()) {
+export function buildMoveEffects(
+  move,
+  might,
+  language =
+    getPokemonContentLanguage()
+) {
   const effects = [];
-  const meta = move?.meta ?? {};
-  const rule = SPECIAL_MOVE_RULES[move?.id] ?? {};
-  const effectRule = MOVE_EFFECT_RULES[move?.id] ?? null;
 
-  const push = effect => {
-    if (!effect?.name) return;
-    const key = [
-      effect.target,
-      effect.kind,
-      effect.name,
-      effect.level,
-      effect.trigger
-    ].join("|");
+  const meta =
+    move?.meta
+    ?? {};
 
-    if (effects.some(existing => existing._key === key)) return;
-    effects.push({
-      ...effect,
-      _key: key
-    });
-  };
+  const rule =
+    SPECIAL_MOVE_RULES[
+      move?.id
+    ]
+    ?? {};
 
-  const power = Number(move?.power ?? 0);
-  if (power > 0 && move?.damageClass !== "status") {
-    const level = damageStatusLevel(power);
-    if (level > 0) {
-      push({
-        target: "target",
-        kind: "status",
-        name: language === "en" ? "wounded" : "ferido",
-        level,
-        trigger: "principal",
-        source: "damage"
+  const effectRule =
+    MOVE_EFFECT_RULES[
+      move?.id
+    ]
+    ?? null;
+
+  const push =
+    effect => {
+      if (
+        !effect?.name
+      ) {
+        return;
+      }
+
+      const key =
+        [
+          effect.target,
+          effect.kind,
+          effect.name,
+          effect.level,
+          effect.trigger,
+          effect.intrinsic
+            ? "intrinsic"
+            : "spend"
+        ].join(
+          "|"
+        );
+
+      if (
+        effects.some(
+          existing =>
+            existing._key
+              === key
+        )
+      ) {
+        return;
+      }
+
+      effects.push({
+        ...effect,
+        _key:
+          key
       });
-    }
+    };
+
+  /*
+   * O Move causar dano é uma permissão.
+   * O tier base do Challenge vem do Might,
+   * jamais do Base Power.
+   *
+   * Para jogadores, o Detailed Spend ignora
+   * este level e usa o Power efetivamente gasto.
+   */
+  if (
+    String(
+      move?.damageClass
+      ?? "status"
+    ) !== "status"
+  ) {
+    push({
+      target:
+        "target",
+
+      kind:
+        "status",
+
+      name:
+        language === "en"
+          ? "wounded"
+          : "ferido",
+
+      level:
+        mightConsequenceLevel(
+          might
+        ),
+
+      trigger:
+        "principal",
+
+      source:
+        "damage"
+    });
   }
 
-  const ailment = meta.ailment;
-  if (ailment && ailment !== "none" && ailment !== "unknown") {
-    const chance = Number(meta.ailmentChance ?? move.effectChance ?? 0);
-    const guaranteed = move.damageClass === "status" || chance >= 100;
+  const ailment =
+    meta.ailment;
+
+  if (
+    ailment
+    &&
+    ailment !== "none"
+    &&
+    ailment !== "unknown"
+  ) {
+    const chance =
+      Number(
+        meta.ailmentChance
+        ||
+        move?.effectChance
+        ||
+        0
+      );
+
+    const guaranteed =
+      move?.damageClass
+        === "status"
+      ||
+      chance >= 100;
+
+    const profile =
+      narrativeChanceProfile(
+        chance,
+        guaranteed,
+        language
+      );
+
     push({
-      target: "target",
-      kind: "status",
+      target:
+        "target",
+
+      kind:
+        "status",
+
       name:
         language === "en"
           ? ailment
-          : (AILMENT_PTBR[ailment] ?? ailment),
-      level: guaranteed ? 3 : 2,
-      trigger: consequenceTier(chance, guaranteed),
-      source: "ailment"
+          : (
+              AILMENT_PTBR[
+                ailment
+              ]
+              ?? ailment
+            ),
+
+      /*
+       * Preferred level.
+       * O Spend poderá comprar de 1 até este tier.
+       */
+      level:
+        guaranteed
+          ? 3
+          : 2,
+
+      trigger:
+        "principal",
+
+      source:
+        "ailment",
+
+      chanceNarrative:
+        ailmentNarrativeText(
+          ailment,
+          chance,
+          guaranteed,
+          language
+        ),
+
+      suggestionRank:
+        profile?.rank
+        ?? 3
     });
   }
 
-  if (Number(meta.flinchChance) > 0) {
+  if (
+    Number(
+      meta.flinchChance
+      ?? 0
+    ) > 0
+  ) {
+    const profile =
+      narrativeChanceProfile(
+        meta.flinchChance,
+        false,
+        language
+      );
+
     push({
-      target: "target",
-      kind: "status",
+      target:
+        "target",
+
+      kind:
+        "status",
+
       name:
         language === "en"
           ? "hesitation-on-next-move"
           : "hesitacao-no-proximo-movimento",
-      level: 2,
-      trigger: consequenceTier(meta.flinchChance),
-      expires: "next-action",
-      source: "flinch"
+
+      level:
+        2,
+
+      trigger:
+        "principal",
+
+      expires:
+        "next-action",
+
+      source:
+        "flinch",
+
+      chanceNarrative:
+        flinchNarrativeText(
+          meta.flinchChance,
+          language
+        ),
+
+      suggestionRank:
+        profile?.rank
+        ?? 2
     });
   }
 
-  if (Number(meta.drain) < 0) {
+  /*
+   * Recoil não é prêmio comprado com Power.
+   */
+  if (
+    Number(
+      meta.drain
+      ?? 0
+    ) < 0
+  ) {
     push({
-      target: "self",
-      kind: "status",
+      target:
+        "self",
+
+      kind:
+        "status",
+
       name:
         language === "en"
           ? "hurt-by-recoil"
           : "ferido-pelo-recuo",
-      level: Number(meta.drain) <= -50 ? 2 : 1,
-      trigger: "principal",
-      source: "recoil"
+
+      level:
+        Number(
+          meta.drain
+        ) <= -50
+          ? 2
+          : 1,
+
+      trigger:
+        "principal",
+
+      source:
+        "recoil",
+
+      intrinsic:
+        true
     });
   }
 
-  if (Number(meta.healing) > 0 || Number(meta.drain) > 0) {
+  if (
+    Number(
+      meta.healing
+      ?? 0
+    ) > 0
+    ||
+    Number(
+      meta.drain
+      ?? 0
+    ) > 0
+  ) {
     push({
-      target: "self",
-      kind: "status",
+      target:
+        "self",
+
+      kind:
+        "status",
+
       name:
         language === "en"
           ? "recovered"
           : "recuperado",
-      level: 2,
-      trigger: "principal",
-      source: Number(meta.drain) > 0 ? "drain" : "healing"
+
+      level:
+        2,
+
+      trigger:
+        "principal",
+
+      source:
+        Number(
+          meta.drain
+          ?? 0
+        ) > 0
+          ? "drain"
+          : "healing"
     });
   }
 
-  for (const change of move?.statChanges ?? []) {
-    const amount = Number(change.change ?? 0);
-    if (!amount) continue;
+  for (
+    const change
+    of move?.statChanges
+      ?? []
+  ) {
+    const amount =
+      Number(
+        change.change
+        ?? 0
+      );
+
+    if (!amount) {
+      continue;
+    }
 
     const selfTarget =
-      String(move?.target ?? "").includes("user");
+      String(
+        move?.target
+        ?? ""
+      ).includes(
+        "user"
+      );
 
     const chance =
-      Number(meta.statChance ?? move?.effectChance ?? 0);
+      Number(
+        meta.statChance
+        ||
+        move?.effectChance
+        ||
+        0
+      );
 
-    push({
-      target: selfTarget ? "self" : "target",
-      kind: "status",
-      name: statStatusName(
-        change.stat,
-        amount,
-        language
-      ),
-      level: Math.min(
-        4,
-        Math.max(1, Math.abs(amount) + 1)
-      ),
-      trigger: consequenceTier(
+    const guaranteed =
+      chance <= 0
+      ||
+      chance >= 100;
+
+    const profile =
+      narrativeChanceProfile(
         chance,
-        chance <= 0
-      ),
-      source: "stat-change"
+        guaranteed,
+        language
+      );
+
+    push({
+      target:
+        selfTarget
+          ? "self"
+          : "target",
+
+      kind:
+        "status",
+
+      name:
+        statStatusName(
+          change.stat,
+          amount,
+          language
+        ),
+
+      level:
+        Math.min(
+          4,
+          Math.max(
+            1,
+            Math.abs(
+              amount
+            ) + 1
+          )
+        ),
+
+      trigger:
+        "principal",
+
+      source:
+        "stat-change",
+
+      chanceNarrative:
+        statChangeNarrativeText(
+          change.stat,
+          amount,
+          chance,
+          guaranteed,
+          language
+        ),
+
+      suggestionRank:
+        profile?.rank
+        ?? 3
     });
   }
 
-  if (rule.trap) {
+  if (
+    rule.trap
+  ) {
     push({
-      target: "target",
-      kind: "status",
-      name: language === "en" ? "trapped" : "preso",
-      level: 2,
-      trigger: "principal",
-      source: "trap"
+      target:
+        "target",
+
+      kind:
+        "status",
+
+      name:
+        language === "en"
+          ? "trapped"
+          : "preso",
+
+      level:
+        2,
+
+      trigger:
+        "principal",
+
+      source:
+        "trap"
     });
   }
 
-  if (rule.recharge) {
+  /*
+   * Recharge também é custo do Move,
+   * não compra de efeito.
+   */
+  if (
+    rule.recharge
+  ) {
     push({
-      target: "self",
-      kind: "status",
+      target:
+        "self",
+
+      kind:
+        "status",
+
       name:
         language === "en"
           ? "recovering"
           : "recuperando-se",
-      level: 2,
-      trigger: "principal",
-      source: "recharge"
+
+      level:
+        2,
+
+      trigger:
+        "principal",
+
+      source:
+        "recharge",
+
+      intrinsic:
+        true
     });
   }
 
-  if (rule.statusPt || rule.statusEn) {
+  if (
+    rule.statusPt
+    ||
+    rule.statusEn
+  ) {
     push({
-      target: "target",
-      kind: "status",
+      target:
+        "target",
+
+      kind:
+        "status",
+
       name:
         language === "en"
-          ? (rule.statusEn ?? rule.statusPt)
-          : (rule.statusPt ?? rule.statusEn),
-      level: Number(rule.statusLevel ?? 2),
-      trigger: "principal",
-      source: "move-rule"
+          ? (
+              rule.statusEn
+              ?? rule.statusPt
+            )
+          : (
+              rule.statusPt
+              ?? rule.statusEn
+            ),
+
+      level:
+        Number(
+          rule.statusLevel
+          ?? 2
+        ),
+
+      trigger:
+        "principal",
+
+      source:
+        "move-rule"
     });
   }
 
-  if (rule.selfPt || rule.selfEn) {
+  if (
+    rule.selfPt
+    ||
+    rule.selfEn
+  ) {
     push({
-      target: "self",
-      kind: "status",
+      target:
+        "self",
+
+      kind:
+        "status",
+
       name:
         language === "en"
-          ? (rule.selfEn ?? rule.selfPt)
-          : (rule.selfPt ?? rule.selfEn),
-      level: Number(rule.selfLevel ?? 2),
-      trigger: "principal",
-      source: "move-rule"
+          ? (
+              rule.selfEn
+              ?? rule.selfPt
+            )
+          : (
+              rule.selfPt
+              ?? rule.selfEn
+            ),
+
+      level:
+        Number(
+          rule.selfLevel
+          ?? 2
+        ),
+
+      trigger:
+        "principal",
+
+      source:
+        "move-rule"
     });
   }
 
-  if (effectRule?.statusPt || effectRule?.statusEn) {
+  if (
+    effectRule?.statusPt
+    ||
+    effectRule?.statusEn
+  ) {
     push({
-      target: effectRule.target ?? "target",
-      kind: effectRule.kind ?? "status",
+      target:
+        effectRule.target
+        ?? "target",
+
+      kind:
+        effectRule.kind
+        ?? "status",
+
       name:
         language === "en"
-          ? (effectRule.statusEn ?? effectRule.statusPt)
-          : (effectRule.statusPt ?? effectRule.statusEn),
-      level: Number(effectRule.level ?? 2),
-      trigger: "principal",
-      source: "database-effect"
+          ? (
+              effectRule.statusEn
+              ?? effectRule.statusPt
+            )
+          : (
+              effectRule.statusPt
+              ?? effectRule.statusEn
+            ),
+
+      level:
+        Number(
+          effectRule.level
+          ?? 2
+        ),
+
+      trigger:
+        "principal",
+
+      source:
+        "database-effect"
     });
   }
 
-  return effects.map(({ _key, ...effect }) => effect);
+  return effects.map(
+    (
+      {
+        _key,
+        ...effect
+      }
+    ) =>
+      effect
+  );
 }
+
 
 export function buildAbilityThreat(ability, language = getPokemonContentLanguage()) {
   if (!ability?.id) return null;
