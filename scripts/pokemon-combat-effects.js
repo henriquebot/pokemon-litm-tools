@@ -479,6 +479,21 @@ function effectPositive(effect) {
   return false;
 }
 
+function pokemonEffectRequiresDamage(effect) {
+  // These sources explicitly describe damage or a fraction of damage dealt.
+  // Ailments, Tags and other secondary effects have no such dependency in the model.
+  return ["damage", "guided-challenge-damage", "drain", "drain-heal", "recoil"]
+    .includes(String(effect?.source ?? "").trim().toLowerCase());
+}
+
+export function pokemonMoveTargetIsImmune(move, actor) {
+  return knownPokemonTypeMultiplier(actor, move?.type ?? "normal") === 0;
+}
+
+export function pokemonEffectAllowedForTarget(move, effect, actor) {
+  return !pokemonEffectRequiresDamage(effect) || !pokemonMoveTargetIsImmune(move, actor);
+}
+
 function statusEntry(effect, multiplier = 1) {
   let level = Math.max(1, Math.min(6, Number(effect?.level ?? effect?.tier ?? 1) || 1));
   const source = String(effect?.source ?? "").toLowerCase();
@@ -563,7 +578,8 @@ async function applyEffectsToActor(actor, effects, multiplier, maxRank) {
 
   for (const effect of effects) {
     if (effectRank(effect?.trigger) > maxRank) continue;
-    if (multiplier === 0 && String(effect?.target ?? "target") !== "self") continue;
+    if (multiplier === 0 && pokemonEffectRequiresDamage(effect)
+      && String(effect?.target ?? "target").toLowerCase() !== "self") continue;
 
     const entry = statusEntry(effect, multiplier);
     if (!entry) continue;
@@ -1679,7 +1695,8 @@ async function sceneDataItemForSpend(sceneId) {
 
 async function applyFloatingSpendDelta(document, effect, multiplier = 1) {
   if (!document) throw new Error("Destino da consequência não encontrado.");
-  if (multiplier === 0 && String(effect?.target ?? "target").toLowerCase() !== "self") {
+  if (multiplier === 0 && pokemonEffectRequiresDamage(effect)
+    && String(effect?.target ?? "target").toLowerCase() !== "self") {
     return { applied: false, immune: true };
   }
   const entry = statusEntry(effect, multiplier);
@@ -2085,9 +2102,10 @@ async function applyContextSpendDirect(payload) {
       let delta = null;
       if (mode === "apply") {
         let multiplier = 1;
-        if (target.targetKind === "actor" && move && payload.pokemonSuggested === true) {
+        if (target.targetKind === "actor" && destination.kind !== "self"
+          && move && payload.pokemonSuggested === true) {
           multiplier = multiplierFor(target.document, move.type ?? "normal");
-          if (multiplier === 0) {
+          if (!pokemonEffectAllowedForTarget(move, payload.effect, target.document)) {
             skippedImmune.push(target.tokenId ?? target.actorId);
             continue;
           }
@@ -2664,7 +2682,8 @@ function pokemonTypeEffectiveness(
     actor?.getFlag?.(
       MODULE_ID,
       "typeEffectiveness"
-    );
+    )
+    ?? actor?.flags?.[MODULE_ID]?.typeEffectiveness;
 
   if (
     direct
@@ -2681,7 +2700,8 @@ function pokemonTypeEffectiveness(
     actor?.getFlag?.(
       MODULE_ID,
       "characterPokemonProfile"
-    );
+    )
+    ?? actor?.flags?.[MODULE_ID]?.characterPokemonProfile;
 
   return (
     profile?.typeEffectiveness
@@ -2692,6 +2712,16 @@ function pokemonTypeEffectiveness(
   )
     ? profile.typeEffectiveness
     : {};
+}
+
+
+export function knownPokemonTypeMultiplier(actor, type) {
+  const raw = pokemonTypeEffectiveness(actor)?.[type];
+  if (raw == null || typeof raw === "boolean"
+    || (typeof raw === "string" && !raw.trim())) return null;
+  if (typeof raw !== "number" && typeof raw !== "string") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 
@@ -3420,11 +3450,7 @@ function immuneTargetsForMove(
     ?? []
   ).filter(
     token =>
-      multiplierForActorType(
-        token?.actor,
-        move?.type
-          ?? "normal"
-      ) === 0
+      pokemonMoveTargetIsImmune(move, token?.actor)
   );
 }
 
@@ -4370,6 +4396,44 @@ function createMechanicBadge(
 }
 
 
+function compactPokemonMatchupLabel(multiplier) {
+  if (!["number", "string"].includes(typeof multiplier)) return "";
+  if (typeof multiplier === "string" && !multiplier.trim()) return "";
+  const value = Number(multiplier);
+  return Number.isFinite(value) && value >= 0 && value !== 1
+    ? matchupLabel(value)
+    : "";
+}
+
+function pokemonMatchupBadgeText(name, multiplier) {
+  const label = compactPokemonMatchupLabel(multiplier);
+  return label ? String(name ?? "Alvo") + ": " + label : "";
+}
+
+function createPokemonMatchupBadge(name, multiplier) {
+  const text = pokemonMatchupBadgeText(name, multiplier);
+  if (!text) return null;
+  const badge = createMechanicBadge(text);
+  if (Number(multiplier) === 0) badge.classList.add("pokemon-matchup-immune");
+  return badge;
+}
+
+function applyPokemonMoveTypeAccent(element, move) {
+  const type = String(move?.type ?? "").trim().toLowerCase();
+  if (!Object.hasOwn(TYPE_COLORS, type)) return;
+  element.dataset.pokemonMoveType = type;
+  element.style.setProperty("--pokemon-move-type-color", typeColor(type));
+}
+
+function createPokemonMoveTypeBadge(mechanics) {
+  const badge = createMechanicBadge(mechanics.typeText);
+  badge.classList.add("pokemon-move-type-badge");
+  badge.title = mechanics.typeBadge;
+  badge.setAttribute("aria-label", mechanics.typeBadge);
+  return badge;
+}
+
+
 function pokemonMoveMechanicsElement(
   move
 ) {
@@ -4386,14 +4450,16 @@ function pokemonMoveMechanicsElement(
   element.className =
     "pokemon-litm-mechanic-badges";
 
+  applyPokemonMoveTypeAccent(element, move);
+
   for (
     const badge
     of mechanics.badges
   ) {
     element.append(
-      createMechanicBadge(
-        badge
-      )
+      badge === mechanics.typeBadge
+        ? createPokemonMoveTypeBadge(mechanics)
+        : createMechanicBadge(badge)
     );
   }
 
@@ -4657,6 +4723,8 @@ function renderPokemonRollPackage(
   section.className =
     "pokemon-litm-roll-package";
 
+  applyPokemonMoveTypeAccent(section, move ?? reaction?.move);
+
   section.dataset
     .pokemonRollPackage =
       "true";
@@ -4712,9 +4780,9 @@ function renderPokemonRollPackage(
     of mechanics.badges
   ) {
     badges.append(
-      createMechanicBadge(
-        badge
-      )
+      badge === mechanics.typeBadge
+        ? createPokemonMoveTypeBadge(mechanics)
+        : createMechanicBadge(badge)
     );
   }
 
@@ -4728,12 +4796,11 @@ function renderPokemonRollPackage(
       )
     );
 
-    if (
-      reaction.multiplierLabel
-    ) {
+    const reactionMatchup = compactPokemonMatchupLabel(reaction.multiplier);
+    if (reactionMatchup) {
       badges.append(
         createMechanicBadge(
-          reaction.multiplierLabel
+          reactionMatchup
         )
       );
     }
@@ -4750,19 +4817,11 @@ function renderPokemonRollPackage(
             ?? "normal"
         );
 
-      badges.append(
-        createMechanicBadge(
-          (
-            target.name
-            ?? target.actor?.name
-            ?? "Alvo"
-          )
-          + ": "
-          + matchupLabel(
-              multiplier
-            )
-        )
+      const badge = createPokemonMatchupBadge(
+        target.name ?? target.actor?.name ?? "Alvo",
+        multiplier
       );
+      if (badge) badges.append(badge);
     }
   }
 
@@ -5564,8 +5623,9 @@ function matchupSummary(move, targets) {
     + targets.map(token => {
       const actor = token.actor;
       const multiplier = multiplierFor(actor, move.type);
+      const label = compactPokemonMatchupLabel(multiplier);
       return "<div><strong>" + esc(token.name ?? actor?.name ?? "Alvo")
-        + "</strong><span>" + esc(matchupLabel(multiplier)) + "</span></div>";
+        + "</strong>" + (label ? "<span>" + esc(label) + "</span>" : "") + "</div>";
     }).join("")
     + "</div>";
 }
@@ -5884,7 +5944,7 @@ async function applyGuidedChallengeConsequenceDirect(payload) {
     let delta = 0;
     if (move) {
       multiplier = multiplierFor(actor, move.type ?? "normal");
-      if (multiplier === 0) {
+      if (!pokemonEffectAllowedForTarget(move, effect, actor)) {
         report.push({
           actorId: actor.id,
           tokenId: token.id,
@@ -7266,6 +7326,79 @@ function iconActionButton(title, icon, handler) {
   return button;
 }
 
+function consequenceVfxActions(data, scene) {
+  if (!data || !scene || scene.id !== data.sceneId) return [];
+  const targetTokenIds = [...new Set(data.targetTokenIds ?? [])]
+    .filter(id => !!scene.tokens?.get(id)?.actor);
+  if (!targetTokenIds.length) return [];
+
+  const actions = [{
+    mode: "target",
+    title: "VFX no alvo",
+    icon: "fa-wand-magic-sparkles",
+    targetTokenIds
+  }];
+  const source = scene.tokens?.get(data.sourceTokenId);
+  if (source?.actor && targetTokenIds.some(id => id !== source.id)) {
+    actions.push({
+      mode: "source-target",
+      title: "VFX atacante → alvo",
+      icon: "fa-arrow-right-long",
+      sourceTokenId: source.id,
+      targetTokenIds
+    });
+  }
+  return actions;
+}
+
+async function replayConsequenceVfx(data, mode) {
+  // Resolve os documentos novamente: tokens podem ter saído da cena desde o card.
+  const action = consequenceVfxActions(data, canvas?.scene).find(row => row.mode === mode);
+  if (!action) throw new Error("Abra a cena da consequência e verifique os tokens envolvidos.");
+  const type = Object.hasOwn(TYPE_COLORS, data.type) ? data.type : "normal";
+  if (mode === "target") {
+    for (const id of action.targetTokenIds) {
+      await broadcastMoveVfx(data.sceneId, id, [id], type);
+    }
+  } else {
+    await broadcastMoveVfx(data.sceneId, action.sourceTokenId, action.targetTokenIds, type);
+  }
+}
+
+function decorateConsequenceVfx(message, root) {
+  if (!game.user.isGM || root.querySelector(".pokemon-consequence-vfx")) return;
+  const data = message.getFlag?.(MODULE_ID, "consequenceVfx");
+  const actions = consequenceVfxActions(data, canvas?.scene);
+  if (!actions.length) return;
+  const controls = document.createElement("span");
+  controls.className = "pokemon-consequence-vfx";
+  for (const action of actions) {
+    controls.append(iconActionButton(action.title, action.icon, () => replayConsequenceVfx(data, action.mode)));
+  }
+  const host = root.querySelector(".pokemon-guided-mini-card.consequence > div")
+    ?? root.querySelector(".message-content") ?? root;
+  host.append(controls);
+}
+
+function consequenceVfxControlsSelfTest() {
+  const tokens = new Map([
+    ["source", { id: "source", actor: {} }],
+    ["target", { id: "target", actor: {} }]
+  ]);
+  const scene = { id: "scene", tokens };
+  const data = { sceneId: "scene", sourceTokenId: "source", targetTokenIds: ["target", "missing", "target"] };
+  const actions = consequenceVfxActions(data, scene);
+  const noSource = consequenceVfxActions({ ...data, sourceTokenId: "missing" }, scene);
+  return actions.length === 2
+    && actions[0].mode === "target"
+    && actions[0].targetTokenIds.length === 1
+    && actions[1].sourceTokenId === "source"
+    && noSource.length === 1 && noSource[0].mode === "target"
+    && consequenceVfxActions({ ...data, targetTokenIds: ["missing"] }, scene).length === 0
+    && consequenceVfxActions(data, { ...scene, id: "other" }).length === 0
+    && consequenceVfxActions(data, null).length === 0;
+}
+
 
 async function addPokemonCharacterOtherActions(actor, root) {
   const panel = findOtherPanel(root);
@@ -7969,18 +8102,26 @@ function contextSpendDestination(value, frozenTargetIds) {
   return null;
 }
 
-function pokemonSuggestedEligibleIds(move, effect, frozenTargetIds) {
+function pokemonSuggestedEligibleIds(move, effect, frozenTargetIds = []) {
   const targetKind = String(effect?.target ?? "target").toLowerCase();
   if (targetKind !== "target") return [...frozenTargetIds];
   return targetDocuments(frozenTargetIds)
-    .filter(token => multiplierFor(token.actor, move?.type ?? "normal") !== 0)
+    .filter(token => token.actor && pokemonEffectAllowedForTarget(move, effect, token.actor))
     .map(token => token.id);
 }
 
-function pokemonSuggestedEffectAllowed(move, effect, frozenTargetIds) {
-  if (String(effect?.target ?? "target").toLowerCase() !== "target") return true;
-  if (!frozenTargetIds.length) return false;
-  return pokemonSuggestedEligibleIds(move, effect, frozenTargetIds).length > 0;
+function pokemonSuggestedEffectAllowedForTargets(move, effect, targets) {
+  const validTargets = (targets ?? []).filter(token => !!token?.actor);
+  if (String(effect?.target ?? "target").toLowerCase() === "target") {
+    return validTargets.some(token => pokemonEffectAllowedForTarget(move, effect, token.actor));
+  }
+  // Drain/recoil depend on damage dealt to an opponent, never on the user's own type.
+  return !pokemonEffectRequiresDamage(effect) || !validTargets.length
+    || validTargets.some(token => pokemonEffectAllowedForTarget(move, effect, token.actor));
+}
+
+function pokemonSuggestedEffectAllowed(move, effect, frozenTargetIds = []) {
+  return pokemonSuggestedEffectAllowedForTargets(move, effect, targetDocuments(frozenTargetIds));
 }
 
 export async function commitContextSpend(message, entry, applyPayload) {
@@ -8658,6 +8799,8 @@ function appendMoveMechanicsToChat(
   move,
   targetIds
 ) {
+  applyPokemonMoveTypeAccent(panel, move);
+
   const targetBadges =
     document.createElement(
       "div"
@@ -8666,28 +8809,21 @@ function appendMoveMechanicsToChat(
   targetBadges.className =
     "pokemon-litm-mechanic-badges pokemon-chat-matchup-badges";
 
+  if (panel.dataset.pokemonMoveType) {
+    targetBadges.append(createPokemonMoveTypeBadge(moveLitmProfile(move)));
+  }
+
   for (
     const token
     of targetDocuments(
       targetIds
     )
   ) {
-    targetBadges.append(
-      createMechanicBadge(
-        (
-          token.name
-          ?? token.actor?.name
-          ?? "Alvo"
-        )
-        + ": "
-        + matchupLabel(
-            multiplierFor(
-              token.actor,
-              move.type
-            )
-          )
-      )
+    const badge = createPokemonMatchupBadge(
+      token.name ?? token.actor?.name ?? "Alvo",
+      multiplierFor(token.actor, move.type)
     );
+    if (badge) targetBadges.append(badge);
   }
 
   if (
@@ -9228,6 +9364,8 @@ function appendPokemonIntrinsicEffects({
         row =>
           row.effect?.intrinsic
             === true
+          && (pokemonSuggestedEffectAllowed(move, row.effect, targetIds)
+            || !!pokemonIntrinsicApplications(message)[pokemonIntrinsicApplicationKey(move, row.index)])
       );
 
   if (
@@ -9768,16 +9906,17 @@ async function onRenderPokemonChatMessage(
   message,
   html
 ) {
-  const actor = game.actors.get(message?.speaker?.actor);
-  if (!actor) return;
-  if (!game.user.isGM && !actor.isOwner) return;
-
   const root = html instanceof HTMLElement
     ? html
     : html?.[0] instanceof HTMLElement
       ? html[0]
       : null;
   if (!root) return;
+
+  decorateConsequenceVfx(message, root);
+  const actor = game.actors.get(message?.speaker?.actor);
+  if (!actor) return;
+  if (!game.user.isGM && !actor.isOwner) return;
 
   const reaction = message.getFlag?.(MODULE_ID, "pokemonReaction");
   if (reaction) {
@@ -10058,6 +10197,35 @@ export async function pokemonLitmCombatSelfTest() {
     && typeof pokemonSuggestedEffectAllowed === "function"
     && typeof pokemonSpendSuggestions === "function";
 
+  const immunityActor = multiplier => ({
+    getFlag: (_scope, key) => key === "typeEffectiveness" ? { normal: multiplier } : null
+  });
+  const immunityMove = { type: "normal", power: 40, damageClass: "physical" };
+  const immuneTarget = { actor: immunityActor(0) };
+  const neutralTarget = { actor: immunityActor(1) };
+  const unknownTarget = { actor: { getFlag: () => null } };
+  const damageSuggestion = { target: "target", source: "damage", kind: "status" };
+  const independentStatus = { target: "target", source: "ailment", kind: "status" };
+  const independentTag = { target: "target", source: "database-effect", kind: "tag" };
+  const allowsSuggestion = (effect, targets) =>
+    pokemonSuggestedEffectAllowedForTargets(immunityMove, effect, targets);
+
+  checks.immunitySuggestionGuardInstalled =
+    !allowsSuggestion(damageSuggestion, [immuneTarget])
+    && !allowsSuggestion({ target: "self", source: "drain" }, [immuneTarget])
+    && !allowsSuggestion({ target: "self", source: "recoil", intrinsic: true }, [immuneTarget])
+    && allowsSuggestion(independentStatus, [immuneTarget])
+    && allowsSuggestion(independentTag, [immuneTarget])
+    && allowsSuggestion({ target: "self", source: "healing" }, [immuneTarget])
+    && allowsSuggestion({ target: "self", source: "recharge", intrinsic: true }, [immuneTarget])
+    && allowsSuggestion(damageSuggestion, [immuneTarget, neutralTarget])
+    && allowsSuggestion(damageSuggestion, [unknownTarget])
+    && [null, "", "   ", false, true, NaN, -1, {}].every(value =>
+      allowsSuggestion(damageSuggestion, [{ actor: immunityActor(value) }]))
+    && !allowsSuggestion(damageSuggestion, [{ actor: immunityActor("0") }])
+    && !allowsSuggestion(damageSuggestion, [{}, null])
+    && !allowsSuggestion(damageSuggestion, []);
+
   checks.contextSpendInstalled =
     POKEMON_CONTEXT_SPEND_REV === "2026-09-08-context-spend-v2"
     && typeof wirePokemonNativeSpendControls === "function"
@@ -10078,6 +10246,8 @@ export async function pokemonLitmCombatSelfTest() {
     typeof replayVfxTargetIds === "function"
     && replayVfxTargetIds.toString().includes("game.user?.targets");
 
+  checks.consequenceVfxControlsInstalled = consequenceVfxControlsSelfTest();
+
   checks.nativeSpendContextMenusInstalled =
     typeof openNativePokemonStatusSpend === "function"
     && typeof openNativePokemonTagSpend === "function"
@@ -10086,6 +10256,15 @@ export async function pokemonLitmCombatSelfTest() {
   checks.compactPokemonChatInstalled =
     typeof iconActionButton === "function"
     && !onRenderPokemonChatMessage.toString().includes("pokemon-chat-move-header");
+
+  checks.neutralSeekingHidden = [
+    1, "1", null, undefined, "", " ", false, NaN, Infinity, -1, "Neutro", "Neutral", []
+  ].every(multiplier => pokemonMatchupBadgeText("Seeking", multiplier) === "");
+
+  checks.relevantMatchupsPreserved =
+    pokemonMatchupBadgeText("Seeking", 0) === "Seeking: Imune"
+    && pokemonMatchupBadgeText("Seeking", 0.5) === "Seeking: Resistente"
+    && pokemonMatchupBadgeText("Seeking", 2) === "Seeking: Vulnerável";
 
   checks.typeTintedVfxInstalled =
     playMoveVfxLocal.toString().includes("databasePath")

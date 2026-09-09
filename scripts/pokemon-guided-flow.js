@@ -2,7 +2,9 @@ import {
   spendPokemonPower,
   commitContextSpend,
   applyGuidedChallengeConsequence,
-  challengeConsequenceTierDelta
+  challengeConsequenceTierDelta,
+  pokemonEffectAllowedForTarget,
+  pokemonMoveTargetIsImmune
 } from "./pokemon-combat-effects.js";
 
 const MODULE_ID = "pokemon-litm-tools";
@@ -175,7 +177,7 @@ function messageTargetIds(message) {
   return Array.isArray(ids) ? ids : [];
 }
 
-function postMiniCard({ icon = "fa-sparkles", title, body = "", css = "" }) {
+function postMiniCard({ icon = "fa-sparkles", title, body = "", css = "", consequenceVfx = null }) {
   const content = [
     '<div class="pokemon-guided-mini-card ' + esc(css) + '">',
     '<i class="fa-solid ' + esc(icon) + '"></i>',
@@ -186,7 +188,8 @@ function postMiniCard({ icon = "fa-sparkles", title, body = "", css = "" }) {
 
   return ChatMessage.create({
     content,
-    speaker: ChatMessage.getSpeaker()
+    speaker: ChatMessage.getSpeaker(),
+    ...(consequenceVfx ? { flags: { [MODULE_ID]: { consequenceVfx } } } : {})
   });
 }
 
@@ -624,7 +627,7 @@ function selectedSingleUseWorldEntries(message, data) {
   if (scene) {
     const sceneData = game.items.find(item => item.type === "scene-data" && item.system?.sceneKey === scene.id) ?? null;
     collectFloating(sceneData, { sceneDataItemId: sceneData?.id ?? null });
-    for (const token of scene.tokens) {
+    for (const token of sceneTokensList(scene)) {
       if (token.actor?.type === "litm-npc") {
         collectFloating(token.actor, { tokenId: token.id, actorId: token.actor.id });
       }
@@ -702,25 +705,56 @@ function onPreCreateGuidedChat(message, data, options, userId) {
   if (sceneId) requestBurnSingleUse(sceneId, rows);
 }
 
+function sceneTokensList(scene) {
+  if (!scene?.tokens) return [];
+  if (Array.isArray(scene.tokens)) return scene.tokens;
+  if (typeof scene.tokens.values === "function") return [...scene.tokens.values()];
+  return [...scene.tokens];
+}
+
 function isPokemonChallenge(actor) {
   if (actor?.type !== "litm-npc") return false;
   const flags = actor.flags?.[MODULE_ID] ?? {};
   return flags.pokemonBuilder === true
+    || actor.getFlag?.(MODULE_ID, "pokemonBuilder") === true
     || flags.kind === "pokemon"
-    || Number(flags.pokemonId ?? 0) > 0
+    || actor.getFlag?.(MODULE_ID, "kind") === "pokemon"
+    || Number(flags.pokemonId ?? actor.getFlag?.(MODULE_ID, "pokemonId") ?? 0) > 0
     || (actor.system?.roles ?? []).some(role => String(role).toLowerCase() === "pokémon");
 }
 
 function sceneDataItem(sceneId) {
-  return game.items.find(item => item.type === "scene-data" && item.system?.sceneKey === sceneId) ?? null;
+  if (typeof game.items?.find === "function") {
+    return game.items.find(item => item.type === "scene-data" && item.system?.sceneKey === sceneId) ?? null;
+  }
+  return [...(game.items?.values?.() ?? [])].find(item => item.type === "scene-data" && item.system?.sceneKey === sceneId) ?? null;
 }
 
-function activeConsequenceSources(sceneId) {
-  const scene = game.scenes.get(sceneId);
+function currentConsequenceTargetTokens(scene, currentTargets = game.user?.targets ?? []) {
+  const tokens = new Map();
+  for (const target of currentTargets) {
+    const document = target?.document ?? target;
+    const targetSceneId = document?.parent?.id ?? target?.scene?.id;
+    if (targetSceneId && targetSceneId !== scene?.id) continue;
+    const token = scene?.tokens?.get(document?.id);
+    if (token?.actor) tokens.set(token.id, token);
+  }
+  return [...tokens.values()];
+}
+
+function prioritizeConsequenceSources(sources, targetTokens) {
+  const targetIds = new Set(targetTokens.map(token => token.id));
+  return [
+    ...sources.filter(source => targetIds.has(source.tokenId)),
+    ...sources.filter(source => !targetIds.has(source.tokenId))
+  ];
+}
+
+function consequenceSourcesForScene(scene, journey = null) {
   if (!scene) return [];
   const rows = [];
 
-  for (const token of scene.tokens) {
+  for (const token of sceneTokensList(scene)) {
     const actor = token.actor;
     if (!actor || actor.type !== "litm-npc") continue;
     const bossPhaseOne = actor.getFlag?.(MODULE_ID, "bossPhaseRole") === "phase1";
@@ -737,6 +771,12 @@ function activeConsequenceSources(sceneId) {
           name: token.name ?? actor.name,
           actorId: actor.id,
           tokenId: token.id,
+          bossPhaseOne,
+          bossFinalActorId: bossPhaseOne
+            ? actor.getFlag?.(MODULE_ID, "bossFinalActorId")
+              ?? actor.getFlag?.(MODULE_ID, "bossNextActorId")
+              ?? null
+            : null,
           actions: moves
         });
         continue;
@@ -754,14 +794,17 @@ function activeConsequenceSources(sceneId) {
         name: token.name ?? actor.name,
         actorId: actor.id,
         tokenId: token.id,
+        bossPhaseOne,
+        bossFinalActorId: bossPhaseOne
+          ? actor.getFlag?.(MODULE_ID, "bossFinalActorId")
+            ?? actor.getFlag?.(MODULE_ID, "bossNextActorId")
+            ?? null
+          : null,
         actions: threats
       });
     }
   }
 
-  const data = sceneDataItem(sceneId);
-  const journeyId = String(data?.system?.assignedJourneyId ?? "");
-  const journey = journeyId ? game.actors.get(journeyId) : null;
   if (journey?.type === "litm-journey") {
     const consequences = Array.isArray(journey.system?.generalConsequences)
       ? journey.system.generalConsequences
@@ -787,6 +830,63 @@ function activeConsequenceSources(sceneId) {
   return rows;
 }
 
+const retainedPhaseOneSourcesByScene = new Map();
+const retainedConsequenceSourcesByMessage = new Map();
+
+function recordPhaseOneSources(sceneId, sources) {
+  if (!sceneId || !Array.isArray(sources)) return;
+  const phaseOnes = sources.filter(source => source?.bossPhaseOne);
+  if (!phaseOnes.length) return;
+  const existing = retainedPhaseOneSourcesByScene.get(sceneId) ?? [];
+  const map = new Map(existing.map(row => [row.id, row]));
+  for (const source of phaseOnes) map.set(source.id, source);
+  retainedPhaseOneSourcesByScene.set(sceneId, [...map.values()]);
+}
+
+function phaseOneSourceStillRelevant(source, scene) {
+  const finalActorId = String(source?.bossFinalActorId ?? "");
+  if (!source?.bossPhaseOne || !scene || !finalActorId) return false;
+  return sceneTokensList(scene).some(token =>
+    String(token?.actorId ?? token?.actor?.id ?? "") === finalActorId
+  );
+}
+
+function retainPhaseOneSources(currentSources, previousSources = [], sceneRef = null) {
+  const sources = [...currentSources];
+  const currentIds = new Set(sources.map(row => row.id));
+  const scene = sceneRef && typeof sceneRef === "object"
+    ? sceneRef
+    : (sceneRef ? game.scenes.get(sceneRef) : null);
+  const sceneId = String(scene?.id ?? sceneRef ?? "");
+  const combinedPrevious = [
+    ...(Array.isArray(previousSources) ? previousSources : []),
+    ...(sceneId ? retainedPhaseOneSourcesByScene.get(sceneId) ?? [] : [])
+  ];
+  const retained = new Map();
+
+  for (const source of combinedPrevious) {
+    if (!source?.bossPhaseOne) continue;
+    const currentlyPresent = currentIds.has(source.id);
+    if (!currentlyPresent && !phaseOneSourceStillRelevant(source, scene)) continue;
+    retained.set(source.id, source);
+    if (!currentlyPresent) sources.push(source);
+  }
+
+  if (sceneId) retainedPhaseOneSourcesByScene.set(sceneId, [...retained.values()]);
+  return sources;
+}
+
+function activeConsequenceSources(sceneId, previousSources = []) {
+  const scene = game.scenes.get(sceneId);
+  const data = sceneDataItem(sceneId);
+  const journeyId = String(data?.system?.assignedJourneyId ?? "");
+  const journey = journeyId ? game.actors.get(journeyId) : null;
+  const freshSources = consequenceSourcesForScene(scene, journey);
+  recordPhaseOneSources(sceneId, freshSources);
+  const sources = retainPhaseOneSources(freshSources, previousSources, sceneId);
+  return prioritizeConsequenceSources(sources, currentConsequenceTargetTokens(scene));
+}
+
 function parseStatusMarkup(source) {
   const text = [
     source?.description,
@@ -799,18 +899,33 @@ function parseStatusMarkup(source) {
     : null;
 }
 
-function consequenceTargets(sceneId, sourceTokenId) {
-  const scene = game.scenes.get(sceneId);
+function consequenceTargetRows(scene, sourceTokenId, currentTargets) {
+  const targetTokens = currentConsequenceTargetTokens(scene, currentTargets);
+  const characterTargets = targetTokens.filter(token =>
+    token.id !== sourceTokenId && token.actor?.type === "litm-character"
+  );
+  const actorKey = token => token.actorLink === false || token.actor?.isToken === true
+    ? "token:" + token.id
+    : "actor:" + token.actor.id;
+  const targetKeys = new Set(characterTargets.map(actorKey));
   const seen = new Set();
   const rows = [];
-  for (const token of scene?.tokens ?? []) {
-    if (token.id === sourceTokenId || !token.actor || token.actor.type !== "litm-character") continue;
-    const key = token.actorLink === false ? "token:" + token.id : "actor:" + token.actor.id;
+
+  // O token de personagem realmente targetado aparece primeiro.
+  // Challenges targetados continuam sendo usados apenas como fonte.
+  const candidates = [...characterTargets, ...sceneTokensList(scene)];
+  for (const token of candidates) {
+    if (token.id === sourceTokenId || token.actor?.type !== "litm-character") continue;
+    const key = actorKey(token);
     if (seen.has(key)) continue;
     seen.add(key);
-    rows.push({ id: token.id, name: token.name ?? token.actor.name ?? "Actor" });
+    rows.push({ id: token.id, name: token.name ?? token.actor.name ?? "Actor", checked: targetKeys.has(key) });
   }
   return rows;
+}
+
+function consequenceTargets(sceneId, sourceTokenId) {
+  return consequenceTargetRows(game.scenes.get(sceneId), sourceTokenId, game.user?.targets ?? []);
 }
 
 function pokemonMoveEffects(move) {
@@ -821,6 +936,17 @@ function pokemonMoveEffects(move) {
     return [{ target: "target", kind: "status", name: "ferido", level: 1, positive: false, source: "damage", trigger: "principal" }];
   }
   return [];
+}
+
+function consequenceEffectChoices(move, effects, targetActors) {
+  return effects.map((effect, index) => ({ effect, index }))
+    .filter(({ effect }) => !targetActors.length
+      || targetActors.some(actor => pokemonEffectAllowedForTarget(move, effect, actor)));
+}
+
+function consequenceEffectOptions(choices) {
+  return choices.map(({ effect, index }) => '<option value="effect:' + index + '">' + esc(effect.name ?? "efeito") + (effect.kind === "tag" ? "" : "-" + Number(effect.level ?? 1)) + '</option>').join("")
+    + '<option value="custom">Personalizado…</option>';
 }
 
 async function chooseSourceAction(source) {
@@ -853,32 +979,60 @@ async function chooseThreatOrConsequence(source, action) {
 
 async function chooseConsequenceEffect(source, action, sceneId) {
   const targets = consequenceTargets(sceneId, source.tokenId);
-  if (!targets.length) throw new Error("Não há Actors de personagem disponíveis na cena.");
+  if (!targets.length) throw new Error("NÃ£o hÃ¡ personagens disponÃ­veis na cena.");
 
+  const scene = game.scenes.get(sceneId);
+  const actorForTarget = target => scene?.tokens?.get(target.id)?.actor;
   const effects = source.kind === "pokemon" ? pokemonMoveEffects(action) : [];
+  const choices = consequenceEffectChoices(action, effects, targets.filter(target => target.checked).map(actorForTarget).filter(Boolean));
+  const customEffect = { target: "target", kind: "status", name: "", level: 1, positive: false, source: "challenge-guided" };
   const markup = parseStatusMarkup(action);
-  const defaultEffect = effects[0] ?? (markup
+  const defaultEffect = choices[0]?.effect ?? (source.kind === "pokemon" && effects.length ? customEffect : markup
     ? { target: "target", kind: "status", name: markup.name, level: markup.level, positive: false, source: "challenge" }
     : { target: "target", kind: "status", name: "complicado", level: 1, positive: false, source: "challenge" });
-
-  const effectOptions = [
-    ...effects.map((effect, index) => '<option value="effect:' + index + '">' + esc(effect.name ?? "efeito") + (effect.kind === "tag" ? "" : "-" + Number(effect.level ?? 1)) + '</option>'),
-    '<option value="custom">Personalizado…</option>'
-  ].join("");
 
   const result = await foundry.applications.api.DialogV2.input({
     window: { title: "Aplicar consequência" },
     position: { width: 520 },
     content:
       '<div class="pokemon-guided-dialog">'
-      + (source.kind === "pokemon" ? '<label>Efeito sugerido<select name="effect">' + effectOptions + '</select></label>' : "")
+      + (source.kind === "pokemon" ? '<label>Efeito sugerido<select name="effect">' + consequenceEffectOptions(choices) + '</select></label><small data-consequence-immunity aria-live="polite" hidden></small>' : "")
       + '<label>Status / Tag<input name="name" type="text" value="' + esc(defaultEffect.name ?? "consequência") + '"></label>'
       + '<label>Tier<select name="level">' + [1,2,3,4,5,6].map(level => '<option value="' + level + '"' + (level === Number(defaultEffect.level ?? 1) ? ' selected' : '') + '>' + level + '</option>').join("") + '</select></label>'
       + '<fieldset><legend>Actors afetados</legend>'
-      + targets.map((target, index) => '<label class="pokemon-guided-check"><input type="checkbox" name="target_' + index + '" checked> ' + esc(target.name) + '</label>').join("")
+      + targets.map((target, index) => '<label class="pokemon-guided-check"><input type="checkbox" name="target_' + index + '"' + (target.checked ? ' checked' : '') + '> ' + esc(target.name)
+        + (source.kind === "pokemon" && pokemonMoveTargetIsImmune(action, actorForTarget(target)) ? ' · imune ao dano' : '') + '</label>').join("")
       + '</fieldset>'
       + '</div>',
     ok: { label: "Aplicar", icon: "fa-solid fa-burst" },
+    render: (_event, dialog) => {
+      if (source.kind !== "pokemon") return;
+      const root = dialog.element;
+      const select = root.querySelector('[name="effect"]');
+      const nameInput = root.querySelector('[name="name"]');
+      const levelInput = root.querySelector('[name="level"]');
+      const refresh = (changeEffect = false) => {
+        const selectedTargets = targets.filter((_target, index) => root.querySelector('[name="target_' + index + '"]')?.checked);
+        const allowed = consequenceEffectChoices(action, effects, selectedTargets.map(actorForTarget).filter(Boolean));
+        const previous = select.value;
+        select.innerHTML = consequenceEffectOptions(allowed);
+        if (previous === "custom" || allowed.some(row => "effect:" + row.index === previous)) select.value = previous;
+        if (changeEffect || previous !== select.value) {
+          const selected = allowed.find(row => "effect:" + row.index === select.value)?.effect ?? customEffect;
+          nameInput.value = selected.name ?? "";
+          levelInput.value = String(selected.level ?? 1);
+        }
+        const immuneNames = selectedTargets.filter(target => pokemonMoveTargetIsImmune(action, actorForTarget(target))).map(target => target.name);
+        const notice = root.querySelector("[data-consequence-immunity]");
+        notice.hidden = !immuneNames.length;
+        notice.textContent = immuneNames.length
+          ? "Imune ao dano: " + immuneNames.join(", ") + ". Efeitos independentes de dano continuam disponíveis."
+          : "";
+      };
+      select.addEventListener("change", () => refresh(true));
+      for (const checkbox of root.querySelectorAll('[name^="target_"]')) checkbox.addEventListener("change", () => refresh());
+      refresh();
+    },
     modal: true
   });
   if (!result) return null;
@@ -886,9 +1040,12 @@ async function chooseConsequenceEffect(source, action, sceneId) {
   let selected = defaultEffect;
   if (source.kind === "pokemon" && String(result.effect ?? "").startsWith("effect:")) {
     selected = effects[Number(String(result.effect).slice(7))] ?? defaultEffect;
+  } else if (source.kind === "pokemon" && result.effect === "custom") {
+    selected = customEffect;
   }
 
   const name = String(result.name ?? selected?.name ?? "consequência").trim();
+  if (!name) throw new Error("Informe o Status ou Tag da consequência.");
   const level = Math.max(1, Math.min(6, Number(result.level ?? selected?.level ?? 1) || 1));
   const targetTokenIds = targets
     .filter((row, index) => [true, "true", "on", "1", 1].includes(result["target_" + index]))
@@ -958,7 +1115,14 @@ async function resolveGuidedConsequence(message, source) {
       ? source.name + " usou " + actionName + "!"
       : source.name + " · " + actionName,
     body: summary,
-    css: "consequence"
+    css: "consequence",
+    consequenceVfx: {
+      sceneId: messageSceneId(message),
+      sourceTokenId: source.tokenId,
+      sourceActorId: source.actorId,
+      targetTokenIds: (result?.report ?? []).map(row => row.tokenId).filter(Boolean),
+      type: source.kind === "pokemon" ? action?.type ?? "normal" : "normal"
+    }
   });
 
   await message.setFlag(MODULE_ID, "guidedConsequenceResolved", {
@@ -976,8 +1140,11 @@ function decorateGmConsequencePanel(message, root) {
   if (message.getFlag?.(MODULE_ID, "pokemonReaction")) return;
 
   const sceneId = messageSceneId(message);
-  const sources = activeConsequenceSources(sceneId);
+  const messageKey = message?.id ?? null;
+  const previousSources = messageKey ? retainedConsequenceSourcesByMessage.get(messageKey) ?? [] : [];
+  let sources = activeConsequenceSources(sceneId, previousSources);
   if (!sources.length) return;
+  if (messageKey) retainedConsequenceSourcesByMessage.set(messageKey, sources);
 
   const panel = document.createElement("div");
   panel.className = "pokemon-guided-consequence-panel";
@@ -991,13 +1158,31 @@ function decorateGmConsequencePanel(message, root) {
       '<strong><i class="fa-solid fa-shield-halved"></i> Consequência do GM</strong>'
       + '<small>Escolha um Challenge ativo da cena.</small>';
     const select = document.createElement("select");
-    select.innerHTML = sources.map((source, index) => '<option value="' + index + '">' + esc(source.label) + '</option>').join("");
+    select.setAttribute("aria-label", "Fonte da consequência");
+    let targetsKey = null;
+    const refreshSources = () => {
+      const previousValue = select.value;
+      const targetTokens = currentConsequenceTargetTokens(game.scenes.get(sceneId));
+      const nextTargetsKey = targetTokens.map(token => token.id).sort().join(",");
+      const memoized = messageKey ? retainedConsequenceSourcesByMessage.get(messageKey) ?? sources : sources;
+      sources = activeConsequenceSources(sceneId, memoized);
+      if (messageKey) retainedConsequenceSourcesByMessage.set(messageKey, sources);
+      select.innerHTML = sources.map(source => '<option value="' + esc(source.id) + '">' + esc(source.label) + '</option>').join("");
+      if (targetsKey === nextTargetsKey && sources.some(source => source.id === previousValue)) {
+        select.value = previousValue;
+      }
+      targetsKey = nextTargetsKey;
+    };
+    refreshSources();
+    select.addEventListener("focus", refreshSources);
+    select.addEventListener("pointerdown", refreshSources);
     const button = document.createElement("button");
     button.type = "button";
     button.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Resolver';
     button.addEventListener("click", event => {
       event.preventDefault();
-      const source = sources[Number(select.value)];
+      refreshSources();
+      const source = sources.find(row => row.id === select.value);
       if (!source) return;
       void resolveGuidedConsequence(message, source).catch(error => {
         console.error("Pokemon LITM Tools | Consequência guiada:", error);
@@ -1259,6 +1444,9 @@ async function advanceBossPhase(actor) {
   if (!finalActor) throw new Error("Challenge da Fase 2 não encontrado.");
 
   const scene = canvas?.scene;
+  if (scene) {
+    recordPhaseOneSources(scene.id, consequenceSourcesForScene(scene));
+  }
 
   const tokens = scene?.tokens?.filter(token =>
     token.actor?.getFlag?.(MODULE_ID, "bossPhaseRole") === "phase1"
@@ -1442,12 +1630,82 @@ function onRenderGuidedActorSheet(app, html) {
 }
 
 export function pokemonGuidedFlowSelfTest() {
+  const collection = rows => Object.assign(rows, { get: id => rows.find(row => row.id === id) });
+  const character = { id: "character", type: "litm-character" };
+  const synthetic = { id: "synthetic", type: "litm-character", isToken: true };
+  const npc = (id, phaseOne = false) => ({
+    id,
+    type: "litm-npc",
+    isToken: phaseOne,
+    flags: { [MODULE_ID]: { pokemonBuilder: true } },
+    system: { isOvercome: phaseOne },
+    getFlag: (_module, key) => key === "bossPhaseRole" ? (phaseOne ? "phase1" : null)
+      : key === "bossFinalActorId" ? (phaseOne ? "boss-final" : null)
+      : key === "moves" ? [{ id: "tackle", name: "Tackle" }] : null
+  });
+  const scene = {
+    id: "test-scene",
+    tokens: collection([
+      { id: "linked-first", actorLink: true, actor: character },
+      { id: "linked-target", actorLink: true, actor: character },
+      { id: "synthetic-first", actorLink: false, actor: synthetic },
+      { id: "synthetic-target", actorLink: false, actor: synthetic },
+      { id: "challenge-first", actor: npc("npc-first") },
+      { id: "challenge-target", actor: npc("npc-target") },
+      { id: "phase-one", actorLink: false, actor: npc("boss", true) },
+      { id: "boss-final-token", actorId: "boss-final", actor: { id: "boss-final", type: "litm-npc", flags: {}, system: { threatsAndConsequences: [] }, getFlag: () => null } },
+      { id: "overcome", actor: { ...npc("overcome"), system: { isOvercome: true } } },
+      { id: "without-actor" }
+    ])
+  };
+  const currentTargets = ["linked-target", "synthetic-target", "challenge-target"]
+    .map(id => ({ document: { id, parent: { id: scene.id } } }));
+  const staleTargets = [null, { id: "removed" }, { id: "without-actor" }, { document: { id: "linked-first", parent: { id: "old-scene" } } }];
+  const affected = consequenceTargetRows(scene, "challenge-target", [...currentTargets, ...staleTargets]);
+  const unchecked = consequenceTargetRows(scene, "challenge-target", []);
+  const sources = consequenceSourcesForScene(scene, {
+    id: "journey", type: "litm-journey", system: { generalConsequences: ["Tempestade"] }
+  });
+  const prioritized = prioritizeConsequenceSources(sources, [scene.tokens.get("challenge-target"), scene.tokens.get("phase-one")]);
+  const afterTransition = retainPhaseOneSources(sources.filter(source => source.tokenId !== "phase-one"), sources, scene);
+  scene.tokens.splice(scene.tokens.findIndex(token => token.id === "boss-final-token"), 1);
+  const afterBossLeaves = retainPhaseOneSources([], afterTransition, scene);
+  const move = { type: "normal" };
+  const immuneActor = {
+    flags: { [MODULE_ID]: { types: ["ghost"], typeEffectiveness: { normal: 0 } } },
+    getFlag: (_module, key) => key === "typeEffectiveness" ? { normal: 0 } : (key === "types" ? ["ghost"] : null)
+  };
+  const neutralActor = {
+    flags: { [MODULE_ID]: { types: ["normal"], typeEffectiveness: { normal: 1 } } },
+    getFlag: (_module, key) => key === "typeEffectiveness" ? { normal: 1 } : (key === "types" ? ["normal"] : null)
+  };
+  const moveEffects = [{ name: "ferido", source: "damage" }, { name: "abertura", kind: "tag", source: "move" }];
   const checks = {
     discoverGuided: typeof handleDiscoverSpend === "function" && typeof discoverForGM === "function",
     extraFeatGuided: typeof handleFeatSpend === "function",
     singleUseLastPower: handleSingleUseSpend.toString().includes("remainingPower(message) !== 1"),
     singleUseAutoBurn: typeof burnSingleUseDirect === "function" && typeof onPreCreateGuidedChat === "function",
     gmConsequencePanel: typeof decorateGmConsequencePanel === "function" && typeof activeConsequenceSources === "function",
+    consequenceCurrentTargetsHandling:
+      affected.filter(row => row.checked).map(row => row.id).join(",") === "linked-target,synthetic-target"
+      && affected.some(row => row.id === "synthetic-first" && !row.checked)
+      && !affected.some(row => row.id === "linked-first")
+      && !affected.some(row => row.id === "challenge-target")
+      && prioritized.map(row => row.tokenId ?? row.id).join(",") === "challenge-target,phase-one,challenge-first,journey:journey",
+    consequenceNoTargetUnchecked: unchecked.length === 3 && unchecked.every(row => row.checked === false),
+    consequenceStaleTargetsIgnored:
+      currentConsequenceTargetTokens(scene, staleTargets).length === 0
+      && consequenceTargetRows(scene, null, staleTargets).every(row => row.checked === false),
+    bossOvercomeConsequenceSourcePreserved:
+      sources.some(source => source.tokenId === "phase-one" && source.bossPhaseOne)
+      && !sources.some(source => source.tokenId === "overcome")
+      && afterTransition.find(source => source.tokenId === "phase-one")?.actions[0]?.id === "tackle"
+      && afterTransition.some(source => source.kind === "story")
+      && !afterBossLeaves.some(source => source.tokenId === "phase-one"),
+    consequenceImmunitySuggestionGuard:
+      consequenceEffectChoices(move, moveEffects, [immuneActor]).map(row => row.index).join(",") === "1"
+      && consequenceEffectChoices(move, moveEffects, [immuneActor, neutralActor]).length === 2
+      && consequenceEffectChoices(move, moveEffects, []).length === 2,
     cappedChallengeEffectiveness:
       challengeConsequenceTierDelta(4) === 1
       && challengeConsequenceTierDelta(2) === 1
@@ -1466,7 +1724,7 @@ export function pokemonGuidedFlowSelfTest() {
     burnedChallengeVisual: typeof decorateBurnedChallengeTags === "function"
   };
   return {
-    revision: "2026-09-08-guided-hotfix-v1",
+    revision: "2026-09-09-combat-consequence-ux-v1",
     checks,
     ok: Object.values(checks).every(Boolean)
   };
