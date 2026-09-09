@@ -410,6 +410,23 @@ function sourceTokenForActor(actor) {
   return token?.document ?? token ?? null;
 }
 
+function replayVfxTargetIds(frozenTargetIds) {
+  const scene = canvas?.scene;
+
+  const frozen = [...new Set(
+    [...(frozenTargetIds ?? [])]
+      .filter(id => !!scene?.tokens?.get(id))
+  )];
+
+  if (frozen.length) return frozen;
+
+  return [...new Set(
+    [...(game.user?.targets ?? [])]
+      .map(target => target?.document?.id ?? target?.id)
+      .filter(id => !!scene?.tokens?.get(id))
+  )];
+}
+
 function tokenObject(tokenDoc) {
   return tokenDoc?.object ?? canvas?.tokens?.get?.(tokenDoc?.id) ?? null;
 }
@@ -8019,13 +8036,43 @@ async function rollbackContextSpendEntry(message, index) {
       application: entry.pokemonApplication
     });
   } catch (error) {
+    const rollbackMessage =
+      String(error?.message ?? error ?? "");
+
+    const externalConflict =
+      rollbackMessage.includes(
+        "Não foi possível reverter com segurança:"
+      );
+
+    if (externalConflict) {
+      console.warn(
+        "Pokemon LITM Tools | Refund-only: alvo mudou após o gasto.",
+        error
+      );
+
+      ui.notifications.info(
+        "Gasto devolvido. O alvo mudou desde a aplicação, então o efeito não foi revertido."
+      );
+
+      // O ledger já foi atualizado acima.
+      // Mantemos o estado atual do alvo exatamente como está.
+      return true;
+    }
+
+    // Erro inesperado: preserva a transação original e recoloca
+    // a entrada no ledger para não perder Power indevidamente.
     try {
       await updateDetailedSpendMessage(message, original);
     } catch (restoreError) {
-      console.error("Pokemon LITM Tools | restaurando ledger após rollback recusado:", restoreError);
+      console.error(
+        "Pokemon LITM Tools | restaurando ledger após falha de rollback:",
+        restoreError
+      );
     }
+
     throw error;
   }
+
   return true;
 }
 
@@ -9768,8 +9815,15 @@ async function onRenderPokemonChatMessage(
     iconActionButton("VFX no Token", "fa-wand-magic-sparkles", async () => {
       const source = sourceToken();
       const selfTarget = ["self", "user", "users-field"].includes(String(move?.target ?? "").toLowerCase());
-      const ids = selfTarget ? [source.id] : [...frozenTargetIds];
-      if (!ids.length) throw new Error("A rolagem não tinha alvo para reproduzir o VFX.");
+      const ids = selfTarget
+        ? [source.id]
+        : replayVfxTargetIds(frozenTargetIds);
+
+      if (!ids.length) {
+        throw new Error(
+          "Selecione um alvo no Foundry para reproduzir o VFX."
+        );
+      }
       await broadcastMoveVfx(canvas.scene.id, source.id, ids, move.type ?? "normal");
     }),
     iconActionButton("VFX em Área", "fa-circle-nodes", async () => {
@@ -10013,6 +10067,16 @@ export async function pokemonLitmCombatSelfTest() {
     typeof applyContextSpendDirect === "function"
     && typeof rollbackContextSpendDirect === "function"
     && requestAuthority.toString().includes("context-spend-rollback");
+
+  checks.contextSpendConflictRefundOnly =
+    rollbackContextSpendEntry.toString().includes("Gasto devolvido")
+    && rollbackContextSpendEntry.toString().includes(
+      "Não foi possível reverter com segurança:"
+    );
+
+  checks.vfxCurrentTargetFallback =
+    typeof replayVfxTargetIds === "function"
+    && replayVfxTargetIds.toString().includes("game.user?.targets");
 
   checks.nativeSpendContextMenusInstalled =
     typeof openNativePokemonStatusSpend === "function"
