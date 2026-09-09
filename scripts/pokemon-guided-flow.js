@@ -722,7 +722,9 @@ function activeConsequenceSources(sceneId) {
 
   for (const token of scene.tokens) {
     const actor = token.actor;
-    if (!actor || actor.type !== "litm-npc" || actor.system?.isOvercome === true) continue;
+    if (!actor || actor.type !== "litm-npc") continue;
+    const bossPhaseOne = actor.getFlag?.(MODULE_ID, "bossPhaseRole") === "phase1";
+    if (challengeIsOvercome(actor) && !bossPhaseOne) continue;
     if (isPokemonChallenge(actor)) {
       const moves = Array.isArray(actor.getFlag?.(MODULE_ID, "moves"))
         ? foundry.utils.deepClone(actor.getFlag(MODULE_ID, "moves"))
@@ -1021,10 +1023,60 @@ function decorateBurnedChallengeTags(actor, root) {
   }
 }
 
-function bossFinalActor(actor) {
+function bossWorldActor(actor) {
   if (!actor) return null;
   if (actor.isToken === true) return game.actors.get(actor.id) ?? actor;
   return actor;
+}
+
+function challengeIsOvercome(actor) {
+  if (!actor) return false;
+  if (actor.system?.isOvercome === true) return true;
+
+  const stem = value =>
+    String(value ?? "").trim().toLowerCase().slice(0, 4);
+
+  const statuses = Array.isArray(actor.system?.floatingTagsAndStatuses)
+    ? actor.system.floatingTagsAndStatuses
+    : [];
+
+  return (actor.system?.limits ?? []).some(limit => {
+    const tier = parseInt(limit?.value);
+    const limitStem = stem(limit?.name);
+
+    return Number.isFinite(tier)
+      && tier > 0
+      && limitStem.length > 0
+      && statuses.some(status =>
+        Number(status?.value ?? 0) >= tier
+        && stem(status?.name) === limitStem
+      );
+  });
+}
+
+function floatingStateKey(entry) {
+  const kind = entry?.isStatus === true ? "status" : "tag";
+  return kind + ":" + String(entry?.name ?? "").trim().toLowerCase();
+}
+
+function mergeFloatingState(baseEntries, carriedEntries) {
+  const merged = new Map();
+
+  for (const entry of baseEntries ?? []) {
+    if (!entry?.name) continue;
+    merged.set(floatingStateKey(entry), foundry.utils.deepClone(entry));
+  }
+
+  for (const entry of carriedEntries ?? []) {
+    if (!entry?.name) continue;
+    merged.set(floatingStateKey(entry), {
+      ...foundry.utils.deepClone(entry),
+      selected: false,
+      toBurn: false
+    });
+  }
+
+  return [...merged.values()];
 }
 
 function bossTierForMight(actor) {
@@ -1080,7 +1132,7 @@ async function replaceBossTokensWithPhase(finalActor, phaseActor) {
 
 async function openBossGenerator(actor) {
   if (!game.user.isGM) return;
-  const finalActor = bossFinalActor(actor);
+  const finalActor = bossWorldActor(actor);
   if (!isPokemonChallenge(finalActor)) throw new Error("Este botão é exclusivo de Challenge Pokémon.");
   if (finalActor.getFlag?.(MODULE_ID, "bossPhaseRole") === "phase1") throw new Error("Esta ficha já é uma Fase 1.");
 
@@ -1188,22 +1240,53 @@ async function openBossGenerator(actor) {
 
 async function advanceBossPhase(actor) {
   if (!game.user.isGM) return;
-  const phaseActor = bossFinalActor(actor);
+
+  // IMPORTANTE: mantém o Actor sintético do token.
+  // É nele que vivem os Tags/Statuses aplicados ao token não vinculado.
+  const phaseActor = actor;
+
   if (phaseActor?.getFlag?.(MODULE_ID, "bossPhaseRole") !== "phase1") return;
-  if (phaseActor.system?.isOvercome !== true) {
+
+  if (!challengeIsOvercome(phaseActor)) {
     throw new Error("A Fase 1 ainda não atingiu seu Limit.");
   }
 
-  const finalId = phaseActor.getFlag(MODULE_ID, "bossFinalActorId") ?? phaseActor.getFlag(MODULE_ID, "bossNextActorId");
+  const finalId =
+    phaseActor.getFlag(MODULE_ID, "bossFinalActorId")
+    ?? phaseActor.getFlag(MODULE_ID, "bossNextActorId");
+
   const finalActor = game.actors.get(finalId);
   if (!finalActor) throw new Error("Challenge da Fase 2 não encontrado.");
+
   const scene = canvas?.scene;
-  const tokens = scene?.tokens?.filter(token => token.actor?.id === phaseActor.id) ?? [];
+
+  const tokens = scene?.tokens?.filter(token =>
+    token.actor?.getFlag?.(MODULE_ID, "bossPhaseRole") === "phase1"
+    && (
+      token.actor?.getFlag?.(MODULE_ID, "bossFinalActorId") === finalActor.id
+      || token.actor?.getFlag?.(MODULE_ID, "bossNextActorId") === finalActor.id
+    )
+  ) ?? [];
+
+  let createdTokens = [];
 
   if (scene && tokens.length) {
+    // Cada token não vinculado pode possuir estado próprio.
+    const carriedByToken = tokens.map(token =>
+      foundry.utils.deepClone(
+        token.actor?.system?.floatingTagsAndStatuses
+        ?? phaseActor.system?.floatingTagsAndStatuses
+        ?? []
+      )
+    );
+
     const creates = tokens.map(token => {
-      const data = foundry.utils.deepClone(finalActor.prototypeToken?.toObject?.() ?? {});
+      const data = foundry.utils.deepClone(
+        finalActor.prototypeToken?.toObject?.() ?? {}
+      );
+
       delete data._id;
+
       return {
         ...data,
         name: finalActor.name,
@@ -1217,47 +1300,128 @@ async function advanceBossPhase(actor) {
         disposition: token.disposition
       };
     });
-    await scene.createEmbeddedDocuments("Token", creates);
-    await scene.deleteEmbeddedDocuments("Token", tokens.map(token => token.id));
+
+    createdTokens = await scene.createEmbeddedDocuments("Token", creates);
+
+    // Primeiro confirma e restaura os estados relevantes na Fase 2.
+    // Limits/Overcome da Fase 1 NÃO são copiados.
+    for (let index = 0; index < createdTokens.length; index++) {
+      const created = scene.tokens.get(createdTokens[index].id) ?? createdTokens[index];
+      const syntheticActor = created?.actor;
+      if (!syntheticActor) {
+        throw new Error("A Fase 2 foi criada, mas seu Actor sintético não pôde ser preparado.");
+      }
+
+      const baseline = foundry.utils.deepClone(
+        syntheticActor.system?.floatingTagsAndStatuses
+        ?? finalActor.system?.floatingTagsAndStatuses
+        ?? []
+      );
+
+      const merged = mergeFloatingState(
+        baseline,
+        carriedByToken[index] ?? []
+      );
+
+      await syntheticActor.update({
+        "system.floatingTagsAndStatuses": merged
+      });
+    }
+
+    // Só remove a Fase 1 depois que a Fase 2 estiver pronta.
+    await scene.deleteEmbeddedDocuments(
+      "Token",
+      tokens.map(token => token.id)
+    );
   }
 
   await postMiniCard({
     icon: "fa-layer-group",
     title: finalActor.name + " · Fase 2",
-    body: "A primeira fase foi superada. O confronto muda de forma.",
+    body: "A primeira fase foi superada. Tags e Status continuam; o Limit da Fase 1 foi encerrado.",
     css: "boss-phase"
   });
-  finalActor.sheet?.render?.(true);
+
+  const firstCreated = createdTokens[0]
+    ? scene?.tokens?.get(createdTokens[0].id)
+    : null;
+
+  const actorToOpen = firstCreated?.actor ?? finalActor;
+  actorToOpen.sheet?.render?.(true);
 }
 
 function decorateBossHeader(actor, root) {
   if (!game.user.isGM || !isPokemonChallenge(actor) || !root) return;
+
   const windowRoot = root.closest?.(".application, .window-app") ?? root;
-  if (windowRoot.querySelector?.("[data-pokemon-boss-phase-control]")) return;
-  const header = windowRoot.querySelector?.(".window-header") ?? null;
-  const host = header?.querySelector?.(".window-controls") ?? header;
-  if (!host) return;
+
+  if (
+    windowRoot.querySelector?.("[data-pokemon-boss-phase-control]")
+    || root.querySelector?.("[data-pokemon-boss-phase-control]")
+  ) return;
+
+  // Nunca volta para o cabeçalho.
+  // O controle de Boss pertence visualmente à área de Limits.
+  const limitsHost =
+    root.querySelector?.(".npc-limits-container")
+    ?? windowRoot.querySelector?.(".npc-limits-container");
+
+  if (!limitsHost) {
+    console.warn(
+      "Pokemon LITM Tools | Boss em Fases: área de Limits não encontrada; botão não foi inserido."
+    );
+    return;
+  }
 
   const role = actor.getFlag?.(MODULE_ID, "bossPhaseRole");
-  const canAdvance = role === "phase1" && actor.system?.isOvercome === true;
+  const canAdvance =
+    role === "phase1"
+    && challengeIsOvercome(actor);
+
+  const label = role === "phase1"
+    ? (canAdvance ? "Avançar para Fase 2" : "Fase 1 ainda não superada")
+    : "Criar Boss em Fases";
+
+  const control = document.createElement("div");
+  control.dataset.pokemonBossPhaseControl = "true";
+  control.className = "pokemon-boss-phase-control-wrap";
+  control.style.cssText =
+    "display:flex;justify-content:center;margin:6px 0 4px;width:100%;";
+
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "header-control icon pokemon-boss-phase-control";
-  button.dataset.pokemonBossPhaseControl = "true";
-  button.title = canAdvance ? "Avançar para Fase 2" : role === "phase1" ? "Fase 1 ainda não superada" : "Criar Boss em Fases";
-  button.setAttribute("aria-label", button.title);
-  button.innerHTML = '<i class="fa-solid ' + (canAdvance ? "fa-forward" : "fa-layer-group") + '"></i>';
+  button.className = "pokemon-boss-phase-control";
+  button.title = label;
+  button.setAttribute("aria-label", label);
   button.disabled = role === "phase1" && !canAdvance;
+  button.style.cssText =
+    "width:auto;min-height:26px;padding:3px 8px;font-size:12px;line-height:1.2;";
+
+  button.innerHTML =
+    '<i class="fa-solid '
+    + (role === "phase1" ? "fa-forward" : "fa-layer-group")
+    + '"></i> '
+    + esc(label);
+
   button.addEventListener("click", event => {
     event.preventDefault();
     event.stopPropagation();
-    const action = role === "phase1" ? advanceBossPhase(actor) : openBossGenerator(actor);
+
+    const action =
+      role === "phase1"
+        ? advanceBossPhase(actor)
+        : openBossGenerator(actor);
+
     void Promise.resolve(action).catch(error => {
       console.error("Pokemon LITM Tools | Boss em Fases:", error);
-      ui.notifications.error(error?.message ?? "Não foi possível resolver o Boss em Fases.");
+      ui.notifications.error(
+        error?.message ?? "Não foi possível resolver o Boss em Fases."
+      );
     });
   });
-  host.prepend(button);
+
+  control.append(button);
+  limitsHost.append(control);
 }
 
 function onRenderGuidedChat(message, html) {
@@ -1292,6 +1456,12 @@ export function pokemonGuidedFlowSelfTest() {
       && challengeConsequenceTierDelta(0.25) === -1
       && challengeConsequenceTierDelta(0) === null,
     bossGenerator: typeof openBossGenerator === "function" && typeof advanceBossPhase === "function",
+    bossSyntheticActorPreserved:
+      typeof challengeIsOvercome === "function"
+      && advanceBossPhase.toString().includes("const phaseActor = actor"),
+    bossControlInsideLimits:
+      decorateBossHeader.toString().includes(".npc-limits-container")
+      && !decorateBossHeader.toString().includes(".window-header"),
     bossLimitEditable: openBossGenerator.toString().includes('name="limit"'),
     burnedChallengeVisual: typeof decorateBurnedChallengeTags === "function"
   };
