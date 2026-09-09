@@ -1,0 +1,4035 @@
+import { getPokemonDbUrl } from "./pokemon-links.js";
+
+import {
+  getPokemonContentLanguage,
+  typeLabel,
+  statLabel,
+  natureProfile,
+  moveLabel,
+  abilityLabel,
+  fetchPokeJson,
+  choosePrimaryAbility,
+  buildDexText,
+  statPowerText,
+  statWeaknessText,
+  typeDefenseGroups,
+  buildMoveThreat,
+  buildMoveEffects,
+  buildAbilityThreat,
+  moveShortDescription,
+  moveEnglishLabel,
+  formatThemeDescription,
+  pokemonSpecialImprovements,
+  moveLitmProfile,
+  pokemonGenusLabel,
+  POKEMON_LITM_SEMANTICS_REV
+} from "./pokemon-content.js";
+
+import {
+  sendPokemonThemeToPc
+} from "./pokemon-manager-app.js";
+
+const MODULE_ID = "pokemon-litm-tools";
+const PC_FLAG = "pokemonPC";
+
+const {
+  ApplicationV2,
+  HandlebarsApplicationMixin
+} = foundry.applications.api;
+
+let pokemonBuilderWizardApp = null;
+
+const NATURE_IDS = [
+  "hardy","lonely","adamant","naughty","brave",
+  "bold","docile","impish","lax","relaxed",
+  "modest","mild","bashful","rash","quiet",
+  "calm","gentle","careful","quirky","sassy",
+  "timid","hasty","jolly","naive","serious"
+];
+
+const TYPE_PT = {
+  normal: "Normal", fire: "Fogo", water: "Água", electric: "Elétrico",
+  grass: "Planta", ice: "Gelo", fighting: "Lutador", poison: "Venenoso",
+  ground: "Terrestre", flying: "Voador", psychic: "Psíquico", bug: "Inseto",
+  rock: "Pedra", ghost: "Fantasma", dragon: "Dragão", dark: "Sombrio",
+  steel: "Aço", fairy: "Fada"
+};
+
+const STAT_TEXT = {
+  hp: { power: "Resistência impressionante", weakness: "Pouca resistência" },
+  attack: { power: "Força física impressionante", weakness: "Pouca força física" },
+  defense: { power: "Defesa resistente", weakness: "Frágil a impactos" },
+  "special-attack": { power: "Poder especial excepcional", weakness: "Poder especial limitado" },
+  "special-defense": { power: "Grande resistência especial", weakness: "Vulnerável a ataques especiais" },
+  speed: { power: "Veloz como um raio", weakness: "Lento para reagir" }
+};
+
+const MIGHT = {
+  origin: { label: "Origin", maxLevel: 20 },
+  adventure: { label: "Adventure", maxLevel: 45 },
+  greatness: { label: "Greatness", maxLevel: 100 }
+};
+
+const HM_MOVES = new Set([
+  "cut", "fly", "surf", "strength", "flash", "whirlpool", "waterfall"
+]);
+
+function wizardHeader(step, title, subtitle = "") {
+  return `
+    <div class="pokemon-builder-wizard-head">
+      <div class="pokemon-builder-wizard-steps">Etapa ${step} de 5</div>
+      <h2>${escapeHTML(title)}</h2>
+      ${subtitle ? `<p>${escapeHTML(subtitle)}</p>` : ""}
+    </div>
+  `;
+}
+
+function rankForLevel(level) {
+  const value = Number(level ?? 0);
+  if (value <= 20) return "origin";
+  if (value <= 45) return "adventure";
+  return "greatness";
+}
+
+function learnMethodInfo(methods, level, language = "pt-BR") {
+  if (Number(level) > 0) {
+    return {
+      id: "level-up",
+      label: language === "en" ? `Level ${level}` : `Por nível · Nv. ${level}`
+    };
+  }
+  if (methods.includes("machine")) {
+    const hm = methods.includes("hm");
+    return {
+      id: hm ? "hm" : "tm",
+      label: hm ? "HM" : "TM"
+    };
+  }
+  if (methods.includes("tutor")) {
+    return { id: "tutor", label: language === "en" ? "Tutor" : "Tutor" };
+  }
+  if (methods.includes("egg")) {
+    return { id: "breeding", label: language === "en" ? "Breeding" : "Cruzamento" };
+  }
+  return { id: "other", label: language === "en" ? "Other method" : "Outra forma de aprendizado" };
+}
+
+function defeatedLimitFor(stats, might) {
+  const base = Number({ origin: 3, adventure: 4, greatness: 5 }[might] ?? 4);
+  const hp = Number(stats?.hp ?? 0);
+  const modifier = hp <= 45 ? -1 : hp >= 90 ? 1 : 0;
+  return Math.max(3, Math.min(6, base + modifier));
+}
+
+function captureLimitFor(catchRate) {
+  const rate = Number(catchRate ?? 0);
+  if (rate >= 200) return 3;
+  if (rate >= 120) return 4;
+  if (rate >= 45) return 5;
+  return 6;
+}
+
+function escapeStatusLevel(speed, might) {
+  const base = Number({ origin: 1, adventure: 2, greatness: 3 }[might] ?? 2);
+  const value = Number(speed ?? 0);
+  const speedMod = value >= 90 ? 2 : value >= 50 ? 1 : 0;
+  return Math.max(1, Math.min(5, base + speedMod));
+}
+
+function genderOptionsForRate(rate, language = "pt-BR") {
+  const value = Number(rate ?? -1);
+  const labels = language === "en"
+    ? { male: "Male", female: "Female", genderless: "Genderless" }
+    : { male: "Macho", female: "Fêmea", genderless: "Sem gênero" };
+
+  if (value < 0) {
+    return [{
+      id: "genderless",
+      label: labels.genderless,
+      chance: 100
+    }];
+  }
+
+  const femaleChance = Math.max(0, Math.min(100, (value / 8) * 100));
+  const maleChance = 100 - femaleChance;
+  const rows = [];
+
+  if (maleChance > 0) {
+    rows.push({
+      id: "male",
+      label: labels.male,
+      chance: maleChance
+    });
+  }
+
+  if (femaleChance > 0) {
+    rows.push({
+      id: "female",
+      label: labels.female,
+      chance: femaleChance
+    });
+  }
+
+  return rows;
+}
+
+function defaultGenderForRate(rate) {
+  const options = genderOptionsForRate(rate, "pt-BR");
+  if (options.length <= 1) return options[0]?.id ?? "genderless";
+
+  const roll = Math.random() * 100;
+  let cursor = 0;
+  for (const option of options) {
+    cursor += Number(option.chance ?? 0);
+    if (roll <= cursor) return option.id;
+  }
+
+  return options[0].id;
+}
+
+function genderLabel(id, language = "pt-BR") {
+  const labels = language === "en"
+    ? { male: "Male", female: "Female", genderless: "Genderless" }
+    : { male: "Macho", female: "Fêmea", genderless: "Sem gênero" };
+  return labels[id] ?? labels.genderless;
+}
+
+function futureLevelUpMoves(data) {
+  const selectedIds = new Set(
+    (data.moves ?? [])
+      .map(move => move?.id)
+      .filter(Boolean)
+  );
+
+  const selectedLevel = Math.max(
+    0,
+    ...(data.moves ?? [])
+      .map(move => Number(move.level ?? 0))
+      .filter(level => level > 0)
+  );
+
+  const all = (data.biographyMoves ?? [])
+    .filter(move =>
+      move?.id
+      && Number(move.level ?? 0) > 0
+      && !selectedIds.has(move.id)
+    );
+
+  const after = all
+    .filter(move => Number(move.level ?? 0) > selectedLevel)
+    .sort((a, b) =>
+      Number(a.level ?? 0) - Number(b.level ?? 0)
+      || String(a.name ?? '').localeCompare(String(b.name ?? ''), 'pt-BR')
+    );
+
+  // Alguns Pokémon já chegam ao fim do learnset no Rank escolhido.
+  // Nesse caso completamos os slots planejados com golpes por nível
+  // ainda não usados, começando pelos mais avançados.
+  const earlier = all
+    .filter(move => Number(move.level ?? 0) <= selectedLevel)
+    .sort((a, b) =>
+      Number(b.level ?? 0) - Number(a.level ?? 0)
+      || String(a.name ?? '').localeCompare(String(b.name ?? ''), 'pt-BR')
+    );
+
+  const seen = new Set();
+  const result = [];
+  for (const move of [...after, ...earlier]) {
+    if (!move.id || seen.has(move.id)) continue;
+    seen.add(move.id);
+    result.push({
+      id: move.id,
+      name: move.name,
+      englishName: move.englishName,
+      learnedAt: Number(move.level ?? 0)
+    });
+    if (result.length >= 3) break;
+  }
+  return result;
+}
+
+const POKEMON_NATURES = [
+  ["hardy","Resistente","Cansado","Determinado"],
+  ["lonely","Solitário","Isolado","Apegado"],
+  ["adamant","Adamante","Frustrado","Obstinado"],
+  ["naughty","Travesso","Repreendido","Desafiador"],
+  ["brave","Corajoso","Assustado","Destemido"],
+  ["bold","Audacioso","Intimidado","Confiante"],
+  ["docile","Dócil","Pressionado","Convencido"],
+  ["impish","Travesso","Repreendido","Brincalhão"],
+  ["lax","Relaxado","Distraído","Despreocupado"],
+  ["relaxed","Relaxado","Apressado","Tranquilo"],
+  ["modest","Modesto","Exposto","Confiante"],
+  ["mild","Gentil","Abalado","Gentil"],
+  ["bashful","Tímido","Envergonhado","À vontade"],
+  ["rash","Impulsivo","Cauteloso","Impetuoso"],
+  ["quiet","Silencioso","Perturbado","Concentrado"],
+  ["calm","Calmo","Agitado","Sereno"],
+  ["gentle","Gentil","Hostilizado","Amigável"],
+  ["careful","Cuidadoso","Surpreendido","Cauteloso"],
+  ["quirky","Peculiar","Confuso","Imprevisível"],
+  ["sassy","Atrevido","Contrariado","Desafiador"],
+  ["timid","Tímido","Assustado","Convencido"],
+  ["hasty","Apressado","Preso","Impaciente"],
+  ["jolly","Alegre","Desanimado","Animado"],
+  ["naive","Ingênuo","Enganado","Confiante"],
+  ["serious","Sério","Desconcertado","Determinado"]
+].map(([id,label,low,high]) => ({id,label,low,high}));
+
+const NATURE_BY_STATS = {
+  attack: {
+    attack:"hardy", defense:"lonely", "special-attack":"adamant", "special-defense":"naughty", speed:"brave"
+  },
+  defense: {
+    attack:"bold", defense:"docile", "special-attack":"impish", "special-defense":"lax", speed:"relaxed"
+  },
+  "special-attack": {
+    attack:"modest", defense:"mild", "special-attack":"bashful", "special-defense":"rash", speed:"quiet"
+  },
+  "special-defense": {
+    attack:"calm", defense:"gentle", "special-attack":"careful", "special-defense":"quirky", speed:"sassy"
+  },
+  speed: {
+    attack:"timid", defense:"hasty", "special-attack":"jolly", "special-defense":"naive", speed:"serious"
+  }
+};
+
+function pokemonNature(id) {
+  return POKEMON_NATURES.find(n => n.id === id) ?? POKEMON_NATURES[0];
+}
+
+function defaultNatureForStats(stats) {
+  const names = ["attack","defense","special-attack","special-defense","speed"];
+  const rows = names.map(name => ({name, value:Number(stats?.[name] ?? 0)}));
+  const best = rows.reduce((a,b) => b.value > a.value ? b : a, rows[0]);
+  const worst = rows.reduce((a,b) => b.value < a.value ? b : a, rows[0]);
+  return pokemonNature(NATURE_BY_STATS[best.name]?.[worst.name] ?? "hardy");
+}
+
+function flavorText(entries) {
+  for (const code of ["pt-BR","pt","en"]) {
+    const found = entries?.find(row => row.language?.name === code);
+    if (found?.flavor_text) {
+      return String(found.flavor_text).replace(/[\n\f]+/g," ").replace(/\s+/g," ").trim();
+    }
+  }
+  return "";
+}
+
+function englishEffect(entries) {
+  const found = entries?.find(row => row.language?.name === "en");
+  return String(found?.short_effect ?? found?.effect ?? "")
+    .replace(/\$effect_chance/g,"chance")
+    .replace(/\s+/g," ")
+    .trim();
+}
+
+const apiCache = new Map();
+
+
+let litmMarkupModulePromise =
+  null;
+
+
+function litmSystemRoute(
+  relativePath
+) {
+  const raw =
+    "systems/mist-engine-fvtt/"
+    + relativePath;
+
+  try {
+    return (
+      foundry.utils.getRoute
+        ?.(
+          raw
+        )
+      ?? (
+        "/"
+        + raw
+      )
+    );
+
+  } catch {
+    return (
+      "/"
+      + raw
+    );
+  }
+}
+
+
+async function litmMarkupHtml(
+  value
+) {
+  try {
+    if (
+      !litmMarkupModulePromise
+    ) {
+      litmMarkupModulePromise =
+        import(
+          litmSystemRoute(
+            "module/lib/tag-status-text-helper.mjs"
+          )
+        );
+    }
+
+    const module =
+      await litmMarkupModulePromise;
+
+    if (
+      typeof module.textWithTags
+        === "function"
+    ) {
+      return module.textWithTags(
+        String(
+          value
+          ?? ""
+        )
+      );
+    }
+
+  } catch (error) {
+    console.warn(
+      "Pokemon LITM Tools | Markup LitM:",
+      error
+    );
+  }
+
+  return foundry.utils.escapeHTML(
+    String(
+      value
+      ?? ""
+    )
+  );
+}
+
+function randomId() {
+  return foundry.utils.randomID(16);
+}
+
+function escapeHTML(value) {
+  return foundry.utils.escapeHTML(String(value ?? ""));
+}
+
+function titleCase(value) {
+  return String(value ?? "")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function localizedName(names, fallback) {
+  for (const code of ["pt-BR", "pt", "en"]) {
+    const found = names?.find(row => row.language?.name === code);
+    if (found?.name) return found.name;
+  }
+  return titleCase(fallback);
+}
+
+async function fetchJson(url) {
+  if (!apiCache.has(url)) {
+    apiCache.set(url, (async () => {
+      const response = await fetch(url, { cache: "force-cache" });
+      if (!response.ok) throw new Error(`PokéAPI HTTP ${response.status}`);
+      return response.json();
+    })());
+  }
+  return apiCache.get(url);
+}
+
+function levelForMove(move) {
+  const levels = (move.version_group_details ?? [])
+    .filter(row => row.move_learn_method?.name === "level-up")
+    .map(row => Number(row.level_learned_at ?? 0))
+    .filter(Number.isFinite);
+  if (!levels.length) return null;
+  const positive = levels.filter(level => level > 0);
+  return positive.length ? Math.min(...positive) : 1;
+}
+
+async function loadPokemonBuildData(entry, might) {
+  const language = getPokemonContentLanguage();
+  const pokemonId = Number(entry.pokemonId ?? entry.dex);
+
+  if (!Number.isInteger(pokemonId) || pokemonId < 1) {
+    throw new Error("Pokémon sem número de Pokédex válido.");
+  }
+
+  const [pokemon, species] = await Promise.all([
+    fetchPokeJson(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`),
+    fetchPokeJson(`https://pokeapi.co/api/v2/pokemon-species/${pokemonId}`)
+  ]);
+
+  const types = (pokemon.types ?? [])
+    .slice()
+    .sort((a, b) => Number(a.slot) - Number(b.slot))
+    .map(row => row.type?.name)
+    .filter(Boolean);
+
+  const stats = {};
+  for (const row of pokemon.stats ?? []) {
+    if (row.stat?.name) stats[row.stat.name] = Number(row.base_stat ?? 0);
+  }
+
+  const abilities = (await Promise.all(
+    (pokemon.abilities ?? []).map(async row => {
+      const id = row.ability?.name ?? "unknown";
+      try {
+        const detail = await fetchPokeJson(row.ability?.url);
+        const effectEn = detail.effect_entries?.find(entry => entry.language?.name === "en");
+        return {
+          id,
+          name: abilityLabel(id, detail.names, language),
+          englishName: abilityLabel(id, detail.names, "en"),
+          hidden: !!row.is_hidden,
+          effectTextEn: String(effectEn?.short_effect ?? effectEn?.effect ?? "").replace(/\s+/g, " ").trim()
+        };
+      } catch (error) {
+        console.warn("Pokemon LITM Tools | Ability:", id, error);
+        return {
+          id,
+          name: abilityLabel(id, [], language),
+          englishName: titleCase(id),
+          hidden: !!row.is_hidden,
+          effectTextEn: ""
+        };
+      }
+    })
+  )).filter(Boolean);
+
+  const ability = abilities.find(row => !row.hidden) ?? abilities[0] ?? null;
+
+  const speciesLabel =
+    pokemonGenusLabel(
+      species,
+      language
+    );
+
+  const speciesLabelEn =
+    pokemonGenusLabel(
+      species,
+      "en"
+    );
+
+  const dexText = buildDexText({ pokemon, species, types, ability }, language);
+
+  const typeEffectiveness = {};
+  for (const defendedType of types) {
+    try {
+      const detail = await fetchPokeJson(`https://pokeapi.co/api/v2/type/${defendedType}`);
+      const relations = detail.damage_relations ?? {};
+      for (const row of relations.double_damage_from ?? []) {
+        typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 2;
+      }
+      for (const row of relations.half_damage_from ?? []) {
+        typeEffectiveness[row.name] = Number(typeEffectiveness[row.name] ?? 1) * 0.5;
+      }
+      for (const row of relations.no_damage_from ?? []) {
+        typeEffectiveness[row.name] = 0;
+      }
+    } catch (error) {
+      console.warn("Pokemon LITM Tools | Type effectiveness:", defendedType, error);
+    }
+  }
+
+  const preferredGroups = ["heartgold-soulsilver", "crystal", "gold-silver"];
+
+  function preferredDetails(row) {
+    const all = row.version_group_details ?? [];
+    for (const group of preferredGroups) {
+      const rows = all.filter(detail => detail.version_group?.name === group);
+      if (rows.length) return rows;
+    }
+    return [];
+  }
+
+  const moveSources = (pokemon.moves ?? []).map(row => {
+    const id = row.move?.name ?? "";
+    const details = preferredDetails(row);
+    if (!details.length) return null;
+    const methods = [...new Set(details.map(detail => detail.move_learn_method?.name).filter(Boolean))];
+    const levels = details
+      .filter(detail => detail.move_learn_method?.name === "level-up")
+      .map(detail => Number(detail.level_learned_at ?? 0))
+      .filter(value => Number.isFinite(value) && value > 0);
+    const level = levels.length ? Math.min(...levels) : null;
+    if (methods.includes("machine") && HM_MOVES.has(id)) methods.push("hm");
+
+    return {
+      id,
+      url: row.move?.url,
+      methods,
+      level,
+      rank: level ? rankForLevel(level) : null
+    };
+  }).filter(row => row?.id && row.url);
+
+  const maxLevel = MIGHT[might]?.maxLevel ?? 45;
+  const levelPool = moveSources
+    .filter(row => Number(row.level ?? Infinity) <= maxLevel)
+    .sort((a, b) => Number(a.level ?? 0) - Number(b.level ?? 0));
+
+  const otherPool = moveSources
+    .filter(row => !row.level && row.methods.some(method => ["machine", "tutor", "egg"].includes(method)))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const chosenSources = [];
+  const seen = new Set();
+  for (const row of [...levelPool, ...otherPool]) {
+    if (seen.has(row.id)) continue;
+    chosenSources.push(row);
+    seen.add(row.id);
+    if (chosenSources.length >= 36) break;
+  }
+
+  const detailRows = (await Promise.all(chosenSources.map(async source => {
+    try {
+      const detail = await fetchPokeJson(source.url);
+      const meta = detail.meta ?? {};
+      const effectPt = (detail.effect_entries ?? []).find(entry =>
+        ["pt-BR", "pt"].includes(entry.language?.name)
+      ) ?? null;
+      const effectEn = detail.effect_entries?.find(entry => entry.language?.name === "en") ?? null;
+      const flavorEn = detail.flavor_text_entries?.find(entry => entry.language?.name === "en");
+      const methodInfo = learnMethodInfo(source.methods, source.level, language);
+
+      const move = {
+        id: detail.name,
+        name: moveLabel(detail.name, detail.names, language),
+        englishName: moveEnglishLabel(detail.name, detail.names),
+        type: detail.type?.name ?? "normal",
+        damageClass: detail.damage_class?.name ?? "status",
+        power: Number(detail.power ?? 0),
+        accuracy:
+          detail.accuracy == null
+            ? null
+            : Number(
+                detail.accuracy
+              ),
+
+        pp: Number(detail.pp ?? 0),
+
+        priority:
+          Number(
+            detail.priority
+            ?? 0
+          ),
+
+        level: source.level,
+        rank: source.rank,
+        methods: source.methods,
+        methodId: methodInfo.id,
+        methodLabel: methodInfo.label,
+        target: detail.target?.name ?? "selected-pokemon",
+        effectChance: Number(detail.effect_chance ?? 0),
+        effectTextPt: String(effectPt?.effect ?? "").replace(/\s+/g, " ").trim(),
+        shortEffectPt: String(effectPt?.short_effect ?? "").replace(/\s+/g, " ").trim(),
+        effectTextEn: String(effectEn?.effect ?? "").replace(/\s+/g, " ").trim(),
+        shortEffectEn: String(effectEn?.short_effect ?? "").replace(/\s+/g, " ").trim(),
+        flavorEn: String(flavorEn?.flavor_text ?? "").replace(/[\n\f]+/g, " ").replace(/\s+/g, " ").trim(),
+        pokemonDbUrl: "https://pokemondb.net/move/" + encodeURIComponent(detail.name),
+        statChanges: (detail.stat_changes ?? []).map(change => ({
+          change: Number(change.change ?? 0),
+          stat: change.stat?.name ?? ""
+        })).filter(change => !!change.stat),
+        meta: {
+          ailment: meta.ailment?.name ?? "none",
+          ailmentChance: Number(meta.ailment_chance ?? 0),
+          category: meta.category?.name ?? "",
+          criticalRate: Number(meta.crit_rate ?? 0),
+          drain: Number(meta.drain ?? 0),
+          flinchChance: Number(meta.flinch_chance ?? 0),
+          healing: Number(meta.healing ?? 0),
+          minHits: Number(meta.min_hits ?? 0),
+          maxHits: Number(meta.max_hits ?? 0),
+          minTurns: Number(meta.min_turns ?? 0),
+          maxTurns: Number(meta.max_turns ?? 0),
+          statChance: Number(meta.stat_chance ?? 0)
+        }
+      };
+      move.shortDescription = moveShortDescription(move, move.name, language);
+      move.effects = buildMoveEffects(
+        move,
+        might,
+        language
+      );
+      return move;
+    } catch (error) {
+      console.warn("Pokemon LITM Tools | Move:", source.id, error);
+      return null;
+    }
+  }))).filter(Boolean);
+
+  function score(move) {
+    const stab = types.includes(move.type) ? 75 : 0;
+    const usefulStatus = move.damageClass === "status" ? 45 : 0;
+    const powerScore = Math.min(Number(move.power ?? 0), 150);
+    const accuracyScore = Math.min(Number(move.accuracy || 80), 100) / 10;
+    const levelScore = Number(move.level ?? 1) * (might === "origin" ? 0.15 : might === "greatness" ? 0.8 : 0.45);
+    return stab + usefulStatus + powerScore + accuracyScore + levelScore;
+  }
+
+  const moveChoices = detailRows.slice().sort((a, b) =>
+    score(b) - score(a) || a.name.localeCompare(b.name, language)
+  );
+
+  const moves = [];
+  const usedTypes = new Set();
+  const usedClasses = new Set();
+  for (const move of moveChoices) {
+    const diversity = !usedTypes.has(move.type) || !usedClasses.has(move.damageClass) || moves.length < 2;
+    if (!diversity && moves.length < 3) continue;
+    moves.push(move);
+    usedTypes.add(move.type);
+    usedClasses.add(move.damageClass);
+    if (moves.length >= 4) break;
+  }
+  for (const move of moveChoices) {
+    if (moves.length >= 4) break;
+    if (!moves.some(existing => existing.id === move.id)) moves.push(move);
+  }
+
+  const statOrder = ["hp", "attack", "defense", "special-attack", "special-defense", "speed"];
+  const statRows = statOrder.map(name => ({ name, value: Number(stats[name] ?? 0) }));
+  const rankedStats = statRows.slice().sort((a, b) =>
+    b.value - a.value || statOrder.indexOf(a.name) - statOrder.indexOf(b.name)
+  );
+  const best = rankedStats[0];
+
+  const weaknessRows = statRows.filter(row => row.name !== "hp");
+  const weaknessOrder = statOrder.filter(name => name !== "hp");
+  const worst = weaknessRows.reduce((a, b) => {
+    if (b.value < a.value) return b;
+    if (b.value === a.value && weaknessOrder.indexOf(b.name) > weaknessOrder.indexOf(a.name)) return b;
+    return a;
+  }, weaknessRows[0]);
+
+  const biographyMoves = moveSources.map(source => ({
+    id: source.id,
+    name: moveLabel(source.id, [], language),
+    englishName: titleCase(source.id),
+    level: source.level,
+    rank: source.rank,
+    methods: source.methods,
+    method: learnMethodInfo(source.methods, source.level, language)
+  }));
+
+  return {
+    pokemonId,
+    contentLanguage: language,
+    types,
+    stats,
+    typeEffectiveness,
+    abilities,
+    ability,
+    moves,
+    moveChoices,
+    dexText,
+
+    speciesLabel,
+    speciesLabelEn,
+
+    catchRate: Number(species.capture_rate ?? 0),
+    genderRate: Number(species.gender_rate ?? -1),
+    biographyMoves,
+    best,
+    worst,
+    topStats: rankedStats.slice(0, 2),
+    powerStatTag: statPowerText(best.name, language),
+    weaknessTag: statWeaknessText(worst.name, language)
+  };
+}
+
+
+function npcTrainerOptions() {
+  return game.actors
+    .filter(actor => {
+      if (actor.type !== "litm-npc") return false;
+      if (!game.user.isGM && !actor.isOwner) return false;
+
+      const moduleFlags = actor.flags?.[MODULE_ID] ?? {};
+      const roles = Array.isArray(actor.system?.roles) ? actor.system.roles : [];
+      const pokemonChallenge = (
+        moduleFlags.kind === "pokemon"
+        || Number(moduleFlags.pokemonId ?? 0) > 0
+        || (
+          moduleFlags.pokemonBuilder === true
+          && roles.some(role => String(role).toLocaleLowerCase() === "pokémon")
+        )
+      );
+
+      return !pokemonChallenge;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
+
+function playerTrainerOptions() {
+  return game.actors
+    .filter(actor =>
+      actor.type === "litm-character"
+      && actor.getFlag(MODULE_ID, "kind") !== "pokemon"
+      && actor.getFlag(MODULE_ID, "kind") !== "pokemon-combat"
+      && actor.getFlag(MODULE_ID, "combatProjection") !== true
+      && (game.user.isGM || actor.isOwner)
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
+
+function actorFolderOptions() {
+  const remembered =
+    String(
+      game.settings.get(
+        MODULE_ID,
+        "lastActorFolder"
+      )
+      ?? ""
+    );
+
+  return game.folders
+    .filter(
+      folder =>
+        folder.type === "Actor"
+    )
+    .sort(
+      (a, b) =>
+        a.name.localeCompare(
+          b.name,
+          "pt-BR"
+        )
+    )
+    .map(folder => {
+      const selected =
+        folder.id === remembered
+          ? "selected"
+          : "";
+
+      return (
+        `<option value="${folder.id}" ${selected}>`
+        +
+        `${escapeHTML(folder.name)}</option>`
+      );
+    })
+    .join("");
+}
+
+
+async function resolveChallengeFolder(
+  config
+) {
+  let folderId =
+    String(
+      config.folderId
+      ?? ""
+    ).trim();
+
+  const newFolder =
+    String(
+      config.newFolder
+      ?? ""
+    ).trim();
+
+  if (newFolder) {
+    const folder =
+      await Folder.create({
+        name:
+          newFolder,
+
+        type:
+          "Actor"
+      });
+
+    if (!folder) {
+      throw new Error(
+        "Não foi possível criar a pasta."
+      );
+    }
+
+    folderId =
+      folder.id;
+  }
+
+  if (folderId) {
+    const folder =
+      game.folders.get(
+        folderId
+      );
+
+    if (
+      !folder ||
+      folder.type !== "Actor"
+    ) {
+      throw new Error(
+        "Pasta de Actors inválida."
+      );
+    }
+  }
+
+  await game.settings.set(
+    MODULE_ID,
+    "lastActorFolder",
+    folderId
+  );
+
+  return folderId || null;
+}
+
+
+async function askBuildConfig(entry) {
+  const modeResult = await foundry.applications.api.DialogV2.input({
+    window: { title: `${entry.name} · Challenge · Etapa 2` },
+    position: { width: 620 },
+    content: `
+      <div class="pokemon-builder-wizard">
+        ${wizardHeader(2, "Configurar Challenge", "O arraste rápido continua disponível; este fluxo cria uma ficha elaborada.")}
+        <div class="pokemon-builder-config">
+          <div class="pokemon-builder-field">
+            <label>Criar como</label>
+            <select name="mode">
+              <option value="challenge">Pokémon selvagem / Challenge</option>
+              <option value="trainer">Adicionar a um treinador jogador</option>
+            </select>
+          </div>
+          <div class="pokemon-builder-field">
+            <label>Rank / Might</label>
+            <select name="might">
+              <option value="origin">Origin</option>
+              <option value="adventure" selected>Adventure</option>
+              <option value="greatness">Greatness</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    `,
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
+    modal: true
+  });
+
+  if (!modeResult) return null;
+  const mode = String(modeResult.mode ?? "challenge");
+  const might = String(modeResult.might ?? "adventure");
+
+  if (mode === "challenge") {
+    const folderChoices = actorFolderOptions();
+    const remembered = String(game.settings.get(MODULE_ID, "lastActorFolder") ?? "");
+    const rootSelected = remembered ? "" : "selected";
+
+    const result = await foundry.applications.api.DialogV2.input({
+      window: { title: `${entry.name} · Destino` },
+      position: { width: 620 },
+      content: `
+        <div class="pokemon-builder-wizard">
+          ${wizardHeader(2, "Destino do Challenge")}
+          <div class="pokemon-builder-config">
+            <div class="pokemon-builder-field">
+              <label>Pasta de Actors</label>
+              <select name="folderId">
+                <option value="" ${rootSelected}>Raiz de Actors</option>
+                ${folderChoices}
+              </select>
+            </div>
+            <div class="pokemon-builder-field">
+              <label>Ou criar nova pasta</label>
+              <input type="text" name="newFolder" placeholder="Ex.: Pokémon Selvagens">
+            </div>
+          </div>
+        </div>
+      `,
+      ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
+      modal: true
+    });
+
+    if (!result) return null;
+    return {
+      mode, might,
+      trainerId: "", destination: "",
+      folderId: String(result.folderId ?? ""),
+      newFolder: String(result.newFolder ?? "").trim()
+    };
+  }
+
+  const options = npcTrainerOptions()
+    .map(actor => `<option value="${actor.id}">${escapeHTML(actor.name)}</option>`)
+    .join("");
+
+  const result = await foundry.applications.api.DialogV2.input({
+    window: { title: `${entry.name} · Treinador` },
+    position: { width: 620 },
+    content: `
+      <div class="pokemon-builder-wizard">
+        ${wizardHeader(2, "Destino do Pokémon")}
+        <div class="pokemon-builder-config">
+          <div class="pokemon-builder-field">
+            <label>Treinador</label>
+            <select name="trainerId">
+              <option value="">Escolha um treinador</option>
+              ${options}
+            </select>
+          </div>
+          <div class="pokemon-builder-field">
+            <label>Destino</label>
+            <select name="destination">
+              <option value="team">Time</option>
+              <option value="pc">PC</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    `,
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
+    modal: true
+  });
+
+  if (!result) return null;
+  const trainerId = String(result.trainerId ?? "");
+  if (!trainerId) throw new Error("Escolha o treinador.");
+
+  return {
+    mode, might, trainerId,
+    destination: String(result.destination ?? "team"),
+    folderId: "", newFolder: ""
+  };
+}
+
+
+async function reviewBuild(entry, config, data) {
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
+  const defaultNatureId = defaultNatureForStats(data.stats).id;
+  const natureIds = [
+    "hardy","lonely","adamant","naughty","brave",
+    "bold","docile","impish","lax","relaxed",
+    "modest","mild","bashful","rash","quiet",
+    "calm","gentle","careful","quirky","sassy",
+    "timid","hasty","jolly","naive","serious"
+  ];
+
+  const natureOptions = natureIds.map(id => {
+    const nature = natureProfile(id, language);
+    return `<option value="${id}" ${id === defaultNatureId ? "selected" : ""}>${escapeHTML(nature.label)}</option>`;
+  }).join("");
+
+  const abilityOptions = (data.abilities ?? []).map(ability => `
+    <option value="${escapeHTML(ability.id)}" ${ability.id === data.ability?.id ? "selected" : ""}>
+      ${escapeHTML(ability.name)}${ability.hidden ? (language === "en" ? " · Hidden Ability" : " · Habilidade Oculta") : ""}
+    </option>
+  `).join("");
+
+  const weaknessStats = ["attack","defense","special-attack","special-defense","speed"];
+  const weaknessOptions = weaknessStats.map(stat => {
+    const text = statWeaknessText(stat, language);
+    return `<option value="${stat}" ${stat === data.worst?.name ? "selected" : ""}>${escapeHTML(text)} · ${escapeHTML(statLabel(stat, language))} ${Number(data.stats?.[stat] ?? 0)}</option>`;
+  }).join("");
+
+  const profile = await foundry.applications.api.DialogV2.input({
+    window: { title: `${entry.name} · Perfil · Etapa 3` },
+    position: { width: 720 },
+    content: `
+      <div class="pokemon-builder-wizard">
+        ${wizardHeader(3, "Perfil do Pokémon", "Natureza e Habilidade são propriedades do indivíduo. HP nunca é usado para sugerir a fraqueza.")}
+        <div class="pokemon-builder-profile-grid">
+          <label>
+            <span>Natureza</span>
+            <select name="natureId">${natureOptions}</select>
+          </label>
+          <label>
+            <span>Habilidade</span>
+            <select name="abilityId">${abilityOptions}</select>
+          </label>
+          <label class="wide">
+            <span>Fraqueza sugerida</span>
+            <select name="weaknessStat">${weaknessOptions}<option value="custom">Personalizada</option></select>
+          </label>
+          <label class="wide">
+            <span>Fraqueza personalizada (opcional)</span>
+            <input name="customWeakness" type="text" placeholder="Se preencher, substitui a sugestão acima">
+          </label>
+        </div>
+      </div>
+    `,
+    ok: { label: "Escolher golpes", icon: "fa-solid fa-arrow-right" },
+    modal: true
+  });
+
+  if (!profile) return null;
+
+  const nature = natureProfile(String(profile.natureId ?? defaultNatureId), language);
+  const selectedAbility = (data.abilities ?? []).find(row => row.id === String(profile.abilityId ?? "")) ?? data.ability ?? null;
+  data.ability = selectedAbility;
+
+  const customWeakness = String(profile.customWeakness ?? "").trim();
+  const weaknessStat = String(profile.weaknessStat ?? data.worst?.name ?? "speed");
+  const weaknessTag = customWeakness || (
+    weaknessStat === "custom"
+      ? data.weaknessTag
+      : statWeaknessText(weaknessStat, language)
+  );
+
+  let selectedMoves = null;
+
+  while (!selectedMoves) {
+    const defaults = new Set((data.moves ?? []).map(move => move.id));
+    const cards = (data.moveChoices ?? []).map((move, index) => {
+      const threat = buildMoveThreat(move, move.name, config.might, language);
+      const consequenceText = threat.list.map(item => `<li>${item}</li>`).join("");
+      return `
+        <label class="pokemon-builder-move-card">
+          <input type="checkbox" name="move_${index}" ${defaults.has(move.id) ? "checked" : ""}>
+          <div class="pokemon-builder-move-main">
+            <div class="pokemon-builder-move-title">
+              <strong>${escapeHTML(move.name)} <span>(${escapeHTML(move.englishName)})</span></strong>
+              <a href="https://pokemondb.net/move/${encodeURIComponent(move.id)}" target="_blank" rel="noopener noreferrer" title="PokémonDB">
+                <i class="fa-solid fa-up-right-from-square"></i>
+              </a>
+            </div>
+            <small>${escapeHTML(typeLabel(move.type, language))} · ${escapeHTML(move.methodLabel)} · ${move.power ? `${language === "en" ? "Power" : "Poder"} ${move.power}` : (language === "en" ? "No direct damage" : "Sem dano direto")}</small>
+            <p>${escapeHTML(move.shortDescription)}</p>
+            <ul>${consequenceText}</ul>
+          </div>
+        </label>
+      `;
+    }).join("");
+
+    const result = await foundry.applications.api.DialogV2.input({
+      window: { title: `${entry.name} · Golpes · Etapa 4` },
+      position: { width: 860, height: 760 },
+      content: `
+        <div class="pokemon-builder-wizard pokemon-builder-moves-step">
+          ${wizardHeader(4, "Escolher golpes", "Marque até 4. As sugestões respeitam o Rank, mas você pode trocar livremente.")}
+          <div class="pokemon-builder-move-list">${cards}</div>
+        </div>
+      `,
+      ok: { label: "Revisar", icon: "fa-solid fa-arrow-right" },
+      modal: true
+    });
+
+    if (!result) return null;
+
+    const picked = (data.moveChoices ?? []).filter((move, index) => result[`move_${index}`] === true || result[`move_${index}`] === "true" || result[`move_${index}`] === "on");
+    if (picked.length < 1 || picked.length > 4) {
+      ui.notifications.warn("Escolha entre 1 e 4 golpes.");
+      continue;
+    }
+    selectedMoves = picked;
+  }
+
+  data.moves = selectedMoves;
+
+  const review = {
+    moveNames: selectedMoves.map(move => move.name),
+    powerStatTag: data.powerStatTag,
+    weaknessTag,
+    natureId: nature.id,
+    natureLabel: nature.label,
+    natureLimits: [],
+    abilityId: selectedAbility?.id ?? null
+  };
+
+  const threatPreview = selectedMoves.map(move => {
+    const threat = buildMoveThreat(move, move.name, config.might, language);
+    return `<li><strong>${escapeHTML(move.name)} (${escapeHTML(move.englishName)})</strong> — ${escapeHTML(threat.description)}</li>`;
+  }).join("");
+
+  const confirm = await foundry.applications.api.DialogV2.input({
+    window: { title: `${entry.name} · Revisão · Etapa 5` },
+    position: { width: 720 },
+    content: `
+      <div class="pokemon-builder-wizard">
+        ${wizardHeader(5, "Revisar Pokémon")}
+        <div class="pokemon-builder-final-review">
+          <p><strong>Rank:</strong> ${escapeHTML(MIGHT[config.might]?.label ?? config.might)}</p>
+          <p><strong>Natureza:</strong> ${escapeHTML(review.natureLabel)}</p>
+          <p><strong>Habilidade:</strong> ${escapeHTML(selectedAbility?.name ?? "—")}${selectedAbility?.hidden ? (language === "en" ? " · Hidden Ability" : " · Habilidade Oculta") : ""}</p>
+          <p><strong>Tag de Poder sugerida:</strong> ${escapeHTML(review.powerStatTag)}</p>
+          <p><strong>Tag de Fraqueza:</strong> ${escapeHTML(review.weaknessTag)}</p>
+          <p><strong>Golpes:</strong></p>
+          <ul>${threatPreview}</ul>
+        </div>
+        <input type="hidden" name="confirmed" value="yes">
+      </div>
+    `,
+    ok: { label: "Criar Pokémon", icon: "fa-solid fa-check" },
+    modal: true
+  });
+
+  return confirm ? review : null;
+}
+
+
+function powerTag(name, planned = false, question = '') {
+  return {
+    name,
+    question,
+    burned: false,
+    toBurn: false,
+    planned: !!planned,
+    selected: false,
+    expiring: false,
+    expired: false
+  };
+}
+
+function floatingTag(name, positive = true) {
+  return {
+    name,
+    value: 0,
+    isStatus: false,
+    burned: false,
+    toBurn: false,
+    selected: false,
+    positive,
+    markings: [false, false, false, false, false, false],
+    might: 0,
+    mightIcon: ''
+  };
+}
+
+function pokemonThemeTitleTag(entry, review, language = 'pt-BR') {
+  const species = String(entry?.name ?? 'Pokémon').trim() || 'Pokémon';
+  const nature = String(review?.natureLabel ?? '').trim();
+  const suffix = nature ? ' ' + nature : '';
+
+  if (language === 'en') return species + suffix;
+  if (review?.genderId === 'male') return 'O ' + species + suffix;
+  if (review?.genderId === 'female') return 'A ' + species + suffix;
+  return nature ? species + ' · ' + nature : species;
+}
+
+function pokemonMoveDisplayName(move, fallback = "") {
+  const local =
+    String(fallback || move?.name || move?.id || "Golpe").trim();
+
+  const english =
+    String(move?.englishName ?? "").trim();
+
+  if (
+    !english
+    || local.localeCompare(
+      english,
+      undefined,
+      { sensitivity: "base" }
+    ) === 0
+  ) {
+    return local;
+  }
+
+  if (local.endsWith("(" + english + ")")) {
+    return local;
+  }
+
+  return local + " (" + english + ")";
+}
+
+function themeSystem(review, data, entry) {
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
+  const pt = language !== "en";
+
+  const moveTags = review.moveNames.map((name, index) =>
+    powerTag(
+      pokemonMoveDisplayName(data.moves?.[index], name),
+      false,
+      pt ? `Movimento ${index + 1}` : `Move ${index + 1}`
+    )
+  );
+
+  const abilityTag = data.ability?.name
+    ? [powerTag(
+        `Habilidade: ${data.ability.name}`,
+        false,
+        pt ? "Habilidade nata" : "Innate Ability"
+      )]
+    : [];
+
+  const futureTags = futureLevelUpMoves(data)
+    .map((move, index) => powerTag(
+      pokemonMoveDisplayName(move, move.name),
+      true,
+      pt ? `Próximo movimento ${index + 1}` : `Next move ${index + 1}`
+    ));
+
+  return {
+    description: formatThemeDescription({ data, review }, language),
+    type: 'litm-variable',
+    color: 'litm-variable',
+    quest: '',
+    story: '',
+    tabCategory: 'main',
+    powertags: [
+      powerTag(
+        pokemonThemeTitleTag(entry, review, language),
+        false,
+        pt
+          ? "O Pokémon, sua natureza e personalidade"
+          : "The Pokémon, its nature and personality"
+      ),
+      ...moveTags,
+      ...(review.powerStatTag
+        ? [powerTag(
+            review.powerStatTag,
+            false,
+            pt ? "Stat de destaque" : "Standout Stat"
+          )]
+        : []),
+      ...abilityTag,
+      ...futureTags
+    ],
+    weaknesstags: [powerTag(
+      review.weaknessTag,
+      false,
+      pt ? "Stat mais fraco" : "Weakest Stat"
+    )],
+    specialImprovements: pokemonSpecialImprovements(language),
+    options: { isStoryTheme: false }
+  };
+}
+
+function moduleMetadata(entry, definition, config, data, review, instanceId) {
+  const defenses = typeDefenseGroups(data.typeEffectiveness, data.contentLanguage);
+
+  return {
+    ...foundry.utils.deepClone(definition.moduleFlags),
+    pokemonBuilder: true,
+    pokemonInstanceId: instanceId,
+    speciesName: entry.name,
+    contentLanguage: data.contentLanguage,
+    nature: {
+      id: review.natureId,
+      label: review.natureLabel
+    },
+    gender: review.genderId ?? "genderless",
+    genderLabel: review.genderLabel ?? genderLabel(review.genderId, data.contentLanguage),
+    ability: data.ability ? foundry.utils.deepClone(data.ability) : null,
+    might: config.might,
+    trainerNpcId: config.mode === "trainer" ? (config.trainerId || null) : null,
+    weaknessTag: review.weaknessTag,
+    powerStatTag: review.powerStatTag,
+    types: foundry.utils.deepClone(data.types),
+    baseStats: foundry.utils.deepClone(data.stats),
+    typeEffectiveness: foundry.utils.deepClone(data.typeEffectiveness),
+    futureMoves: futureLevelUpMoves(data),
+    levelUpMoves: (data.biographyMoves ?? [])
+      .filter(move => Number(move.level ?? 0) > 0)
+      .map(move => ({
+        id: move.id,
+        name: move.name,
+        englishName: move.englishName,
+        learnedAt: Number(move.level ?? 0)
+      })),
+    themeTitleTag: pokemonThemeTitleTag(entry, review, data.contentLanguage),
+    moves: data.moves.map((move, index) => ({
+      id: move.id,
+      name: pokemonMoveDisplayName(move, review.moveNames[index]),
+      englishName: move.englishName,
+      type: move.type,
+      damageClass: move.damageClass,
+      power: move.power,
+      accuracy: move.accuracy,
+      pp: Number(move.pp ?? 0),
+
+      priority:
+        Number(
+          move.priority
+          ?? 0
+        ),
+
+      learnedAt: move.level,
+      target: move.target,
+      description: move.shortDescription ?? move.description ?? "",
+      pokemonDbUrl: move.pokemonDbUrl ?? ("https://pokemondb.net/move/" + encodeURIComponent(move.id)),
+      effectTextPt: move.effectTextPt ?? "",
+      shortEffectPt: move.shortEffectPt ?? "",
+      effectTextEn: move.effectTextEn ?? "",
+      shortEffectEn: move.shortEffectEn ?? "",
+      meta: foundry.utils.deepClone(move.meta ?? {}),
+      statChanges: foundry.utils.deepClone(move.statChanges ?? []),
+      effects: foundry.utils.deepClone(
+        move.effects
+        ?? buildMoveEffects(
+          move,
+          config.might,
+          data.contentLanguage
+        )
+      )
+    })),
+    tagBindings: data.moves.map((move, index) => ({
+      tagIndex: index + 1,
+      tagName: pokemonMoveDisplayName(move, review.moveNames[index]),
+      kind: "pokemonMove",
+      moveId: move.id,
+      type: move.type,
+      vfx: `${move.type}-move`
+    })),
+    defenseBindings: defenses.map(defense => ({
+      tagName: defense.name,
+      kind: `pokemonTypeDefense:${defense.kind}`,
+      positive: defense.positive,
+      types: foundry.utils.deepClone(defense.types),
+      multipliers: foundry.utils.deepClone(defense.multipliers)
+    })),
+    pokedexUrl: getPokemonDbUrl(entry)
+  };
+}
+
+function prototypeToken(definition, flags) {
+  const tokenFlags = foundry.utils.deepClone(definition.prototypeFlags ?? {});
+  tokenFlags[MODULE_ID] = foundry.utils.deepClone(flags);
+  return {
+    name: flags.species ?? "Pokémon",
+    width: 1,
+    height: 1,
+    texture: {
+      src: definition.tokenPath,
+      scaleX: definition.visualScale,
+      scaleY: definition.visualScale
+    },
+    lockRotation: true,
+    disposition: CONST.TOKEN_DISPOSITIONS.NEUTRAL,
+    flags: tokenFlags
+  };
+}
+
+function matchupText(effectiveness, predicate, language) {
+  const values = Object.entries(effectiveness ?? {})
+    .filter(([, value]) => predicate(Number(value)))
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([type, value]) => `${typeLabel(type, language)} ×${Number(value)}`);
+
+  return values.join(", ") || (language === "en" ? "None" : "Nenhuma");
+}
+
+function pokemonBiography(data, review) {
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
+  const profile = formatThemeDescription({ data, review }, language);
+  const rows = data.biographyMoves ?? [];
+
+  const nameText = move =>
+    escapeHTML(pokemonMoveDisplayName(move, move.name));
+  const rankSections = [
+    ["origin", language === "en" ? "Origin · up to Lv. 20" : "Origin · até Nv. 20"],
+    ["adventure", language === "en" ? "Adventure · Lv. 21–45" : "Adventure · Nv. 21–45"],
+    ["greatness", language === "en" ? "Greatness · Lv. 46+" : "Greatness · Nv. 46+"]
+  ].map(([rank, title]) => {
+    const moves = rows.filter(move => move.rank === rank).sort((a, b) => Number(a.level ?? 0) - Number(b.level ?? 0));
+    const text = moves.length
+      ? moves.map(move => `${nameText(move)} · Nv. ${move.level}`).join("<br>")
+      : (language === "en" ? "None listed." : "Nenhum listado.");
+    return `<h3>${title}</h3><p>${text}</p>`;
+  }).join("");
+
+  function otherGroup(method, title) {
+    const moves = rows.filter(move => move.method?.id === method);
+    if (!moves.length) return "";
+    return `<h3>${title}</h3><p>${moves.map(nameText).join(", ")}</p>`;
+  }
+
+  const actionRows = (data.moves ?? []).map((move, index) => {
+    const displayName = review.moveNames[index] ?? move.name;
+    const threat = buildMoveThreat(move, displayName, review.might ?? "adventure", language);
+    return `
+      <article class="pokemon-biography-effect"
+        data-pokemon-effect-kind="move"
+        data-pokemon-effect-id="${escapeHTML(move.id)}"
+        data-pokemon-effect-type="${escapeHTML(move.type)}"
+        data-pokemon-effect-target="${escapeHTML(move.target ?? "selected-pokemon")}">
+        <div class="pokemon-biography-effect-main">
+          <h3><i class="fa-solid fa-bolt"></i> ${escapeHTML(pokemonMoveDisplayName(move, displayName))}</h3>
+          <p>${escapeHTML(threat.description)}</p>
+        </div>
+        <div class="pokemon-biography-effect-actions" data-pokemon-biography-actions="true"></div>
+      </article>
+    `;
+  }).join("");
+
+  const abilityThreat = buildAbilityThreat(data.ability, language);
+  const abilityRow = abilityThreat ? `
+    <article class="pokemon-biography-effect"
+      data-pokemon-effect-kind="ability"
+      data-pokemon-effect-id="${escapeHTML(data.ability?.id ?? "")}"
+      data-pokemon-effect-target="self">
+      <h3><i class="fa-solid fa-star"></i> ${escapeHTML(abilityThreat.name)}${data.ability?.englishName && data.ability.englishName !== abilityThreat.name ? ` (${escapeHTML(data.ability.englishName)})` : ""}</h3>
+      <p>${escapeHTML(abilityThreat.description)}</p>
+    </article>
+  ` : "";
+
+  return `
+    <h2>${language === "en" ? "Actions / Effects" : "Ações / Efeitos"}</h2>
+    <p><em>${language === "en" ? "Use the sheet buttons to present the move, area and structured effects." : "Use os botões da ficha para apresentar o golpe, a área e seus efeitos estruturados."}</em></p>
+    <div class="pokemon-biography-effects" data-pokemon-effect-actions="true">
+      ${actionRows}
+      ${abilityRow}
+    </div>
+
+    <h2>${language === "en" ? "Moves by Rank" : "Golpes por Rank"}</h2>
+    ${rankSections}
+
+    <h2>${language === "en" ? "Other learning methods" : "Outras formas de aprendizado"}</h2>
+    ${otherGroup("tm", "TM")}
+    ${otherGroup("hm", "HM")}
+    ${otherGroup("tutor", "Tutor")}
+    ${otherGroup("breeding", language === "en" ? "Breeding" : "Cruzamento")}
+
+    <hr>
+    ${profile}
+  `;
+}
+
+
+function pokemonThreats(data, review, config) {
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
+  const threats = data.moves.map((move, index) => {
+    const threat = buildMoveThreat(
+      move,
+      review.moveNames[index] ?? move.name,
+      config.might,
+      language
+    );
+    return {
+      name: pokemonMoveDisplayName(
+        move,
+        review.moveNames[index] ?? move.name
+      ),
+      description: threat.description,
+      list: threat.list
+    };
+  });
+
+  const abilityThreat = buildAbilityThreat(data.ability, language);
+  if (abilityThreat) {
+    threats.push({
+      name: `${abilityThreat.name}${data.ability?.englishName && data.ability.englishName !== abilityThreat.name ? ` (${data.ability.englishName})` : ""}`,
+      description: abilityThreat.description,
+      list: abilityThreat.list
+    });
+  }
+
+  if (config.mode === "challenge") {
+    const fuga = escapeStatusLevel(data.stats?.speed, config.might);
+    threats.unshift({
+      name: language === "en" ? "ESCAPE" : "FUGIR",
+      description: language === "en"
+        ? "The wild Pokémon looks for an opening to leave the confrontation."
+        : "O Pokémon selvagem procura uma abertura para abandonar o confronto.",
+      list: [
+        language === "en"
+          ? `When it threatens to flee, apply [/s escape-${fuga}] against attempts to stop it.`
+          : `Quando ameaçar fugir, aplique [/s fuga-${fuga}] contra tentativas de impedir a fuga.`
+      ]
+    });
+  }
+
+  return threats;
+}
+
+
+
+function isPokemonChallengeActor(
+  actor
+) {
+  if (
+    !actor
+    ||
+    actor.type
+      !== "litm-npc"
+  ) {
+    return false;
+  }
+
+  const flags =
+    actor.flags?.[
+      MODULE_ID
+    ]
+    ?? {};
+
+  const roles =
+    Array.isArray(
+      actor.system?.roles
+    )
+      ? actor.system.roles
+      : [];
+
+  return (
+    flags.pokemonBuilder
+      === true
+    ||
+    flags.kind
+      === "pokemon"
+    ||
+    Number(
+      flags.pokemonId
+      ?? 0
+    ) > 0
+    ||
+    roles.some(
+      role =>
+        String(
+          role
+          ?? ""
+        ).toLocaleLowerCase()
+          === "pokémon"
+    )
+  );
+}
+
+
+function storedPokemonChallengeThreats(
+  actor
+) {
+  const flags =
+    actor.flags?.[
+      MODULE_ID
+    ]
+    ?? {};
+
+  const language =
+    flags.contentLanguage
+    ?? getPokemonContentLanguage();
+
+  const might =
+    flags.might
+    ?? "origin";
+
+  const storedMoves =
+    Array.isArray(
+      flags.moves
+    )
+      ? foundry.utils.deepClone(
+          flags.moves
+        )
+      : [];
+
+  const moves =
+    storedMoves.map(
+      move => {
+        if (
+          language !== "en"
+          &&
+          String(
+            move?.id
+            ?? ""
+          ) === "electro-ball"
+        ) {
+          return {
+            ...move,
+
+            name:
+              "Bola Elétrica (Electro Ball)",
+
+            englishName:
+              move?.englishName
+              || "Electro Ball"
+          };
+        }
+
+        return move;
+      }
+    );
+
+  const threats =
+    moves.map(
+      move => {
+        const displayName =
+          String(
+            move?.name
+            ?? move?.id
+            ?? "Golpe"
+          );
+
+        const threat =
+          buildMoveThreat(
+            move,
+            displayName,
+            might,
+            language
+          );
+
+        return {
+          name:
+            displayName,
+
+          description:
+            threat.description,
+
+          list:
+            threat.list
+        };
+      }
+    );
+
+  const ability =
+    flags.ability
+    && typeof flags.ability
+      === "object"
+      ? foundry.utils.deepClone(
+          flags.ability
+        )
+      : null;
+
+  const abilityThreat =
+    buildAbilityThreat(
+      ability,
+      language
+    );
+
+  if (
+    abilityThreat
+  ) {
+    threats.push({
+      name:
+        abilityThreat.name
+        +
+        (
+          ability?.englishName
+          &&
+          ability.englishName
+            !== abilityThreat.name
+            ? (
+                " ("
+                + ability.englishName
+                + ")"
+              )
+            : ""
+        ),
+
+      description:
+        abilityThreat.description,
+
+      list:
+        abilityThreat.list
+    });
+  }
+
+  if (
+    flags.encounter?.wild
+      === true
+  ) {
+    const escapeLevel =
+      Number(
+        flags.encounter
+          ?.escapeStatusLevel
+        ?? 0
+      )
+      ||
+      escapeStatusLevel(
+        flags.baseStats?.speed,
+        might
+      );
+
+    threats.unshift({
+      name:
+        language === "en"
+          ? "ESCAPE"
+          : "FUGIR",
+
+      description:
+        language === "en"
+          ? "The wild Pokémon looks for an opening to leave the confrontation."
+          : "O Pokémon selvagem procura uma abertura para abandonar o confronto.",
+
+      list: [
+        language === "en"
+          ? (
+              "When it threatens to flee, apply [/s escape-"
+              + escapeLevel
+              + "] against attempts to stop the escape."
+            )
+          : (
+              "Quando ameaçar fugir, aplique [/s fuga-"
+              + escapeLevel
+              + "] contra tentativas de impedir a fuga."
+            )
+      ]
+    });
+  }
+
+  return {
+    threats,
+    moves
+  };
+}
+
+
+function migratePokemonChallengeLimits(
+  actor,
+  language
+) {
+  const limits =
+    foundry.utils.deepClone(
+      Array.isArray(
+        actor.system?.limits
+      )
+        ? actor.system.limits
+        : []
+    );
+
+  let changed = false;
+
+  for (
+    const limit
+    of limits
+  ) {
+    const name =
+      String(
+        limit?.name
+        ?? ""
+      )
+        .trim()
+        .toLocaleLowerCase();
+
+    if (
+      name !== "derrotado"
+      &&
+      name !== "defeated"
+    ) {
+      continue;
+    }
+
+    limit.name =
+      language === "en"
+        ? "Wound"
+        : "Ferido";
+
+    changed = true;
+  }
+
+  return {
+    changed,
+    limits
+  };
+}
+
+
+export async function refreshPokemonChallengeSemantics(
+  actor,
+  {
+    force = false
+  } = {}
+) {
+  if (
+    !isPokemonChallengeActor(
+      actor
+    )
+  ) {
+    return {
+      updated:
+        false,
+
+      reason:
+        "not-pokemon-challenge"
+    };
+  }
+
+  const flags =
+    actor.flags?.[
+      MODULE_ID
+    ]
+    ?? {};
+
+  if (
+    !force
+    &&
+    flags.challengeSemanticsRevision
+      === POKEMON_LITM_SEMANTICS_REV
+  ) {
+    return {
+      updated:
+        false,
+
+      reason:
+        "current"
+    };
+  }
+
+  const language =
+    flags.contentLanguage
+    ?? getPokemonContentLanguage();
+
+  const limitMigration =
+    migratePokemonChallengeLimits(
+      actor,
+      language
+    );
+
+  const {
+    threats,
+    moves
+  } =
+    storedPokemonChallengeThreats(
+      actor
+    );
+
+  if (
+    !threats.length
+    &&
+    !limitMigration.changed
+  ) {
+    return {
+      updated:
+        false,
+
+      reason:
+        "no-stored-semantics"
+    };
+  }
+
+  const update = {
+    [
+      "flags."
+      + MODULE_ID
+      + ".challengeSemanticsRevision"
+    ]:
+      POKEMON_LITM_SEMANTICS_REV
+  };
+
+  if (
+    threats.length
+  ) {
+    update[
+      "system.threatsAndConsequences"
+    ] =
+      threats;
+  }
+
+  if (
+    limitMigration.changed
+  ) {
+    update[
+      "system.limits"
+    ] =
+      limitMigration.limits;
+  }
+
+  if (
+    JSON.stringify(
+      moves
+    )
+    !==
+    JSON.stringify(
+      flags.moves
+      ?? []
+    )
+  ) {
+    update[
+      "flags."
+      + MODULE_ID
+      + ".moves"
+    ] =
+      moves;
+  }
+
+  await actor.update(
+    update
+  );
+
+  return {
+    updated:
+      true,
+
+    actorId:
+      actor.id,
+
+    name:
+      actor.name,
+
+    revision:
+      POKEMON_LITM_SEMANTICS_REV
+  };
+}
+
+
+export async function migratePokemonChallengesLitmFirst(
+  {
+    force = false,
+    notify = false
+  } = {}
+) {
+  if (
+    !game.user?.isGM
+  ) {
+    return {
+      updated:
+        0,
+
+      skipped:
+        0,
+
+      authority:
+        false
+    };
+  }
+
+  /*
+   * Evita dois GMs ativos executarem
+   * a mesma migração ao mesmo tempo.
+   */
+  const authority =
+    game.users
+      .filter(
+        user =>
+          user.active
+          &&
+          user.isGM
+      )
+      .sort(
+        (
+          a,
+          b
+        ) =>
+          a.id.localeCompare(
+            b.id
+          )
+      )[0]
+    ?? null;
+
+  if (
+    authority?.id
+      !== game.user.id
+  ) {
+    return {
+      updated:
+        0,
+
+      skipped:
+        0,
+
+      authority:
+        false
+    };
+  }
+
+  const actors =
+    game.actors.filter(
+      isPokemonChallengeActor
+    );
+
+  let updated = 0;
+  let skipped = 0;
+  const errors = [];
+
+  for (
+    const actor
+    of actors
+  ) {
+    try {
+      const result =
+        await refreshPokemonChallengeSemantics(
+          actor,
+          {
+            force
+          }
+        );
+
+      if (
+        result.updated
+      ) {
+        updated++;
+
+      } else {
+        skipped++;
+      }
+
+    } catch (
+      error
+    ) {
+      errors.push({
+        actorId:
+          actor.id,
+
+        name:
+          actor.name,
+
+        error:
+          error?.message
+          ?? String(
+            error
+          )
+      });
+    }
+  }
+
+  const result = {
+    revision:
+      POKEMON_LITM_SEMANTICS_REV,
+
+    total:
+      actors.length,
+
+    updated,
+    skipped,
+    errors,
+
+    authority:
+      true
+  };
+
+  console.log(
+    "Pokemon LITM Tools | Refresh semântico dos Challenges:",
+    result
+  );
+
+  if (
+    notify
+    &&
+    updated > 0
+  ) {
+    ui.notifications.info(
+      updated
+      + " Challenge(s) Pokémon atualizado(s) para as regras LitM-first."
+    );
+  }
+
+  if (
+    errors.length
+  ) {
+    console.warn(
+      "Pokemon LITM Tools | Challenges não atualizados:",
+      errors
+    );
+  }
+
+  return result;
+}
+
+
+function stripLinkedPokemonSection(html) {
+  return String(html ?? "")
+    .replace(/<section data-pokemon-litm-team="true">[\s\S]*?<\/section>/g, "")
+    .trim();
+}
+
+async function refreshNpcTrainerPokemonSection(trainer) {
+  if (!trainer) return;
+  const recordsRaw = trainer.getFlag(MODULE_ID, "linkedPokemonChallenges");
+  const records = Array.isArray(recordsRaw) ? recordsRaw : [];
+  let base = trainer.getFlag(MODULE_ID, "trainerBiographyBase");
+  if (typeof base !== "string") {
+    base = stripLinkedPokemonSection(trainer.system?.biography ?? "");
+    await trainer.setFlag(MODULE_ID, "trainerBiographyBase", base);
+  }
+
+  const rows = records
+    .map(record => {
+      const pokemon = game.actors.get(record.actorId);
+      if (!pokemon) return "";
+      const rank = pokemon.getFlag(MODULE_ID, "might") ?? record.might ?? "origin";
+      return `<li>@UUID[Actor.${pokemon.id}]{${escapeHTML(pokemon.name)}} · ${escapeHTML(MIGHT[rank]?.label ?? rank)}</li>`;
+    })
+    .filter(Boolean)
+    .join("");
+
+  const section = rows
+    ? `<section data-pokemon-litm-team="true"><h2>Pokémon</h2><ul>${rows}</ul></section>`
+    : "";
+
+  await trainer.update({
+    "system.biography": `${base}${base && section ? "\n" : ""}${section}`
+  });
+}
+
+async function linkPokemonChallengeToNpcTrainer(trainerId, pokemon) {
+  if (!trainerId || !pokemon) return;
+  const trainer = game.actors.get(trainerId);
+  if (!trainer || trainer.type !== "litm-npc") {
+    throw new Error("Challenge do treinador NPC não encontrado.");
+  }
+  const raw = trainer.getFlag(MODULE_ID, "linkedPokemonChallenges");
+  const records = Array.isArray(raw) ? foundry.utils.deepClone(raw) : [];
+  if (!records.some(record => record.actorId === pokemon.id)) {
+    records.push({
+      actorId: pokemon.id,
+      pokemonInstanceId: pokemon.getFlag(MODULE_ID, "pokemonInstanceId") ?? null,
+      might: pokemon.getFlag(MODULE_ID, "might") ?? "origin"
+    });
+    await trainer.setFlag(MODULE_ID, "linkedPokemonChallenges", records);
+  }
+  await pokemon.setFlag(MODULE_ID, "trainerNpcId", trainer.id);
+  await refreshNpcTrainerPokemonSection(trainer);
+}
+
+async function createChallenge(entry, config, data, review, definition, existingActor = null) {
+  const language = data.contentLanguage ?? getPokemonContentLanguage();
+  const instanceId = existingActor?.getFlag(MODULE_ID, "pokemonInstanceId") || randomId();
+  const flags = moduleMetadata(entry, definition, config, data, review, instanceId);
+
+  flags.challengeSemanticsRevision =
+    POKEMON_LITM_SEMANTICS_REV;
+
+  flags.encounter = {
+    wild: config.mode === "challenge",
+    defeatedLimit: defeatedLimitFor(data.stats, config.might),
+    catchRate: Number(data.catchRate ?? 0),
+    captureBase: captureLimitFor(data.catchRate),
+    dynamicCaptureReady: true,
+    escapeStatusLevel: escapeStatusLevel(data.stats?.speed, config.might)
+  };
+  const types = data.types.map(type => typeLabel(type, language));
+  const defenses = typeDefenseGroups(data.typeEffectiveness, language);
+
+  const mightyAspects = config.might === "origin" ? [] : [{
+    level: config.might,
+    aspect: language === "en" ? "Pokémon Power" : "Poder Pokémon",
+    mightIcon: config.might
+  }];
+
+  const defeated = defeatedLimitFor(data.stats, config.might);
+  const captureBase = captureLimitFor(data.catchRate);
+
+  const limits = [
+    {
+      name: language === "en" ? "Wound" : "Ferido",
+      value: String(defeated),
+      consequence: language === "en" ? "Out of action" : "Fora de combate"
+    }
+  ];
+
+  if (config.mode === "challenge") {
+    limits.push({
+      name: language === "en" ? "Captured" : "Capturado",
+      value: String(captureBase),
+      consequence: language === "en" ? "Captured by a Trainer" : "Capturado por um Treinador"
+    });
+  }
+
+
+  const resistances = matchupText(data.typeEffectiveness, value => value > 0 && value < 1, language);
+  const weaknesses = matchupText(data.typeEffectiveness, value => value > 1, language);
+  const immunities = matchupText(data.typeEffectiveness, value => value === 0, language);
+  const folderId = await resolveChallengeFolder(config);
+
+  const statTags = (data.topStats ?? [])
+    .map(row => statPowerText(row.name, language))
+    .filter(Boolean);
+
+  const intrinsicTags = [
+    ...statTags.map(name => floatingTag(name, false)),
+    ...(data.ability?.name ? [floatingTag(`Habilidade: ${data.ability.name}`, false)] : []),
+    floatingTag(`Natureza: ${review.natureLabel}`, false),
+    floatingTag(review.weaknessTag, true),
+    ...defenses.map(defense => floatingTag(defense.name, defense.positive))
+  ];
+
+  const actorData = {
+    name: entry.name,
+    type: "litm-npc",
+    ...(folderId ? { folder: folderId } : {}),
+    img: definition.portraitPath,
+    system: {
+      editMode: false,
+      shortDescription: data.dexText || `Pokémon · ${types.join(" / ")}`,
+      biography: pokemonBiography(data, review),
+      difficulty: 1,
+      roles: ["Pokémon", ...types, review.natureLabel],
+      mightyAspects,
+      limits,
+      secrets: [],
+      specialFeatures: [
+        { name: language === "en" ? "TYPES" : "TIPOS", description: types.join(" / ") },
+        { name: language === "en" ? "RESISTANCES" : "RESISTÊNCIAS", description: resistances },
+        { name: language === "en" ? "WEAKNESSES" : "FRAQUEZAS", description: weaknesses },
+        { name: language === "en" ? "IMMUNITIES" : "IMUNIDADES", description: immunities }
+      ],
+      threatsAndConsequences: pokemonThreats(data, review, config),
+      floatingTagsAndStatusesEditable: false,
+      floatingTagsAndStatuses: intrinsicTags
+    },
+    prototypeToken: prototypeToken(definition, flags),
+    flags: { [MODULE_ID]: flags }
+  };
+
+  let actor = existingActor;
+  if (actor) {
+    const updateData = foundry.utils.deepClone(actorData);
+    delete updateData.type;
+    actor = await actor.update(updateData);
+  } else {
+    actor = await Actor.implementation.create(actorData);
+  }
+
+  if (!actor) throw new Error("Não foi possível criar o Challenge.");
+
+  if (config.mode === "trainer" && config.trainerId) {
+    await linkPokemonChallengeToNpcTrainer(config.trainerId, actor);
+  }
+
+  void actor.sheet?.render?.({ force: true });
+  return actor;
+}
+
+async function createTrainerPokemon(entry, config, data, review, definition) {
+  const trainer = game.actors.get(config.trainerId);
+  if (!trainer || trainer.type !== "litm-character" || (!game.user.isGM && !trainer.isOwner)) {
+    throw new Error("Treinador não encontrado.");
+  }
+
+  let destination = config.destination === "pc" ? "pc" : "team";
+  let existingThemes = trainer.items.filter(item =>
+    item.type === "themebook"
+    && item.getFlag(MODULE_ID, "pokemonTheme") === true
+    && item.getFlag(MODULE_ID, "themeRole") === "pokemon"
+  );
+
+  if (destination === "team" && existingThemes.length >= 6) {
+    const options = [
+      `<option value="__new__">${escapeHTML(entry.name)} → PC · manter o Time atual</option>`,
+      ...existingThemes.map(theme =>
+        `<option value="${theme.id}">${escapeHTML(theme.name)} → PC · ${escapeHTML(entry.name)} entra no Time</option>`
+      )
+    ].join("");
+
+    const choice = await foundry.applications.api.DialogV2.input({
+      window: { title: "Time cheio" },
+      content: `<div style="display:grid;gap:10px;padding:8px">
+        <p>O Time de ${escapeHTML(trainer.name)} já tem 6 Pokémon. Escolha o destino.</p>
+        <select name="choice">${options}</select>
+      </div>`,
+      ok: { label: "Confirmar", icon: "fa-solid fa-check" },
+      modal: true
+    });
+
+    if (!choice) return null;
+    const selected = String(choice.choice ?? "__new__");
+    if (selected === "__new__") {
+      destination = "pc";
+    } else {
+      await sendPokemonThemeToPc(trainer, selected);
+    }
+
+    existingThemes = trainer.items.filter(item =>
+      item.type === "themebook"
+      && item.getFlag(MODULE_ID, "pokemonTheme") === true
+      && item.getFlag(MODULE_ID, "themeRole") === "pokemon"
+    );
+  }
+
+  if (destination === "team" && existingThemes.length >= 6) {
+    throw new Error("O time continua cheio; a criação foi cancelada para impedir um sétimo Pokémon.");
+  }
+
+  const instanceId = randomId();
+  const flags = moduleMetadata(entry, definition, config, data, review, instanceId);
+  Object.assign(flags, {
+    pokemonTheme: true,
+    themeRole: "pokemon",
+    ...(destination === "team" ? { pokemonTeamSlot: existingThemes.length } : {})
+  });
+
+  const themeData = {
+    name: entry.name,
+    type: "themebook",
+    img: definition.portraitPath,
+    system: themeSystem(review, data, entry),
+    flags: { [MODULE_ID]: flags }
+  };
+
+  if (destination === "team") {
+    const created = await trainer.createEmbeddedDocuments("Item", [themeData]);
+    if (!created?.[0]) throw new Error("Não foi possível adicionar o Pokémon ao time.");
+    void created[0].sheet?.render?.({ force: true });
+    return created[0];
+  }
+
+  const current = trainer.getFlag(MODULE_ID, PC_FLAG);
+  const records = Array.isArray(current) ? foundry.utils.deepClone(current) : [];
+  records.push({ id: randomId(), data: themeData });
+  await trainer.setFlag(MODULE_ID, PC_FLAG, records);
+  ui.notifications.info(`${entry.name} foi enviado para o PC de ${trainer.name}.`);
+  return trainer;
+}
+
+
+export async function loadPokemonTrainerCustomization(
+  entry,
+  might = "origin"
+) {
+  const data =
+    await loadPokemonBuildData(
+      entry,
+      might
+    );
+
+  const suggestedNature =
+    defaultNatureForStats(
+      data.stats
+    );
+
+  const nature =
+    natureProfile(
+      suggestedNature?.id
+        ?? "hardy",
+      data.contentLanguage
+    );
+
+  const genderId =
+    defaultGenderForRate(
+      data.genderRate
+    );
+
+  return {
+    speciesLabel:
+      data.speciesLabel
+      ?? "Pokémon",
+
+    speciesLabelEn:
+      data.speciesLabelEn
+      ?? "",
+
+    types:
+      foundry.utils.deepClone(
+        data.types
+        ?? []
+      ),
+
+    baseStats:
+      foundry.utils.deepClone(
+        data.stats
+        ?? {}
+      ),
+
+    typeEffectiveness:
+      foundry.utils.deepClone(
+        data.typeEffectiveness
+        ?? {}
+      ),
+
+    defaults: {
+      assetId:
+        entry.id,
+
+      natureId:
+        nature.id,
+
+      abilityId:
+        data.ability?.id
+        ?? data.abilities?.[0]?.id
+        ?? "",
+
+      genderId,
+
+      weaknessStat:
+        data.worst?.name
+        ?? "speed",
+
+      customWeakness:
+        "",
+
+      moveIds:
+        (data.moves ?? [])
+          .slice(0, 4)
+          .map(
+            move => move.id
+          )
+    },
+
+    natureOptions:
+      NATURE_IDS.map(
+        id => {
+          const row =
+            natureProfile(
+              id,
+              data.contentLanguage
+            );
+
+          return {
+            id:
+              row.id,
+
+            label:
+              row.label,
+
+            raised:
+              row.raised,
+
+            lowered:
+              row.lowered,
+
+            raisedLabel:
+              row.raised
+                ? statLabel(
+                    row.raised,
+                    data.contentLanguage
+                  )
+                : "",
+
+            loweredLabel:
+              row.lowered
+                ? statLabel(
+                    row.lowered,
+                    data.contentLanguage
+                  )
+                : "",
+
+            effect:
+              row.effect
+          };
+        }
+      ),
+
+    abilityOptions:
+      (data.abilities ?? [])
+        .map(
+          ability => ({
+            id:
+              ability.id,
+
+            name:
+              ability.name,
+
+            hidden:
+              !!ability.hidden,
+
+            description:
+              buildAbilityThreat(
+                ability,
+                data.contentLanguage
+              )?.description
+              ?? ""
+          })
+        ),
+
+    genderOptions:
+      genderOptionsForRate(
+        data.genderRate,
+        data.contentLanguage
+      ),
+
+    weaknessOptions: [
+      "attack",
+      "defense",
+      "special-attack",
+      "special-defense",
+      "speed"
+    ].map(
+      stat => ({
+        id:
+          stat,
+
+        label:
+          statWeaknessText(
+            stat,
+            data.contentLanguage
+          ),
+
+        statLabel:
+          statLabel(
+            stat,
+            data.contentLanguage
+          ),
+
+        value:
+          Number(
+            data.stats?.[stat]
+            ?? 0
+          )
+      })
+    ),
+
+    moveOptions:
+      (data.moveChoices ?? [])
+        .map(
+          move => ({
+            id:
+              move.id,
+
+            name:
+              pokemonMoveDisplayName(
+                move,
+                move.name
+              ),
+
+            typeLabel:
+              typeLabel(
+                move.type,
+                data.contentLanguage
+              ),
+
+            methodLabel:
+              move.methodLabel,
+
+            description:
+              move.shortDescription,
+
+            effectTextPt:
+              move.effectTextPt ?? "",
+
+            shortEffectPt:
+              move.shortEffectPt ?? "",
+
+            effectTextEn:
+              move.effectTextEn ?? "",
+
+            shortEffectEn:
+              move.shortEffectEn ?? "",
+
+            pokemonDbUrl:
+              "https://pokemondb.net/move/"
+              + encodeURIComponent(
+                  move.id
+                ),
+
+            englishName:
+              move.englishName,
+
+            type:
+              move.type,
+
+            damageClass:
+              move.damageClass,
+
+            power:
+              move.power,
+
+            accuracy:
+              move.accuracy,
+
+            priority:
+              Number(
+                move.priority
+                ?? 0
+              ),
+
+            target:
+              move.target,
+
+            meta:
+              foundry.utils.deepClone(
+                move.meta ?? {}
+              ),
+
+            statChanges:
+              foundry.utils.deepClone(
+                move.statChanges
+                ?? []
+              ),
+
+            effects:
+              foundry.utils.deepClone(
+                move.effects
+                ??
+                buildMoveEffects(
+                  move,
+                  might,
+                  data.contentLanguage
+                )
+              ),
+
+            vfx:
+              `${move.type}-move`
+          })
+        )
+  };
+}
+
+
+export async function buildPokemonTrainerThemeData(
+  entry,
+  definition,
+  {
+    might = "origin",
+    slot = 0,
+    trainerId = "",
+    customization = null
+  } = {}
+) {
+  const data =
+    await loadPokemonBuildData(
+      entry,
+      might
+    );
+
+  const suggestedNature =
+    defaultNatureForStats(
+      data.stats
+    );
+
+  const nature =
+    natureProfile(
+      customization?.natureId
+        ?? suggestedNature?.id
+        ?? "hardy",
+      data.contentLanguage
+    );
+
+  const selectedAbility =
+    (data.abilities ?? [])
+      .find(
+        ability =>
+          ability.id
+          === customization?.abilityId
+      )
+    ??
+    data.ability
+    ??
+    data.abilities?.[0]
+    ??
+    null;
+
+  data.ability =
+    selectedAbility;
+
+  const genderId =
+    customization?.genderId
+    ??
+    defaultGenderForRate(
+      data.genderRate
+    );
+
+  const weaknessStat =
+    customization?.weaknessStat
+    ??
+    data.worst?.name
+    ??
+    "speed";
+
+  const customWeakness =
+    String(
+      customization?.customWeakness
+      ?? ""
+    ).trim();
+
+  const weaknessTag =
+    customWeakness
+    ||
+    statWeaknessText(
+      weaknessStat,
+      data.contentLanguage
+    );
+
+  const requestedMoveIds =
+    Array.isArray(
+      customization?.moveIds
+    )
+      ? customization
+          .moveIds
+          .filter(Boolean)
+          .slice(0, 4)
+      : [];
+
+  if (
+    requestedMoveIds.length
+  ) {
+    const wanted =
+      new Set(
+        requestedMoveIds
+      );
+
+    const selectedMoves =
+      (data.moveChoices ?? [])
+        .filter(
+          move =>
+            wanted.has(
+              move.id
+            )
+        )
+        .sort(
+          (a, b) =>
+            requestedMoveIds
+              .indexOf(a.id)
+            -
+            requestedMoveIds
+              .indexOf(b.id)
+        )
+        .slice(
+          0,
+          4
+        );
+
+    if (
+      selectedMoves.length
+    ) {
+      data.moves =
+        selectedMoves;
+    }
+  }
+
+  const review = {
+    might,
+
+    natureId:
+      nature.id,
+
+    natureLabel:
+      nature.label,
+
+    genderId,
+
+    genderLabel:
+      genderLabel(
+        genderId,
+        data.contentLanguage
+      ),
+
+    weaknessStat,
+
+    weaknessTag,
+
+    powerStatTag:
+      data.powerStatTag,
+
+    moveNames:
+      data.moves.map(
+        move => move.name
+      )
+  };
+
+  const config = {
+    mode:
+      "player-theme",
+
+    destination:
+      "team",
+
+    trainerId,
+
+    might
+  };
+
+  const instanceId =
+    randomId();
+
+  const flags =
+    moduleMetadata(
+      entry,
+      definition,
+      config,
+      data,
+      review,
+      instanceId
+    );
+
+  flags.pokemonTheme =
+    true;
+
+  flags.themeRole =
+    "pokemon";
+
+  flags.pokemonTeamSlot =
+    Number(
+      slot ?? 0
+    );
+
+  return {
+    name:
+      entry.name,
+
+    type:
+      "themebook",
+
+    img:
+      definition.portraitPath,
+
+    system:
+      themeSystem(
+        review,
+        data,
+        entry
+      ),
+
+    flags: {
+      [MODULE_ID]:
+        flags
+    }
+  };
+}
+
+
+class PokemonChallengeWizardApp
+  extends HandlebarsApplicationMixin(ApplicationV2) {
+
+  static DEFAULT_OPTIONS = {
+    id: "pokemon-litm-challenge-wizard",
+    classes: [
+      "pokemon-litm-tools",
+      "pokemon-challenge-wizard"
+    ],
+    position: {
+      width: 900,
+      height: 780
+    },
+    window: {
+      title: "Criar Challenge Pokémon",
+      icon: "fa-solid fa-dragon",
+      resizable: true
+    }
+  };
+
+  static PARTS = {
+    main: {
+      template:
+        "modules/" +
+        MODULE_ID +
+        "/templates/pokemon-builder-wizard.hbs",
+      scrollable: [
+        ".pokemon-challenge-wizard-body",
+        ".pokemon-builder-move-list"
+      ]
+    }
+  };
+
+  step = 1;
+  busy = false;
+  data = null;
+  loadedMight = null;
+  natureId = "hardy";
+  abilityId = "";
+  genderId = "";
+  weaknessStat = "speed";
+  customWeakness = "";
+  selectedMoveIds = new Set();
+  existingActor = null;
+  hydratedFromActor = false;
+  launchKind = "challenge";
+
+  config = {
+    mode: "challenge",
+    might: "adventure",
+    trainerId: "",
+    destination: "team",
+    folderId: "",
+    newFolder: ""
+  };
+
+  constructor(entry, prepareDefinition, options = {}) {
+    const requestedKind = options.launchKind === "theme" ? "theme" : "challenge";
+    const appOptions = { ...options };
+    delete appOptions.launchKind;
+    delete appOptions.existingActor;
+    appOptions.window = {
+      ...(appOptions.window ?? {}),
+      title: requestedKind === "theme"
+        ? "Criar Tema Pokémon"
+        : "Criar Challenge Pokémon"
+    };
+
+    super(appOptions);
+    this.entry = entry;
+    this.prepareDefinition = prepareDefinition;
+    this.existingActor = options.existingActor ?? null;
+    this.launchKind = requestedKind;
+    this.config.mode = requestedKind === "theme" ? "player-theme" : "challenge";
+
+    if (this.existingActor) {
+      const flags = this.existingActor.flags?.[MODULE_ID] ?? {};
+      this.launchKind = "challenge";
+      this.config.mode = flags.trainerNpcId ? "trainer" : "challenge";
+      this.config.might = flags.might ?? "adventure";
+      this.config.trainerId = flags.trainerNpcId ?? "";
+      this.config.folderId = this.existingActor.folder?.id ?? "";
+      this.config.newFolder = "";
+    }
+  }
+
+  async _ensureData() {
+    if (
+      this.data &&
+      this.loadedMight === this.config.might
+    ) return;
+
+    ui.notifications.info(
+      `Consultando dados de ${this.entry.name}...`
+    );
+
+    this.data = await loadPokemonBuildData(
+      this.entry,
+      this.config.might
+    );
+
+    this.loadedMight = this.config.might;
+
+    const defaultNature = defaultNatureForStats(this.data.stats);
+
+    if (this.existingActor && !this.hydratedFromActor) {
+      const flags = this.existingActor.flags?.[MODULE_ID] ?? {};
+      this.natureId = flags.nature?.id ?? defaultNature.id;
+      this.abilityId = flags.ability?.id ?? this.data.ability?.id ?? this.data.abilities?.[0]?.id ?? "";
+      this.genderId = flags.gender ?? defaultGenderForRate(this.data.genderRate);
+      this.weaknessStat = this.data.worst?.name ?? "speed";
+      this.customWeakness = flags.weaknessTag ?? "";
+      this.selectedMoveIds = new Set((flags.moves ?? []).map(move => move.id).filter(Boolean).slice(0, 4));
+      if (!this.selectedMoveIds.size) {
+        this.selectedMoveIds = new Set((this.data.moves ?? []).slice(0, 4).map(move => move.id));
+      }
+      this.hydratedFromActor = true;
+    } else if (!this.hydratedFromActor) {
+      this.natureId = defaultNature.id;
+      this.abilityId = this.data.ability?.id ?? this.data.abilities?.[0]?.id ?? "";
+      this.genderId = this.genderId || defaultGenderForRate(this.data.genderRate);
+      this.weaknessStat = this.data.worst?.name ?? "speed";
+      this.customWeakness = "";
+      this.selectedMoveIds = new Set((this.data.moves ?? []).slice(0, 4).map(move => move.id));
+      this.hydratedFromActor = true;
+    }
+  }
+
+  _selectedAbility() {
+    return (
+      (this.data?.abilities ?? [])
+        .find(row => row.id === this.abilityId)
+      ??
+      this.data?.ability
+      ??
+      null
+    );
+  }
+
+  _selectedMoves() {
+    return (this.data?.moveChoices ?? [])
+      .filter(move =>
+        this.selectedMoveIds.has(move.id)
+      )
+      .slice(0, 4);
+  }
+
+  _buildReview() {
+    const language =
+      this.data?.contentLanguage ??
+      getPokemonContentLanguage();
+
+    const nature =
+      natureProfile(
+        this.natureId,
+        language
+      );
+
+    const ability =
+      this._selectedAbility();
+
+    const weaknessTag =
+      this.customWeakness.trim()
+      ||
+      statWeaknessText(
+        this.weaknessStat,
+        language
+      );
+
+    const moves =
+      this._selectedMoves();
+
+    return {
+      nature,
+      ability,
+      moves,
+      review: {
+        moveNames:
+          moves.map(move => move.name),
+        powerStatTag:
+          this.data?.powerStatTag ?? "",
+        weaknessTag,
+        natureId:
+          nature.id,
+        natureLabel:
+          nature.label,
+        genderId:
+          this.genderId || "genderless",
+        genderLabel:
+          genderLabel(
+            this.genderId || "genderless",
+            language
+          ),
+        natureLimits: [],
+        abilityId:
+          ability?.id ?? null,
+        might:
+          this.config.might
+      }
+    };
+  }
+
+  async _prepareContext(options) {
+    const context =
+      await super._prepareContext(options);
+
+    if (this.step >= 3) {
+      await this._ensureData();
+    }
+
+    const language =
+      this.data?.contentLanguage ??
+      getPokemonContentLanguage();
+
+    const progressNames = [
+      "Configuração",
+      "Destino",
+      "Perfil",
+      "Golpes",
+      "Revisão"
+    ];
+
+    const progress =
+      progressNames.map((name, index) => {
+        const number = index + 1;
+        return {
+          number,
+          name,
+          active: number === this.step,
+          done: number < this.step
+        };
+      });
+
+    const folders =
+      game.folders
+        .filter(folder => folder.type === "Actor")
+        .sort((a, b) =>
+          a.name.localeCompare(b.name, "pt-BR")
+        )
+        .map(folder => ({
+          id: folder.id,
+          name: folder.name,
+          selected:
+            folder.id === this.config.folderId
+        }));
+
+    const trainerActors =
+      this.config.mode === "player-theme"
+        ? playerTrainerOptions()
+        : npcTrainerOptions();
+
+    const trainers =
+      trainerActors.map(actor => ({
+        id: actor.id,
+        name: actor.name,
+        img: actor.img || 'icons/svg/mystery-man.svg',
+        folderId: actor.folder?.id ?? "",
+        folderName: actor.folder?.name ?? "Raiz de Actors",
+        search: [
+          actor.name,
+          actor.folder?.name ?? ""
+        ].join(" ").toLocaleLowerCase(),
+        selected:
+          actor.id === this.config.trainerId
+      }));
+
+    const trainerFolders =
+      [...new Map(
+        trainerActors
+          .filter(actor => actor.folder)
+          .map(actor => [
+            actor.folder.id,
+            {
+              id: actor.folder.id,
+              name: actor.folder.name
+            }
+          ])
+      ).values()]
+        .sort((a, b) =>
+          a.name.localeCompare(b.name, "pt-BR")
+        );
+
+    let natureOptions = [];
+    let abilityOptions = [];
+    let selectedNature = null;
+    let selectedAbility = null;
+    let genderOptions = [];
+    let selectedGender = null;
+    let weaknessOptions = [];
+    let moveChoices = [];
+    let finalReview = null;
+
+    if (this.data) {
+      natureOptions =
+        NATURE_IDS.map(id => {
+          const nature =
+            natureProfile(id, language);
+          return {
+            ...nature,
+            selected:
+              id === this.natureId
+          };
+        });
+
+      selectedNature =
+        natureProfile(
+          this.natureId,
+          language
+        );
+
+      abilityOptions =
+        (this.data.abilities ?? [])
+          .map(ability => {
+            const threat =
+              buildAbilityThreat(
+                ability,
+                language
+              );
+            return {
+              ...ability,
+              selected:
+                ability.id === this.abilityId,
+              description:
+                threat?.description ??
+                ""
+            };
+          });
+
+      selectedAbility =
+        abilityOptions.find(
+          ability => ability.selected
+        )
+        ??
+        abilityOptions[0]
+        ??
+        null;
+
+      genderOptions =
+        genderOptionsForRate(
+          this.data.genderRate,
+          language
+        ).map(option => ({
+          ...option,
+          chanceText:
+            Number(option.chance ?? 0) === 100
+              ? "100%"
+              : `${Number(option.chance ?? 0).toLocaleString("pt-BR", {maximumFractionDigits: 1})}%`,
+          selected:
+            option.id === this.genderId
+        }));
+
+      if (
+        !genderOptions.some(option => option.selected)
+        && genderOptions.length
+      ) {
+        this.genderId = genderOptions[0].id;
+        genderOptions[0].selected = true;
+      }
+
+      selectedGender =
+        genderOptions.find(option => option.selected)
+        ?? genderOptions[0]
+        ?? null;
+
+      weaknessOptions =
+        [
+          "attack",
+          "defense",
+          "special-attack",
+          "special-defense",
+          "speed"
+        ].map(stat => ({
+          id: stat,
+          label:
+            statWeaknessText(
+              stat,
+              language
+            ),
+          statLabel:
+            statLabel(
+              stat,
+              language
+            ),
+          value:
+            Number(
+              this.data.stats?.[stat] ??
+              0
+            ),
+          selected:
+            stat === this.weaknessStat
+        }));
+
+      moveChoices =
+        await Promise.all(
+          (
+            this.data.moveChoices
+            ?? []
+          )
+            .map(
+              async move => {
+                const threat =
+                  buildMoveThreat(
+                    move,
+                    move.name,
+                    this.config.might,
+                    language
+                  );
+
+                const litm =
+                  moveLitmProfile(
+                    move,
+                    language
+                  );
+
+                return {
+                  ...move,
+
+                  checked:
+                    this.selectedMoveIds.has(
+                      move.id
+                    ),
+
+                  typeText:
+                    typeLabel(
+                      move.type,
+                      language
+                    ),
+
+                  mechanicsText:
+                    litm.badges.join(
+                      " · "
+                    ),
+
+                  consequences:
+                    await Promise.all(
+                      threat.list.map(
+                        item =>
+                          litmMarkupHtml(
+                            item
+                          )
+                      )
+                    )
+                };
+              }
+            )
+        );
+
+      if (this.step === 5) {
+        const built =
+          this._buildReview();
+
+        finalReview = {
+          nature:
+            built.nature,
+          ability:
+            built.ability,
+          gender: {
+            id: built.review.genderId,
+            label: built.review.genderLabel
+          },
+          weaknessTag:
+            built.review.weaknessTag,
+          powerStatTag:
+            built.review.powerStatTag,
+          moves:
+            await Promise.all(
+              built.moves.map(
+                async move => {
+                  const threat =
+                    buildMoveThreat(
+                      move,
+                      move.name,
+                      this.config.might,
+                      language
+                    );
+
+                  const litm =
+                    moveLitmProfile(
+                      move,
+                      language
+                    );
+
+                  return {
+                    ...move,
+
+                    mechanicsText:
+                      litm.badges.join(
+                        " · "
+                      ),
+
+                    threat: {
+                      ...threat,
+
+                      list:
+                        await Promise.all(
+                          threat.list.map(
+                            item =>
+                              litmMarkupHtml(
+                                item
+                              )
+                          )
+                        )
+                    }
+                  };
+                }
+              )
+            )
+        };
+      }
+    }
+
+    const selectedCount =
+      this.selectedMoveIds.size;
+
+    const canNext =
+      (
+        this.step === 1
+      )
+      ||
+      (
+        this.step === 2
+        &&
+        (
+          this.config.mode === "challenge"
+          ||
+          !!this.config.trainerId
+        )
+      )
+      ||
+      (
+        this.step === 3
+      )
+      ||
+      (
+        this.step === 4
+        &&
+        selectedCount >= 1
+        &&
+        selectedCount <= 4
+      );
+
+    return {
+      ...context,
+
+      entry:
+        this.entry,
+
+      pokedexUrl:
+        getPokemonDbUrl(
+          this.entry
+        ),
+
+      step:
+        this.step,
+
+      progress,
+
+      stepIsConfig:
+        this.step === 1,
+
+      stepIsDestination:
+        this.step === 2,
+
+      stepIsProfile:
+        this.step === 3,
+
+      stepIsMoves:
+        this.step === 4,
+
+      stepIsReview:
+        this.step === 5,
+
+      isChallenge:
+        this.config.mode ===
+        "challenge",
+
+      isTrainer:
+        this.config.mode ===
+        "trainer",
+
+      isPlayerTheme:
+        this.config.mode ===
+        "player-theme",
+
+      launchIsTheme:
+        this.launchKind === "theme",
+
+      mode:
+        this.config.mode,
+
+      might:
+        this.config.might,
+
+      mightOrigin:
+        this.config.might === "origin",
+
+      mightAdventure:
+        this.config.might === "adventure",
+
+      mightGreatness:
+        this.config.might === "greatness",
+
+      destination:
+        this.config.destination,
+
+      destinationTeam:
+        this.config.destination === "team",
+
+      destinationPc:
+        this.config.destination === "pc",
+
+      folders,
+      trainers,
+      trainerFolders,
+      selectedTrainerId: this.config.trainerId,
+      trainerEmptyText:
+        this.config.mode === "player-theme"
+          ? "Nenhum treinador-jogador encontrado."
+          : "Nenhum Challenge de treinador encontrado.",
+
+      showPokemonHeader:
+        true,
+      pokemonHeaderImage:
+        this.entry.portrait
+        ?? this.entry.preview
+        ?? this.entry.sheet
+        ?? "icons/svg/mystery-man.svg",
+      pokemonHeaderMeta:
+        [
+          this.data?.types?.length
+            ? this.data.types.map(type => typeLabel(type, language)).join(" / ")
+            : null,
+          MIGHT[this.config.might]?.label ?? this.config.might
+        ].filter(Boolean).join(" · "),
+
+      rootFolderSelected:
+        !this.config.folderId,
+
+      newFolder:
+        this.config.newFolder,
+
+      natureOptions,
+      selectedNature,
+
+      abilityOptions,
+      selectedAbility,
+
+      genderOptions,
+      selectedGender,
+
+      weaknessOptions,
+
+      customWeakness:
+        this.customWeakness,
+
+      moveChoices,
+
+      selectedCount,
+
+      finalReview,
+
+      canBack:
+        !this.busy,
+
+      canNext:
+        canNext
+        &&
+        this.step < 5
+        &&
+        !this.busy,
+
+      canCreate:
+        this.step === 5
+        &&
+        !this.busy,
+
+      busy:
+        this.busy
+    };
+  }
+
+  async _onRender(context, options) {
+    await super._onRender(
+      context,
+      options
+    );
+
+    const field =
+      name =>
+        this.element.querySelector(
+          `[data-builder-field="${name}"]`
+        );
+
+    field("mode")
+      ?.addEventListener(
+        "change",
+        event => {
+          this.config.mode =
+            event.currentTarget.value;
+        }
+      );
+
+    field("might")
+      ?.addEventListener(
+        "change",
+        event => {
+          const next =
+            event.currentTarget.value;
+          if (
+            next !==
+            this.config.might
+          ) {
+            this.config.might =
+              next;
+            this.data = null;
+            this.loadedMight = null;
+            if (!this.existingActor) this.hydratedFromActor = false;
+          }
+        }
+      );
+
+    field("folderId")
+      ?.addEventListener(
+        "change",
+        event => {
+          this.config.folderId =
+            event.currentTarget.value;
+        }
+      );
+
+    field("newFolder")
+      ?.addEventListener(
+        "input",
+        event => {
+          this.config.newFolder =
+            event.currentTarget.value;
+        }
+      );
+
+    const trainerSearch =
+      field("trainerSearch");
+
+    const trainerFolder =
+      field("trainerFolder");
+
+    const trainerSelect =
+      field("trainerId");
+
+    const filterTrainers =
+      () => {
+        if (!trainerSelect) return;
+
+        const query =
+          String(trainerSearch?.value ?? "")
+            .trim()
+            .toLocaleLowerCase();
+
+        const folderId =
+          String(trainerFolder?.value ?? "");
+
+        for (
+          const option
+          of trainerSelect.querySelectorAll(
+            "option[data-trainer-option]"
+          )
+        ) {
+          const search =
+            String(option.dataset.search ?? "");
+          const optionFolder =
+            String(option.dataset.folderId ?? "");
+
+          const visible =
+            (!query || search.includes(query))
+            &&
+            (!folderId || optionFolder === folderId);
+
+          option.hidden = !visible;
+        }
+      };
+
+    trainerSearch
+      ?.addEventListener(
+        "input",
+        filterTrainers
+      );
+
+    trainerFolder
+      ?.addEventListener(
+        "change",
+        filterTrainers
+      );
+
+    const trainerCards = () =>
+      Array.from(
+        this.element.querySelectorAll(
+          "[data-trainer-card]"
+        )
+      );
+
+    const filterTrainerCards = () => {
+      const query = String(trainerSearch?.value ?? '')
+        .trim()
+        .toLocaleLowerCase();
+      const folderId = String(trainerFolder?.value ?? '');
+      let visible = 0;
+
+      for (const card of trainerCards()) {
+        const searchText = String(card.dataset.search ?? '').toLocaleLowerCase();
+        const cardFolder = String(card.dataset.folderId ?? '');
+        const show = (!query || searchText.includes(query))
+          && (!folderId || cardFolder === folderId);
+        card.hidden = !show;
+        if (show) visible++;
+      }
+
+      const empty = this.element.querySelector('[data-trainer-empty]');
+      if (empty) empty.hidden = visible > 0;
+    };
+
+    trainerSearch?.addEventListener('input', filterTrainerCards);
+    trainerFolder?.addEventListener('change', filterTrainerCards);
+
+    for (const card of trainerCards()) {
+      card.addEventListener('click', () => {
+        const id = card.dataset.trainerCard;
+        if (!id) return;
+
+        this.config.trainerId = id;
+        if (trainerSelect) trainerSelect.value = id;
+
+        for (const other of trainerCards()) {
+          other.classList.toggle('selected', other === card);
+        }
+
+        const next = this.element.querySelector("[data-action='builderNext']");
+        if (next && this.step === 2) next.disabled = false;
+      });
+    }
+
+    filterTrainerCards();
+
+    trainerSelect
+      ?.addEventListener(
+        "change",
+        async event => {
+          this.config.trainerId = event.currentTarget.value;
+          await this.render({ force: true });
+        }
+      );
+
+    field("genderId")
+      ?.addEventListener(
+        "change",
+        async event => {
+          this.genderId =
+            event.currentTarget.value;
+          await this.render({
+            force: true
+          });
+        }
+      );
+
+    field("destination")
+      ?.addEventListener(
+        "change",
+        event => {
+          this.config.destination =
+            event.currentTarget.value;
+        }
+      );
+
+    field("natureId")
+      ?.addEventListener(
+        "change",
+        async event => {
+          this.natureId =
+            event.currentTarget.value;
+          await this.render({
+            force: true
+          });
+        }
+      );
+
+    field("abilityId")
+      ?.addEventListener(
+        "change",
+        async event => {
+          this.abilityId =
+            event.currentTarget.value;
+          await this.render({
+            force: true
+          });
+        }
+      );
+
+    field("weaknessStat")
+      ?.addEventListener(
+        "change",
+        event => {
+          this.weaknessStat =
+            event.currentTarget.value;
+        }
+      );
+
+    field("customWeakness")
+      ?.addEventListener(
+        "input",
+        event => {
+          this.customWeakness =
+            event.currentTarget.value;
+        }
+      );
+
+    for (
+      const checkbox
+      of this.element.querySelectorAll(
+        "[data-builder-move]"
+      )
+    ) {
+      checkbox.addEventListener(
+        "change",
+        event => {
+          const id =
+            event.currentTarget
+              .dataset.builderMove;
+
+          if (!id) return;
+
+          if (
+            event.currentTarget.checked
+          ) {
+            if (
+              this.selectedMoveIds.size
+              >=
+              4
+            ) {
+              event.currentTarget.checked =
+                false;
+
+              ui.notifications.warn(
+                "Escolha no máximo 4 golpes."
+              );
+
+              return;
+            }
+
+            this.selectedMoveIds.add(
+              id
+            );
+          } else {
+            this.selectedMoveIds.delete(
+              id
+            );
+          }
+
+          const counter =
+            this.element.querySelector(
+              "[data-builder-move-count]"
+            );
+
+          if (counter) {
+            counter.textContent =
+              String(
+                this.selectedMoveIds.size
+              );
+          }
+        }
+      );
+    }
+
+    this.element
+      .querySelector(
+        "[data-action='builderBack']"
+      )
+      ?.addEventListener(
+        "click",
+        async () => {
+          if (this.busy) return;
+
+          if (this.step <= 1) {
+            await this.close();
+            return;
+          }
+
+          this.step--;
+
+          await this.render({
+            force: true
+          });
+        }
+      );
+
+    this.element
+      .querySelector(
+        "[data-action='builderNext']"
+      )
+      ?.addEventListener(
+        "click",
+        async () => {
+          if (this.busy) return;
+
+          if (
+            this.step === 2
+            &&
+            this.config.mode !==
+              "challenge"
+            &&
+            !this.config.trainerId
+          ) {
+            ui.notifications.warn(
+              "Escolha o treinador."
+            );
+            return;
+          }
+
+          if (
+            this.step === 2
+          ) {
+            await this._ensureData();
+          }
+
+          if (
+            this.step === 4
+            &&
+            (
+              this.selectedMoveIds.size
+                < 1
+              ||
+              this.selectedMoveIds.size
+                > 4
+            )
+          ) {
+            ui.notifications.warn(
+              "Escolha entre 1 e 4 golpes."
+            );
+            return;
+          }
+
+          if (this.step < 5) {
+            this.step++;
+          }
+
+          await this.render({
+            force: true
+          });
+        }
+      );
+
+    this.element
+      .querySelector(
+        "[data-action='builderCreate']"
+      )
+      ?.addEventListener(
+        "click",
+        async event => {
+          if (this.busy) return;
+
+          this.busy = true;
+
+          const button =
+            event.currentTarget;
+
+          button.disabled = true;
+          button.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i> Criando...';
+
+          try {
+            await this._ensureData();
+
+            const built =
+              this._buildReview();
+
+            this.data.ability =
+              built.ability;
+
+            this.data.moves =
+              built.moves;
+
+            const definition =
+              await this.prepareDefinition(
+                this.entry
+              );
+
+            const result =
+              this.config.mode === "player-theme"
+                ? await createTrainerPokemon(
+                    this.entry,
+                    this.config,
+                    this.data,
+                    built.review,
+                    definition
+                  )
+                : await createChallenge(
+                    this.entry,
+                    this.config,
+                    this.data,
+                    built.review,
+                    definition,
+                    this.existingActor
+                  );
+
+            if (this.config.mode === "player-theme" && !result) {
+              this.busy = false;
+              button.disabled = false;
+              button.innerHTML = '<i class="fa-solid fa-check"></i> Criar Pokémon';
+              return null;
+            }
+
+            ui.notifications.info(
+              `${this.entry.name} criado com sucesso.`
+            );
+
+            await this.close();
+
+            return result;
+
+          } catch (error) {
+            console.error(
+              "Pokemon LITM Tools | Challenge Wizard:",
+              error
+            );
+
+            ui.notifications.error(
+              "Não foi possível criar o Pokémon. Veja F12."
+            );
+
+            this.busy = false;
+            button.disabled = false;
+            button.innerHTML =
+              '<i class="fa-solid fa-check"></i> Criar Pokémon';
+          }
+        }
+      );
+  }
+
+  async close(options = {}) {
+    const result =
+      await super.close(options);
+
+    if (
+      pokemonBuilderWizardApp ===
+      this
+    ) {
+      pokemonBuilderWizardApp =
+        null;
+    }
+
+    return result;
+  }
+}
+
+
+export async function openPokemonTrainerThemeBuilder(entry, prepareDefinition) {
+  return openPokemonBuilder(
+    entry,
+    prepareDefinition,
+    { launchKind: "theme" }
+  );
+}
+
+export async function openPokemonBuilder(entry, prepareDefinition, options = {}) {
+  if (!game.user.isGM) return null;
+
+  if (
+    !entry
+    ||
+    entry.category !== "pokemon"
+  ) {
+    throw new Error(
+      "O Builder aceita apenas Pokémon."
+    );
+  }
+
+  if (
+    typeof prepareDefinition
+    !==
+    "function"
+  ) {
+    throw new Error(
+      "Serviço visual do importador indisponível."
+    );
+  }
+
+  if (
+    pokemonBuilderWizardApp
+    &&
+    pokemonBuilderWizardApp.rendered
+  ) {
+    await pokemonBuilderWizardApp.close();
+  }
+
+  pokemonBuilderWizardApp =
+    new PokemonChallengeWizardApp(
+      entry,
+      prepareDefinition,
+      options
+    );
+
+  pokemonBuilderWizardApp.render({
+    force: true
+  });
+
+  return pokemonBuilderWizardApp;
+}

@@ -1,0 +1,1396 @@
+<div class="pokemon-importer-shell pokemon-character-creator-shell{{#if previewZoomed}} preview-zoomed{{/if}}">
+
+  <header class="pokemon-wizard-progress">
+
+    <div class="pokemon-wizard-step {{#if stepIsType}}active{{/if}}">
+      <span>1</span>
+      Tipo
+    </div>
+
+    <div class="pokemon-wizard-line"></div>
+
+    <div class="pokemon-wizard-step {{#if stepIsIdentity}}active{{/if}}">
+      <span>2</span>
+      Identidade e Visual
+    </div>
+
+    {{#if showTrainerProgress}}
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>3</span>Perfil</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>4</span>Temas</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsTeam}}active{{/if}}"><span>5</span>Equipe</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsPokemonTeam}}active{{/if}}"><span>6</span>Pokémon</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsDream}}active{{/if}}"><span>7</span>Time dos Sonhos</div>
+    {{/if}}
+
+    {{#if isPokemon}}
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>3</span>Perfil</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>4</span>Temas de Perfil</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsPokemonProfile}}active{{/if}}"><span>5</span>Natureza &amp; Habilidade</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsPokemonMoves}}active{{/if}}"><span>6</span>Golpes</div>
+    {{/if}}
+
+  </header>
+
+
+  {{#if stepIsType}}
+
+    <section class="pokemon-wizard-page pokemon-wizard-type-page">
+
+      <h2>
+        Quem &eacute; o personagem?
+      </h2>
+
+      <p>
+        Escolha como voc&ecirc; vai viver esta aventura.
+      </p>
+
+
+      <div class="pokemon-character-type-grid">
+
+        <button
+          type="button"
+          class="pokemon-character-type-card {{#if isTrainer}}selected{{/if}}"
+          data-character-type="trainer"
+        >
+          <i class="fa-solid fa-user"></i>
+
+          <strong>
+            Treinador
+          </strong>
+
+          <span>
+            Voc&ecirc; &eacute; humano e viaja com uma equipe de Pok&eacute;mon.
+          </span>
+        </button>
+
+
+        <button
+          type="button"
+          class="pokemon-character-type-card {{#if isPokemon}}selected{{/if}}"
+          data-character-type="pokemon"
+        >
+          <i class="fa-solid fa-paw"></i>
+
+          <strong>
+            Pok&eacute;mon
+          </strong>
+
+          <span>
+            Seu personagem &eacute; o pr&oacute;prio Pok&eacute;mon.
+          </span>
+        </button>
+
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsIdentity}}
+
+    <section class="pokemon-wizard-page pokemon-wizard-visual-page">
+
+      <div class="pokemon-character-section-heading">
+        <h2>Quem &eacute; voc&ecirc;?</h2>
+        <p>D&ecirc; um nome ao personagem e escolha quem vai control&aacute;-lo.</p>
+      </div>
+
+
+      <div class="pokemon-character-fields pokemon-character-fields-compact">
+
+        <div class="form-group">
+
+          <label>
+            Nome do personagem
+          </label>
+
+          <div class="form-fields">
+
+            <input
+              type="text"
+              data-role="character-name"
+              value="{{characterName}}"
+              placeholder="Ex.: Ethan"
+              autofocus
+            >
+
+          </div>
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Pronome
+          </label>
+
+          <div class="form-fields">
+
+            <input
+              type="text"
+              data-role="character-pronoun"
+              value="{{pronoun}}"
+              placeholder="Opcional"
+              autocomplete="off"
+            >
+
+          </div>
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label>
+            Jogador
+          </label>
+
+          <div class="form-fields">
+
+            <select data-role="character-owner">
+
+              <option value="">
+                Definir depois
+              </option>
+
+              {{#each users}}
+
+                <option
+                  value="{{id}}"
+                  {{#if selected}}selected{{/if}}
+                >
+                  {{name}}
+                </option>
+
+              {{/each}}
+
+            </select>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <hr class="pokemon-character-step-divider">
+
+      <div class="pokemon-character-section-heading">
+        <h2>Como seu personagem aparece no mapa?</h2>
+        <p>Escolha um visual pronto ou envie sua pr&oacute;pria imagem.</p>
+      </div>
+
+
+      <nav class="pokemon-importer-tabs pokemon-visual-source-tabs">
+
+        <button
+          type="button"
+          data-visual-source="catalog"
+          class="{{#if visualCatalog}}active{{/if}}"
+        >
+          <i class="fa-solid fa-images"></i>
+          Usar visual pronto
+        </button>
+
+
+        <button
+          type="button"
+          data-visual-source="upload"
+          class="{{#if visualUpload}}active{{/if}}"
+        >
+          <i class="fa-solid fa-upload"></i>
+          Enviar minha imagem
+        </button>
+
+      </nav>
+
+
+      {{#if visualCatalog}}
+
+        <div class="pokemon-character-catalog-tools">
+          <div class="pokemon-visual-help">
+            Escolha uma imagem abaixo. O m&oacute;dulo prepara automaticamente o retrato e o token.
+          </div>
+
+          <div class="pokemon-importer-toolbar pokemon-character-visual-toolbar">
+
+          <input
+            type="search"
+            data-role="asset-search"
+            placeholder="Buscar..."
+            autocomplete="off"
+          >
+
+
+          {{#if isTrainer}}
+
+            <select data-role="person-type">
+
+              <option value="all">Todos</option>
+              <option value="trainer-class">Classes de Treinador</option>
+              <option value="npc">NPCs</option>
+              <option value="named">Personagens</option>
+              <option value="player">Protagonistas</option>
+              <option value="rival">Rivais</option>
+              <option value="professor">Professores</option>
+              <option value="gym-leader">L&iacute;deres</option>
+              <option value="elite-four">Elite dos Quatro</option>
+              <option value="villain">Vil&otilde;es</option>
+
+            </select>
+
+          {{/if}}
+
+
+          <button
+            type="button"
+            data-action="togglePreviewZoom"
+            class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+          >
+            <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+            Zoom
+          </button>
+
+          </div>
+        </div>
+
+
+        <div class="pokemon-importer-list pokemon-character-list">
+
+          {{#each items}}
+
+            <article
+              class="pokemon-asset-card pokemon-character-card{{#if selected}} selected{{/if}}"
+              data-character-asset
+              data-search-card
+              data-search="{{search}}"
+              data-person-type="{{personType}}"
+              data-asset-id="{{id}}"
+              data-asset-name="{{name}}"
+            >
+
+              <div class="pokemon-asset-preview">
+
+                {{#if previewCropped}}
+
+                  <div class="pokemon-overworld-preview">
+
+                    <img
+                      src="{{preview}}"
+                      alt="{{name}}"
+                      loading="lazy"
+                      data-overworld-preview
+                      data-preview-columns="{{previewColumns}}"
+                      data-preview-rows="{{previewRows}}"
+                    >
+
+                  </div>
+
+                {{else}}
+
+                  <img
+                    src="{{preview}}"
+                    alt="{{name}}"
+                    loading="lazy"
+                  >
+
+                {{/if}}
+
+              </div>
+
+
+              <div class="pokemon-asset-info">
+
+                <strong title="{{name}}">
+                  {{name}}
+                </strong>
+
+                {{#if meta}}
+                  <small>{{meta}}</small>
+                {{/if}}
+
+                {{#if secondaryMeta}}
+                  <small class="pokemon-provider">
+                    {{secondaryMeta}}
+                  </small>
+                {{/if}}
+
+                {{#if pokedexUrl}}
+                  <button
+                    type="button"
+                    class="pokemon-pokedex-link"
+                    data-pokedex-url="{{pokedexUrl}}"
+                    title="Abrir no Pok&eacute;monDB"
+                  >
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    Pok&eacute;dex
+                  </button>
+                {{/if}}
+
+              </div>
+
+            </article>
+
+          {{/each}}
+
+        </div>
+
+      {{/if}}
+
+
+      {{#if visualUpload}}
+
+        <div class="pokemon-upload-choice-grid">
+
+          <article class="pokemon-upload-choice selected">
+
+            <div class="pokemon-upload-example pokemon-upload-static-example">
+
+              <div class="pokemon-upload-checker">
+
+                <i class="fa-solid fa-user"></i>
+
+              </div>
+
+            </div>
+
+
+            <div class="pokemon-upload-choice-text">
+
+              <div class="pokemon-upload-title-row">
+
+                <strong>
+                  Imagem simples
+                </strong>
+
+                <span class="pokemon-recommended">
+                  Recomendado
+                </span>
+
+              </div>
+
+              <p>
+                Escolha uma imagem do personagem com fundo transparente.
+              </p>
+
+              <small>
+                PNG ou WebP. Uma imagem quadrada ou vertical funciona melhor.
+              </small>
+
+
+              <label class="pokemon-custom-file-button">
+
+                <i class="fa-solid fa-upload"></i>
+
+                Escolher imagem
+
+                <input
+                  type="file"
+                  data-role="custom-image"
+                  accept="image/png,image/webp,image/jpeg"
+                  hidden
+                >
+
+              </label>
+
+
+              {{#if customFileName}}
+
+                <strong class="pokemon-upload-filename">
+                  {{customFileName}}
+                </strong>
+
+              {{/if}}
+
+            </div>
+
+          </article>
+
+
+          <article class="pokemon-upload-choice disabled">
+
+            <div class="pokemon-upload-example">
+
+              <div class="pokemon-spritesheet-example"></div>
+
+              <div class="pokemon-spritesheet-directions">
+                <span>&darr; Baixo</span>
+                <span>&uarr; Cima</span>
+                <span>&rarr; Direita</span>
+                <span>&larr; Esquerda</span>
+              </div>
+
+            </div>
+
+
+            <div class="pokemon-upload-choice-text">
+
+              <div class="pokemon-upload-title-row">
+
+                <strong>
+                  Sprite animado
+                </strong>
+
+                <span class="pokemon-coming-soon">
+                  Em breve
+                </span>
+
+              </div>
+
+              <p>
+                Para quem quer anima&ccedil;&atilde;o de caminhada personalizada.
+              </p>
+
+              <small>
+                O arquivo usar&aacute; uma grade de 3 colunas por 4 linhas, com todos os quadros do mesmo tamanho.
+              </small>
+
+            </div>
+
+          </article>
+
+        </div>
+
+
+        {{#if customPreviewUrl}}
+
+          <div class="pokemon-selected-upload-preview">
+
+            <span>
+              Sua imagem:
+            </span>
+
+            <img
+              src="{{customPreviewUrl}}"
+              alt="Imagem selecionada"
+            >
+
+          </div>
+
+        {{/if}}
+
+      {{/if}}
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsTeam}}
+
+    <section class="pokemon-wizard-page pokemon-team-page">
+
+      <h2>
+        Qual &eacute; sua equipe inicial?
+      </h2>
+
+      <p>
+        Escolha quantos Pok&eacute;mon seu treinador j&aacute; possui no in&iacute;cio da aventura.
+      </p>
+
+
+      <div class="pokemon-team-size-picker">
+
+        {{#each teamSizeOptions}}
+
+          <button
+            type="button"
+            data-team-size="{{value}}"
+            class="{{#if selected}}selected{{/if}}"
+          >
+            {{value}}
+          </button>
+
+        {{/each}}
+
+      </div>
+
+
+      {{#if teamSizeChosen}}
+
+        {{#if teamHasSlots}}
+
+          <div class="pokemon-team-slots">
+
+            {{#each teamSlots}}
+
+              <div
+                class="pokemon-team-slot{{#if active}} active{{/if}}{{#if filled}} filled{{/if}}"
+                data-team-slot="{{index}}"
+                role="button"
+                tabindex="0"
+              >
+
+                <span class="pokemon-team-slot-number">
+                  {{number}}
+                </span>
+
+
+                {{#if filled}}
+
+                  <img
+                    src="{{preview}}"
+                    alt="{{name}}"
+                  >
+
+                  <strong>
+                    {{name}}
+                  </strong>
+
+                  <button
+                    type="button"
+                    class="pokemon-team-remove"
+                    data-team-remove="{{index}}"
+                    title="Remover Pok&eacute;mon"
+                    aria-label="Remover Pok&eacute;mon"
+                  >
+                    &times;
+                  </button>
+
+                {{else}}
+
+                  <i class="fa-solid fa-plus"></i>
+
+                  <span>
+                    Escolher
+                  </span>
+
+                {{/if}}
+
+              </div>
+
+            {{/each}}
+
+          </div>
+
+
+          <div class="pokemon-team-instruction">
+            Clique em um espa&ccedil;o da equipe e depois escolha o Pok&eacute;mon abaixo.
+          </div>
+
+
+          <div class="pokemon-importer-toolbar pokemon-team-toolbar">
+
+            <input
+              type="search"
+              data-role="asset-search"
+              placeholder="Buscar Pok&eacute;mon..."
+              autocomplete="off"
+            >
+
+            <button
+              type="button"
+              data-action="togglePreviewZoom"
+              class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+            >
+              <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+              Zoom
+            </button>
+
+          </div>
+
+
+          <div class="pokemon-importer-list pokemon-team-list">
+
+            {{#each teamItems}}
+
+              <article
+                class="pokemon-asset-card pokemon-character-card pokemon-team-pokemon{{#if selected}} selected{{/if}}{{#if inTeam}} in-team{{/if}}"
+                data-team-asset
+                data-search-card
+                data-search="{{search}}"
+                data-asset-id="{{id}}"
+              >
+
+                <div class="pokemon-asset-preview">
+
+                  <img
+                    src="{{preview}}"
+                    alt="{{name}}"
+                    loading="lazy"
+                  >
+
+                </div>
+
+
+                <div class="pokemon-asset-info">
+
+                  <strong>
+                    {{name}}
+                  </strong>
+
+                  <small>
+                    {{meta}}
+                  </small>
+
+                  <button
+                    type="button"
+                    class="pokemon-pokedex-link"
+                    data-pokedex-url="{{pokedexUrl}}"
+                    title="Abrir no Pok&eacute;monDB"
+                  >
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    Pok&eacute;dex
+                  </button>
+
+                </div>
+
+              </article>
+
+            {{/each}}
+
+          </div>
+
+        {{else}}
+
+          <div class="pokemon-no-team">
+
+            <i class="fa-regular fa-circle-check"></i>
+
+            <strong>
+              Come&ccedil;ar sem Pok&eacute;mon
+            </strong>
+
+            <span>
+              Sem problema. Voc&ecirc; poder&aacute; adicionar Pok&eacute;mon depois.
+            </span>
+
+          </div>
+
+        {{/if}}
+
+      {{/if}}
+
+    </section>
+
+  {{/if}}
+
+
+
+  {{#if stepIsPokemonTeam}}
+
+    <section class="pokemon-wizard-page pokemon-team-customization-page">
+
+      <h2>Personalize seus Pokémon</h2>
+
+      <p>
+        Defina Natureza, Habilidade, gênero, fraqueza e de 1 a 4 golpes para cada Pokémon inicial.
+      </p>
+
+      <nav class="pokemon-team-customization-tabs">
+        {{#each pokemonProfiles}}
+          <button
+            type="button"
+            data-pokemon-customization-slot="{{slot}}"
+            class="{{#if active}}active{{/if}}"
+          >
+            <img src="{{preview}}" alt="{{name}}">
+            <span>Pokémon {{number}}</span>
+            <strong>{{name}}</strong>
+          </button>
+        {{/each}}
+      </nav>
+
+      <div class="pokemon-team-customization-list">
+
+        {{#each pokemonProfiles}}
+          <article class="pokemon-team-customization-card" {{#unless active}}hidden{{/unless}}>
+              <header>
+                <img src="{{preview}}" alt="{{name}}">
+                <div>
+                  <small>Pokémon {{number}}</small>
+                  <strong>{{name}}</strong>
+                </div>
+              </header>
+
+              <div class="pokemon-team-customization-grid">
+                <label>
+                  <span>Natureza</span>
+                  <select data-pokemon-nature="{{slot}}">
+                    {{#each natureOptions}}
+                      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                    {{/each}}
+                  </select>
+                  <small>{{natureEffect}}</small>
+                </label>
+
+                <label>
+                  <span>Habilidade</span>
+                  <select data-pokemon-ability="{{slot}}">
+                    {{#each abilityOptions}}
+                      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}{{#if hidden}} · Oculta{{/if}}</option>
+                    {{/each}}
+                  </select>
+                  <small>{{abilityDescription}}</small>
+                </label>
+
+                <label>
+                  <span>Gênero</span>
+                  <select data-pokemon-gender="{{slot}}">
+                    {{#each genderOptions}}
+                      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                    {{/each}}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Tag de Fraqueza</span>
+                  <select data-pokemon-weakness="{{slot}}">
+                    {{#each weaknessOptions}}
+                      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}} · {{statLabel}} {{value}}</option>
+                    {{/each}}
+                  </select>
+                </label>
+
+                <label class="wide">
+                  <span>Fraqueza personalizada (opcional)</span>
+                  <input type="text" data-pokemon-custom-weakness="{{slot}}" value="{{customWeakness}}" placeholder="Se preencher, substitui a fraqueza sugerida">
+                </label>
+              </div>
+
+              <div class="pokemon-team-moves">
+                <div class="pokemon-team-moves-heading">
+                  <strong>Golpes</strong>
+                  <span>{{moveCount}} / 4</span>
+                </div>
+
+                <div class="pokemon-team-move-options">
+                  {{#each moveOptions}}
+                    <label class="{{#if selected}}selected{{/if}}">
+                      <input type="checkbox" data-pokemon-move="{{../slot}}" data-move-id="{{id}}" {{#if selected}}checked{{/if}}>
+                      <span>
+                        <strong>{{name}}</strong>
+                        <small>{{typeLabel}} · {{methodLabel}}</small>
+                        <small>{{description}}</small>
+                      </span>
+                    </label>
+                  {{/each}}
+                </div>
+              </div>
+          </article>
+        {{/each}}
+
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+
+  {{#if stepIsDream}}
+
+    <section class="pokemon-wizard-page pokemon-dream-page">
+
+      <h2>
+        Qual &eacute; seu Time dos Sonhos?
+      </h2>
+
+      <p>
+        Escolha at&eacute; 6 Pok&eacute;mon que voc&ecirc; gostaria de encontrar ou ter no futuro.
+        Isso n&atilde;o garante que eles aparecer&atilde;o.
+      </p>
+
+      <p class="pokemon-dream-approval-note">
+        As escolhas devem ser aprovadas pelo Mestre e alinhadas
+        ao tipo de aventura que o grupo ir&aacute; jogar.
+      </p>
+
+      <div class="pokemon-dream-counter">
+        <i class="fa-solid fa-star"></i>
+        Selecionados:
+        <strong>{{dreamCount}} / 6</strong>
+      </div>
+
+      <div class="pokemon-importer-toolbar pokemon-team-toolbar">
+
+        <input
+          type="search"
+          data-role="asset-search"
+          placeholder="Buscar Pok&eacute;mon..."
+          autocomplete="off"
+        >
+
+        <button
+          type="button"
+          data-action="togglePreviewZoom"
+          class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+        >
+          <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+          Zoom
+        </button>
+
+      </div>
+
+      <div class="pokemon-importer-list pokemon-team-list pokemon-dream-list">
+
+        {{#each dreamItems}}
+
+          <article
+            class="pokemon-asset-card pokemon-character-card pokemon-dream-pokemon{{#if inDream}} selected in-dream{{/if}}"
+            data-dream-asset
+            data-search-card
+            data-search="{{search}}"
+            data-asset-id="{{id}}"
+          >
+
+            <div class="pokemon-asset-preview">
+              <img
+                src="{{preview}}"
+                alt="{{name}}"
+                loading="lazy"
+              >
+            </div>
+
+            <div class="pokemon-asset-info">
+
+              <strong>{{name}}</strong>
+              <small>{{meta}}</small>
+
+              <button
+                type="button"
+                class="pokemon-pokedex-link"
+                data-pokedex-url="{{pokedexUrl}}"
+                title="Abrir no Pok&eacute;monDB"
+              >
+                <i class="fa-solid fa-mobile-screen-button"></i>
+                Pok&eacute;dex
+              </button>
+
+            </div>
+
+          </article>
+
+        {{/each}}
+
+      </div>
+
+    </section>
+
+  {{/if}}
+
+  {{#if stepIsArchetype}}
+
+    <section class="pokemon-wizard-page pokemon-archetype-page">
+
+      <h2>
+        {{#if isTrainer}}Que tipo de treinador voc&ecirc; quer ser?{{else}}Que perfil combina com seu Pok&eacute;mon?{{/if}}
+      </h2>
+
+      <p>
+        Escolha o perfil que mais combina com seu personagem.
+        Ele serve como ponto de partida e seus Temas ainda poder&atilde;o ser personalizados.
+      </p>
+
+      <div class="pokemon-archetype-grid">
+
+        {{#each archetypes}}
+
+          <article
+            class="pokemon-archetype-option{{#if selected}} selected{{/if}}"
+          >
+
+            <button
+              type="button"
+              class="pokemon-archetype-card{{#if selected}} selected{{/if}}"
+              data-archetype-id="{{id}}"
+            >
+              <strong>
+                {{name}}
+              </strong>
+
+              <span>
+                {{description}}
+              </span>
+            </button>
+
+            {{#if selected}}
+
+              {{#if hasVariants}}
+
+                <div class="pokemon-archetype-variant">
+
+                  <label>
+                    {{variantLabel}}
+                  </label>
+
+                  <select data-archetype-variant="{{id}}">
+
+                    <option value="">
+                      Selecione...
+                    </option>
+
+                    {{#each variants}}
+
+                      <option
+                        value="{{id}}"
+                        {{#if selected}}selected{{/if}}
+                      >
+                        {{name}}
+                        {{#if originalName}}
+                          ({{originalName}})
+                        {{/if}}
+                      </option>
+
+                    {{/each}}
+
+                  </select>
+
+                </div>
+
+              {{/if}}
+
+            {{/if}}
+
+          </article>
+
+        {{/each}}
+
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsPokemonProfile}}
+
+    <section class="pokemon-wizard-page pokemon-player-profile-page">
+
+      <h2>Natureza e Habilidade</h2>
+
+      <p>
+        Escolha como a Natureza do Pok&eacute;mon afeta seus atributos e qual Habilidade ele possui.
+      </p>
+
+      {{#if visualUpload}}
+
+        <div class="pokemon-theme-guidance">
+          Este visual personalizado n&atilde;o possui uma esp&eacute;cie ligada ao banco de dados.
+          O Tema de Natureza &amp; Habilidade ser&aacute; criado como rascunho para edi&ccedil;&atilde;o manual.
+        </div>
+
+      {{else}}
+
+        {{#if pokemonPlayerProfile}}
+
+          <article class="pokemon-player-profile-card">
+
+            <header>
+
+              <img
+                src="{{pokemonPlayerProfile.preview}}"
+                alt="{{pokemonPlayerProfile.name}}"
+              >
+
+              <div>
+                <small>Terceiro Tema</small>
+                <strong>{{pokemonPlayerProfile.name}}</strong>
+
+                <button
+                  type="button"
+                  class="pokemon-pokedex-link"
+                  data-pokedex-url="{{pokemonPlayerProfile.pokedexUrl}}"
+                >
+                  <i class="fa-solid fa-mobile-screen-button"></i>
+                  Pok&eacute;dex
+                </button>
+              </div>
+
+            </header>
+
+            <div class="pokemon-player-profile-grid">
+
+              <label>
+                <span>Natureza</span>
+
+                <select data-pokemon-player-nature>
+                  {{#each pokemonPlayerProfile.natureOptions}}
+                    <option
+                      value="{{id}}"
+                      {{#if selected}}selected{{/if}}
+                    >
+                      {{label}}
+                    </option>
+                  {{/each}}
+                </select>
+
+                <small class="pokemon-player-mechanical-effect">
+                  {{pokemonPlayerProfile.natureEffect}}
+                </small>
+              </label>
+
+              <label>
+                <span>Habilidade</span>
+
+                <select data-pokemon-player-ability>
+                  {{#each pokemonPlayerProfile.abilityOptions}}
+                    <option
+                      value="{{id}}"
+                      {{#if selected}}selected{{/if}}
+                    >
+                      {{name}}{{#if hidden}} &middot; Oculta{{/if}}
+                    </option>
+                  {{/each}}
+                </select>
+
+                <small class="pokemon-player-mechanical-effect">
+                  {{pokemonPlayerProfile.abilityDescription}}
+                </small>
+              </label>
+
+            </div>
+
+          </article>
+
+          <div class="pokemon-theme-guidance">
+            O terceiro Theme ser&aacute; criado automaticamente com Natureza, atributo favorecido, Habilidade e a limita&ccedil;&atilde;o causada pela Natureza.
+          </div>
+
+        {{/if}}
+
+      {{/if}}
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsPokemonMoves}}
+
+    <section class="pokemon-wizard-page pokemon-builder-moves-page pokemon-player-moves-page">
+
+      <div class="pokemon-builder-moves-heading">
+
+        <div>
+          <h2>
+            Escolha seus golpes
+          </h2>
+
+          <p>
+            Selecione de 1 a 4 golpes que seu Pok&eacute;mon conhece no in&iacute;cio da aventura.
+          </p>
+        </div>
+
+        {{#if visualCatalog}}
+          <strong>
+            {{pokemonPlayerMoveCount}} / 4
+          </strong>
+        {{/if}}
+
+      </div>
+
+
+      {{#if visualUpload}}
+
+        <div class="pokemon-theme-guidance">
+          A imagem personalizada n&atilde;o possui uma esp&eacute;cie vinculada ao banco de dados.
+          Os golpes poder&atilde;o ser adicionados manualmente depois da cria&ccedil;&atilde;o.
+        </div>
+
+      {{else}}
+
+        <div class="pokemon-builder-move-list">
+
+          {{#each pokemonPlayerMoveOptions}}
+
+            <label
+              class="pokemon-builder-move-card{{#if selected}} selected{{/if}}"
+            >
+
+              <input
+                type="checkbox"
+                data-pokemon-player-move
+                data-move-id="{{id}}"
+                {{#if selected}}checked{{/if}}
+              >
+
+              <span class="pokemon-builder-move-main">
+
+                <span class="pokemon-builder-move-title">
+                  <strong>
+                    {{name}}
+                  </strong>
+
+                  <span>
+                    {{typeLabel}}
+                  </span>
+                </span>
+
+                <p>
+                  <strong>Efeito:</strong>
+                  {{description}}
+                </p>
+
+                <span class="pokemon-player-move-meta">
+                  <small>{{methodLabel}}</small>
+
+                  {{#if pokemonDbUrl}}
+                    <button
+                      type="button"
+                      class="pokemon-pokedex-link"
+                      data-pokedex-url="{{pokemonDbUrl}}"
+                      title="Ver o golpe no Pok&eacute;monDB"
+                    >
+                      <i class="fa-solid fa-mobile-screen-button"></i>
+                      Pok&eacute;monDB
+                    </button>
+                  {{/if}}
+                </span>
+
+              </span>
+
+            </label>
+
+          {{/each}}
+
+        </div>
+
+      {{/if}}
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsThemes}}
+
+    <section class="pokemon-wizard-page pokemon-themes-page">
+
+      <h2>
+        {{#if isPokemon}}Construa seus Temas de Perfil{{else}}Construa seus Temas{{/if}}
+      </h2>
+
+
+
+      <div class="pokemon-theme-guidance">
+        <strong>Como pensar seus Temas:</strong>
+        Tags de Poder representam capacidades, recursos e qualidades que ajudam seu personagem.
+        Tags de Fraqueza representam limita&ccedil;&otilde;es que podem complicar suas a&ccedil;&otilde;es.
+        A Quest &eacute; a pergunta que move aquele Tema.
+      </div>
+
+      {{#if isPokemon}}
+        <div class="pokemon-player-moves-theme-note">
+          <i class="fa-solid fa-layer-group"></i>
+          Escolha aqui apenas os 2 Temas narrativos. Natureza &amp; Habilidade e Golpes formar&atilde;o os outros 2 Themes automaticamente.
+        </div>
+      {{/if}}
+
+      {{#if selectedArchetype}}
+
+        <div class="pokemon-theme-editor-heading">
+          <strong>
+            Perfil: {{selectedArchetype.name}}
+            {{#if selectedArchetype.selectedVariant}}
+              &mdash; {{selectedArchetype.selectedVariant.name}}
+            {{/if}}
+          </strong>
+
+          <span>
+            Use uma sugest&atilde;o pronta ou escreva algo totalmente seu.
+          </span>
+        </div>
+
+        <div class="pokemon-theme-editor-list">
+
+          {{#each themeEditorSlots}}
+
+            <article class="pokemon-theme-editor-card">
+
+              <header class="pokemon-theme-editor-card-header">
+
+                <span class="pokemon-theme-number">
+                  Tema {{number}}
+                </span>
+
+                <select data-theme-preset-slot="{{index}}">
+                  {{#each presetOptions}}
+                    <option
+                      value="{{value}}"
+                      {{#if selected}}selected{{/if}}
+                    >
+                      {{name}}
+                    </option>
+                  {{/each}}
+                </select>
+
+              </header>
+
+              <label>
+                Nome do Tema
+
+                <input
+                  type="text"
+                  data-theme-name="{{index}}"
+                  value="{{name}}"
+                  placeholder="Ex.: Instinto de Batalha"
+                >
+              </label>
+
+              <div class="pokemon-theme-editor-section">
+
+                <strong>
+                  Tags de Poder
+                </strong>
+
+                <small>
+                  Frases curtas sobre capacidades, recursos ou qualidades que ajudam voc&ecirc;.
+                </small>
+
+                {{#each powerTags}}
+
+                  <input
+                    type="text"
+                    data-theme-power="{{../index}}:{{index}}"
+                    value="{{name}}"
+                    placeholder="Ex.: Ler o campo de batalha"
+                  >
+
+                {{/each}}
+
+              </div>
+
+              <div class="pokemon-theme-editor-section">
+
+                <strong>
+                  Tag de Fraqueza
+                </strong>
+
+                <small>
+                  Uma limita&ccedil;&atilde;o real que pode complicar suas a&ccedil;&otilde;es.
+                </small>
+
+                <input
+                  type="text"
+                  data-theme-weakness="{{index}}"
+                  value="{{weakness}}"
+                  placeholder="Ex.: Competitivo demais"
+                >
+
+              </div>
+
+              <div class="pokemon-theme-editor-section">
+
+                <strong>
+                  Quest
+                </strong>
+
+                <small>
+                  Uma pergunta aberta que voc&ecirc; quer explorar durante a hist&oacute;ria.
+                </small>
+
+                <input
+                  type="text"
+                  data-theme-quest="{{index}}"
+                  value="{{quest}}"
+                  placeholder="Ex.: Que tipo de treinador quero me tornar?"
+                >
+
+              </div>
+
+            </article>
+
+          {{/each}}
+
+        </div>
+
+      {{/if}}
+
+      <div class="pokemon-theme-rules-note">
+        Durante o jogo, voc&ecirc; usa Tags de Poder que ajudam sua a&ccedil;&atilde;o.
+        Tags de Fraqueza podem dificultar suas a&ccedil;&otilde;es, mas tamb&eacute;m impulsionam a evolu&ccedil;&atilde;o do personagem.
+        As Quests orientam seu desenvolvimento e suas escolhas.
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+  <footer class="pokemon-wizard-footer">
+
+    <button
+      type="button"
+      data-action="wizardBack"
+      {{#unless canBack}}disabled{{/unless}}
+    >
+      <i class="fa-solid fa-arrow-left"></i>
+      Voltar
+    </button>
+
+    <span class="pokemon-wizard-counter">
+      Etapa {{step}} de {{totalSteps}}
+    </span>
+
+    {{#if isFinalStep}}
+
+      <button
+        type="button"
+        data-action="wizardFinish"
+        class="pokemon-wizard-primary"
+        {{#unless canFinish}}disabled{{/unless}}
+      >
+        <i class="fa-solid fa-check"></i>
+        Finalizar
+      </button>
+
+    {{else}}
+
+      {{#if stepIsTeam}}
+
+        <button
+          type="button"
+          data-action="wizardNext"
+          class="pokemon-wizard-primary"
+          {{#unless canNext}}disabled{{/unless}}
+        >
+          Pr&oacute;ximo
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+
+      {{else}}
+
+        {{#if stepIsVisual}}
+
+          <button
+            type="button"
+            data-action="wizardNext"
+            class="pokemon-wizard-primary"
+            {{#unless canNext}}disabled{{/unless}}
+          >
+            Pr&oacute;ximo
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+
+        {{else}}
+
+          <button
+            type="button"
+            data-action="wizardNext"
+            class="pokemon-wizard-primary"
+            {{#unless canNext}}disabled{{/unless}}
+          >
+            Pr&oacute;ximo
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+
+        {{/if}}
+
+      {{/if}}
+
+    {{/if}}
+
+  </footer>
+
+</div>

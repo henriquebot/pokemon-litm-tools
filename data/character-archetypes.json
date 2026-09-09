@@ -1,0 +1,580 @@
+{
+  "version": 2,
+  "archetypes": [
+    {
+      "id": "trainer",
+      "name": "Treinador Pokémon",
+      "description": "Você vive para treinar, viajar e crescer ao lado de seus Pokémon.",
+      "themes": [
+        {
+          "name": "Instinto de Batalha",
+          "powerTags": [
+            "Ler o campo de batalha",
+            "Estratégia sob pressão",
+            "Virada inesperada"
+          ],
+          "weaknessTags": [
+            "Competitivo demais"
+          ],
+          "quest": "Que tipo de treinador quero me tornar?"
+        },
+        {
+          "name": "Laço com meus Pokémon",
+          "powerTags": [
+            "Entender meu parceiro",
+            "Confiança mútua",
+            "Nunca abandonar um Pokémon"
+          ],
+          "weaknessTags": [
+            "Me arrisco demais para proteger meus Pokémon"
+          ],
+          "quest": "Até onde vai nossa confiança?"
+        },
+        {
+          "name": "Vida na Estrada",
+          "powerTags": [
+            "Conheço rotas e atalhos",
+            "Acampar em qualquer lugar",
+            "Fazer amizade pelo caminho"
+          ],
+          "weaknessTags": [
+            "Sempre em movimento"
+          ],
+          "quest": "Onde realmente pertenço?"
+        },
+        {
+          "name": "Sonho de Grandeza",
+          "powerTags": [
+            "Foco no objetivo",
+            "Inspirar minha equipe",
+            "Levantar depois da derrota"
+          ],
+          "weaknessTags": [
+            "Obcecado por vencer"
+          ],
+          "quest": "O que significa ser o melhor?"
+        }
+      ]
+    },
+    {
+      "id": "professor",
+      "name": "Aspirante a Professor",
+      "description": "Você quer compreender Pokémon, fenômenos e mistérios que outros apenas observam.",
+      "themes": [
+        {
+          "name": "Olhar Científico",
+          "powerTags": [
+            "Observar padrões",
+            "Conhecimento Pokémon",
+            "Formular hipóteses rapidamente"
+          ],
+          "weaknessTags": [
+            "Preciso entender tudo"
+          ],
+          "quest": "Que descoberta vai definir meu nome?"
+        },
+        {
+          "name": "Trabalho de Campo",
+          "powerTags": [
+            "Coletar evidências",
+            "Registrar detalhes",
+            "Improvisar instrumentos"
+          ],
+          "weaknessTags": [
+            "Equipamento delicado"
+          ],
+          "quest": "O que existe além dos livros?"
+        },
+        {
+          "name": "Rede Acadêmica",
+          "powerTags": [
+            "Contatos em laboratórios",
+            "Acesso a informações",
+            "Sei quem perguntar"
+          ],
+          "weaknessTags": [
+            "Reputação a zelar"
+          ],
+          "quest": "Em quem posso confiar minha pesquisa?"
+        },
+        {
+          "name": "Fascínio pelo Desconhecido",
+          "powerTags": [
+            "Curiosidade incansável",
+            "Coragem diante do estranho",
+            "Ligar pistas improváveis"
+          ],
+          "weaknessTags": [
+            "Curioso demais"
+          ],
+          "quest": "Qual mistério não consigo deixar de perseguir?"
+        }
+      ]
+    },
+    {
+      "id": "photographer",
+      "name": "Fotógrafo Pokémon",
+      "description": "Você viaja atrás de imagens, comportamentos raros e histórias dignas de registro.",
+      "themes": [
+        {
+          "name": "Olho Fotográfico",
+          "powerTags": [
+            "Enquadramento perfeito",
+            "Notar pequenos detalhes",
+            "Capturar o instante"
+          ],
+          "weaknessTags": [
+            "Preciso da foto perfeita"
+          ],
+          "quest": "Qual imagem quero deixar para o mundo?"
+        },
+        {
+          "name": "Caçador de Momentos",
+          "powerTags": [
+            "Paciência",
+            "Passar despercebido",
+            "Antecipar comportamento Pokémon"
+          ],
+          "weaknessTags": [
+            "Me arrisco pelo clique"
+          ],
+          "quest": "Quanto vale uma foto única?"
+        },
+        {
+          "name": "Equipamento de Campo",
+          "powerTags": [
+            "Câmera versátil",
+            "Lente certa para o momento",
+            "Sempre tenho um plano de reserva"
+          ],
+          "weaknessTags": [
+            "Dependo do equipamento"
+          ],
+          "quest": "Como mostrar aquilo que ninguém viu?"
+        },
+        {
+          "name": "Contador de Histórias",
+          "powerTags": [
+            "Ganhar confiança",
+            "Fazer as perguntas certas",
+            "Mostrar emoção"
+          ],
+          "weaknessTags": [
+            "Não consigo ficar indiferente"
+          ],
+          "quest": "Que história merece ser contada?"
+        }
+      ]
+    },
+    {
+      "id": "ranger",
+      "name": "Pokémon Ranger",
+      "description": "Você protege pessoas, Pokémon e ambientes onde os dois precisam coexistir.",
+      "themes": [
+        {
+          "name": "Protetor da Natureza",
+          "powerTags": [
+            "Ler rastros",
+            "Sobrevivência",
+            "Conhecer habitats"
+          ],
+          "weaknessTags": [
+            "Não tolero abuso contra Pokémon"
+          ],
+          "quest": "O que estou disposto a proteger?"
+        },
+        {
+          "name": "Captura e Resgate",
+          "powerTags": [
+            "Acalmar Pokémon",
+            "Aproximação segura",
+            "Agir em emergências"
+          ],
+          "weaknessTags": [
+            "Assumo riscos demais"
+          ],
+          "quest": "Quem precisa de mim agora?"
+        },
+        {
+          "name": "Dever Ranger",
+          "powerTags": [
+            "Autoridade local",
+            "Rede de Rangers",
+            "Protocolos de crise"
+          ],
+          "weaknessTags": [
+            "O peso da responsabilidade"
+          ],
+          "quest": "Quando devo seguir as regras e quando devo quebrá-las?"
+        },
+        {
+          "name": "Harmonia com Pokémon",
+          "powerTags": [
+            "Sentir suas intenções",
+            "Criar confiança rapidamente",
+            "Cooperar sem dominar"
+          ],
+          "weaknessTags": [
+            "Evito ferir Pokémon"
+          ],
+          "quest": "Como provar que humanos e Pokémon podem agir juntos?"
+        }
+      ]
+    },
+    {
+      "id": "trainer-class",
+      "name": "Classe de Treinador",
+      "description": "Escolha uma das classes clássicas de treinadores do mundo Pokémon.",
+      "variantLabel": "Escolha sua Classe de Treinador",
+      "variants": [
+        {
+          "id": "ace-trainer",
+          "name": "Treinador Ás",
+          "originalName": "Ace Trainer"
+        },
+        {
+          "id": "aroma-lady",
+          "name": "Dama Aromática",
+          "originalName": "Aroma Lady"
+        },
+        {
+          "id": "artist",
+          "name": "Artista",
+          "originalName": "Artist"
+        },
+        {
+          "id": "battle-girl",
+          "name": "Lutadora",
+          "originalName": "Battle Girl"
+        },
+        {
+          "id": "beauty",
+          "name": "Bela",
+          "originalName": "Beauty"
+        },
+        {
+          "id": "biker",
+          "name": "Motoqueiro",
+          "originalName": "Biker"
+        },
+        {
+          "id": "bird-keeper",
+          "name": "Criador de Aves",
+          "originalName": "Bird Keeper"
+        },
+        {
+          "id": "black-belt",
+          "name": "Faixa-Preta",
+          "originalName": "Black Belt"
+        },
+        {
+          "id": "bug-catcher",
+          "name": "Caçador de Insetos",
+          "originalName": "Bug Catcher"
+        },
+        {
+          "id": "camper",
+          "name": "Campista",
+          "originalName": "Camper"
+        },
+        {
+          "id": "dragon-tamer",
+          "name": "Domador de Dragões",
+          "originalName": "Dragon Tamer"
+        },
+        {
+          "id": "firebreather",
+          "name": "Cuspidor de Fogo",
+          "originalName": "Firebreather"
+        },
+        {
+          "id": "fisherman",
+          "name": "Pescador",
+          "originalName": "Fisherman"
+        },
+        {
+          "id": "gentleman",
+          "name": "Cavalheiro",
+          "originalName": "Gentleman"
+        },
+        {
+          "id": "hiker",
+          "name": "Montanhista",
+          "originalName": "Hiker"
+        },
+        {
+          "id": "juggler",
+          "name": "Malabarista",
+          "originalName": "Juggler"
+        },
+        {
+          "id": "kimono-girl",
+          "name": "Garota de Quimono",
+          "originalName": "Kimono Girl"
+        },
+        {
+          "id": "lass",
+          "name": "Garota Treinadora",
+          "originalName": "Lass"
+        },
+        {
+          "id": "medium",
+          "name": "Médium",
+          "originalName": "Medium"
+        },
+        {
+          "id": "picnicker",
+          "name": "Excursionista",
+          "originalName": "Picnicker"
+        },
+        {
+          "id": "pokefan",
+          "name": "Pokéfã",
+          "originalName": "Pokéfan"
+        },
+        {
+          "id": "pokemaniac",
+          "name": "Pokémaníaco",
+          "originalName": "Pokémaniac"
+        },
+        {
+          "id": "psychic",
+          "name": "Psíquico",
+          "originalName": "Psychic"
+        },
+        {
+          "id": "sailor",
+          "name": "Marinheiro",
+          "originalName": "Sailor"
+        },
+        {
+          "id": "sage",
+          "name": "Sábio",
+          "originalName": "Sage"
+        },
+        {
+          "id": "school-kid",
+          "name": "Estudante",
+          "originalName": "School Kid"
+        },
+        {
+          "id": "scientist",
+          "name": "Cientista",
+          "originalName": "Scientist"
+        },
+        {
+          "id": "super-nerd",
+          "name": "Super Nerd",
+          "originalName": "Super Nerd"
+        },
+        {
+          "id": "swimmer",
+          "name": "Nadador",
+          "originalName": "Swimmer"
+        },
+        {
+          "id": "teacher",
+          "name": "Professor Escolar",
+          "originalName": "Teacher"
+        },
+        {
+          "id": "twins",
+          "name": "Gêmeos",
+          "originalName": "Twins"
+        },
+        {
+          "id": "youngster",
+          "name": "Jovem Treinador",
+          "originalName": "Youngster"
+        }
+      ],
+      "themes": [
+        {
+          "name": "Minha Classe",
+          "powerTags": [
+            "Conheço profundamente meu meio",
+            "Técnicas características da minha classe",
+            "Sei lidar com situações típicas da minha área"
+          ],
+          "weaknessTags": [
+            "Preso aos hábitos da minha classe"
+          ],
+          "quest": "O que significa realmente pertencer a essa classe?"
+        },
+        {
+          "name": "Meu Estilo",
+          "powerTags": [
+            "Método próprio",
+            "Treino dedicado",
+            "Surpreender quem me subestima"
+          ],
+          "weaknessTags": [
+            "Meu estilo pode ficar previsível"
+          ],
+          "quest": "Como tornar meu estilo realmente único?"
+        },
+        {
+          "name": "Minha Comunidade",
+          "powerTags": [
+            "Contatos da área",
+            "Conheço gente como eu",
+            "Falo a linguagem do grupo"
+          ],
+          "weaknessTags": [
+            "Rivalidades antigas"
+          ],
+          "quest": "Qual é meu lugar entre os meus?"
+        },
+        {
+          "name": "Provar meu Valor",
+          "powerTags": [
+            "Determinação",
+            "Aprender com cada derrota",
+            "Não recuar diante de desafios"
+          ],
+          "weaknessTags": [
+            "Tenho algo a provar"
+          ],
+          "quest": "Quando saberei que fui reconhecido?"
+        }
+      ]
+    },
+    {
+      "id": "specialist",
+      "name": "Especialista em Tipo",
+      "description": "Seu treinamento gira em torno de um tipo específico de Pokémon.",
+      "variantLabel": "Escolha sua especialidade",
+      "variants": [
+        {
+          "id": "normal",
+          "name": "Normal"
+        },
+        {
+          "id": "fire",
+          "name": "Fogo"
+        },
+        {
+          "id": "water",
+          "name": "Água"
+        },
+        {
+          "id": "electric",
+          "name": "Elétrico"
+        },
+        {
+          "id": "grass",
+          "name": "Planta"
+        },
+        {
+          "id": "ice",
+          "name": "Gelo"
+        },
+        {
+          "id": "fighting",
+          "name": "Lutador"
+        },
+        {
+          "id": "poison",
+          "name": "Veneno"
+        },
+        {
+          "id": "ground",
+          "name": "Terrestre"
+        },
+        {
+          "id": "flying",
+          "name": "Voador"
+        },
+        {
+          "id": "psychic",
+          "name": "Psíquico"
+        },
+        {
+          "id": "bug",
+          "name": "Inseto"
+        },
+        {
+          "id": "rock",
+          "name": "Pedra"
+        },
+        {
+          "id": "ghost",
+          "name": "Fantasma"
+        },
+        {
+          "id": "dragon",
+          "name": "Dragão"
+        },
+        {
+          "id": "dark",
+          "name": "Sombrio"
+        },
+        {
+          "id": "steel",
+          "name": "Aço"
+        },
+        {
+          "id": "fairy",
+          "name": "Fada"
+        }
+      ],
+      "themes": [
+        {
+          "name": "Minha Especialidade",
+          "powerTags": [
+            "Conhecimento profundo do meu tipo",
+            "Reconhecer vantagens e riscos",
+            "Treino especializado"
+          ],
+          "weaknessTags": [
+            "Confio demais na minha especialidade"
+          ],
+          "quest": "Até onde minha especialidade pode me levar?"
+        },
+        {
+          "name": "Sintonia Pokémon",
+          "powerTags": [
+            "Entender Pokémon do meu tipo",
+            "Reconhecer seu potencial",
+            "Conhecer seus hábitos"
+          ],
+          "weaknessTags": [
+            "Tenho dificuldade fora da minha zona de conforto"
+          ],
+          "quest": "O que ainda preciso aprender sobre esses Pokémon?"
+        },
+        {
+          "name": "Meu Estilo",
+          "powerTags": [
+            "Estratégias características",
+            "Preparação especializada",
+            "Explorar oportunidades"
+          ],
+          "weaknessTags": [
+            "Meu estilo pode ser antecipado"
+          ],
+          "quest": "Como superar os limites da minha especialidade?"
+        },
+        {
+          "name": "Reputação",
+          "powerTags": [
+            "Reconhecido entre especialistas",
+            "Contatos da área",
+            "Experiência prática"
+          ],
+          "weaknessTags": [
+            "Minha reputação está em jogo"
+          ],
+          "quest": "Que especialista quero me tornar?"
+        }
+      ]
+    },
+    {
+      "id": "custom",
+      "name": "Personalizado",
+      "description": "Monte livremente seus Temas usando sugestões de qualquer perfil.",
+      "allPresets": true,
+      "themes": []
+    }
+  ]
+}

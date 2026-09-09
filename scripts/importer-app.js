@@ -1,6 +1,19 @@
-﻿const MODULE_ID = "pokemon-litm-tools";
+import {
+  getPokemonDbUrl,
+  openPokemonDb
+} from "./pokemon-links.js";
+
+import {
+  openPokemonBuilder,
+  openPokemonTrainerThemeBuilder
+} from "./pokemon-builder.js";
+
+const MODULE_ID = "pokemon-litm-tools";
 const DYLAN_ID = "dylans-animated-tokens";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
+
+export const POKEMON_IMPORTER_DRAG_TYPE =
+  "PokemonLITMAsset";
 
 const {
   ApplicationV2,
@@ -68,14 +81,69 @@ function safeFilename(
   return `${prefix}-${clean}${ext}`;
 }
 
+
+async function shortBlobHash(
+  blob
+) {
+  const digest =
+    await crypto.subtle.digest(
+      "SHA-256",
+      await blob.arrayBuffer()
+    );
+
+  return Array
+    .from(
+      new Uint8Array(digest)
+    )
+    .map(
+      value =>
+        value
+          .toString(16)
+          .padStart(2, "0")
+    )
+    .join("")
+    .slice(0, 12);
+}
+
+function immutableFilename(
+  filename,
+  hash
+) {
+  const dot =
+    filename.lastIndexOf(".");
+
+  if (dot <= 0) {
+    return `${filename}-${hash}`;
+  }
+
+  return (
+    filename.slice(0, dot)
+    +
+    "-"
+    +
+    hash
+    +
+    filename.slice(dot)
+  );
+}
+
 async function uploadBlob(
   blob,
   filename
 ) {
+  const hash =
+    await shortBlobHash(blob);
+
+  const immutableName =
+    immutableFilename(
+      filename,
+      hash
+    );
+
   const file =
     new File(
       [blob],
-      filename,
+      immutableName,
       {
         type:
           blob.type
@@ -103,16 +171,30 @@ async function uploadBlob(
         }
       );
 
-  return (
+  const storedPath =
     uploaded?.path
-    ??
-    uploaded?.url
-    ??
-    uploaded?.file
-    ??
-    null
+    ?? uploaded?.url
+    ?? uploaded?.file
+    ?? null;
+
+  if (!storedPath) return null;
+
+  const separator =
+    storedPath.includes("?")
+      ? "&"
+      : "?";
+
+  return (
+    storedPath
+    +
+    separator
+    +
+    "v="
+    +
+    Date.now().toString(36)
   );
 }
+
 
 async function persistRemoteAsset(
   url,
@@ -389,11 +471,9 @@ async function prepareVertical6(
       )
     ]);
 
-  const cacheKey = Date.now();
-
   return {
-    sheetPath: `${sheetPath}?v=${cacheKey}`,
-    portraitPath: `${portraitPath}?v=${cacheKey}`
+    sheetPath,
+    portraitPath
   };
 }
 
@@ -425,82 +505,425 @@ function cleanAnimation(animation) {
 /* CRIAR ACTOR                                               */
 /* --------------------------------------------------------- */
 
-async function prepareActorAssets(
-  entry
+function getOverworldFrameGrid(entry) {
+  const animation = cleanAnimation(entry.animation);
+
+  if (!animation) return null;
+
+  const frames = Number(animation.animationframes ?? 4);
+
+  switch (animation.sheetstyle) {
+    case "durlReduced":
+      return { columns: 3, rows: 4 };
+
+    case "dlru":
+      return { columns: frames, rows: 4 };
+
+    case "eight":
+      return { columns: frames, rows: 8 };
+
+    default:
+      return null;
+  }
+}
+
+function getImporterPreviewData(
+  entry,
+  activeTab
 ) {
   if (
-    entry.sheetLayout
-    ===
-    "gen1Vertical6"
+    activeTab !== "people" ||
+    entry.portrait
   ) {
-    return prepareVertical6(entry);
+    return {
+      previewCropped: false,
+      previewColumns: 1,
+      previewRows: 1
+    };
   }
 
-  const isPokemon =
-    entry.category === "pokemon";
+  const grid =
+    entry.previewMode === "vertical6"
+      ? {
+          columns: 1,
+          rows: 6
+        }
+      : getOverworldFrameGrid(entry);
 
-  const portraitUrl =
-    entry.portrait
-    ||
-    entry.preview
-    ||
-    "icons/svg/mystery-man.svg";
-
-  const [
-    sheetPath,
-    portraitPath
-  ] =
-    await Promise.all([
-
-      persistRemoteAsset(
-        entry.sheet,
-
-        safeFilename(
-          isPokemon
-            ? "pokemon-sheet"
-            : "person-sheet",
-
-          entry,
-          entry.sheet
-        )
-      ),
-
-      portraitUrl.startsWith("icons/")
-        ?
-        Promise.resolve(
-          portraitUrl
-        )
-        :
-        persistRemoteAsset(
-          portraitUrl,
-
-          safeFilename(
-            isPokemon
-              ? "pokemon-portrait"
-              : "person-portrait",
-
-            entry,
-            portraitUrl
-          )
-        )
-    ]);
+  if (!grid) {
+    return {
+      previewCropped: false,
+      previewColumns: 1,
+      previewRows: 1
+    };
+  }
 
   return {
-    sheetPath,
-    portraitPath
+    previewCropped: true,
+    previewColumns: grid.columns,
+    previewRows: grid.rows
   };
 }
 
-async function createActorFromEntry(
-  entry,
-  folderId = null
+
+function sizePreviewElement(
+  element,
+  naturalWidth,
+  naturalHeight,
+  zoomed
+) {
+  if (
+    !naturalWidth ||
+    !naturalHeight
+  ) {
+    return;
+  }
+
+  const maxSize =
+    zoomed
+      ? 136
+      : 64;
+
+  const scale =
+    Math.min(
+      maxSize / naturalWidth,
+      maxSize / naturalHeight
+    );
+
+  element.style.width =
+    `${naturalWidth * scale}px`;
+
+  element.style.height =
+    `${naturalHeight * scale}px`;
+}
+
+
+function renderOverworldPreview(
+  image,
+  zoomed
+) {
+  const columns =
+    Number(
+      image.dataset.previewColumns
+      ?? 1
+    );
+
+  const rows =
+    Number(
+      image.dataset.previewRows
+      ?? 1
+    );
+
+  const naturalWidth =
+    image.naturalWidth;
+
+  const naturalHeight =
+    image.naturalHeight;
+
+  if (
+    !naturalWidth ||
+    !naturalHeight ||
+    columns < 1 ||
+    rows < 1
+  ) {
+    return;
+  }
+
+  const frameWidth =
+    Math.round(
+      naturalWidth / columns
+    );
+
+  const frameHeight =
+    Math.round(
+      naturalHeight / rows
+    );
+
+  const wrapper =
+    image.closest(
+      ".pokemon-overworld-preview"
+    );
+
+  if (!wrapper) return;
+
+  let canvas =
+    wrapper.querySelector(
+      "[data-overworld-canvas]"
+    );
+
+  if (!canvas) {
+    canvas =
+      document.createElement(
+        "canvas"
+      );
+
+    canvas.dataset.overworldCanvas =
+      "";
+
+    wrapper.append(canvas);
+  }
+
+  if (
+    canvas.width !== frameWidth ||
+    canvas.height !== frameHeight
+  ) {
+    canvas.width =
+      frameWidth;
+
+    canvas.height =
+      frameHeight;
+
+    const ctx =
+      canvas.getContext(
+        "2d",
+        {
+          alpha: true
+        }
+      );
+
+    ctx.imageSmoothingEnabled =
+      false;
+
+    ctx.clearRect(
+      0,
+      0,
+      frameWidth,
+      frameHeight
+    );
+
+    ctx.drawImage(
+      image,
+
+      0,
+      0,
+      frameWidth,
+      frameHeight,
+
+      0,
+      0,
+      frameWidth,
+      frameHeight
+    );
+  }
+
+  image.hidden =
+    true;
+
+  sizePreviewElement(
+    canvas,
+    frameWidth,
+    frameHeight,
+    zoomed
+  );
+
+  wrapper.style.width =
+    canvas.style.width;
+
+  wrapper.style.height =
+    canvas.style.height;
+}
+
+
+function refreshImporterPreviews(
+  root,
+  zoomed
+) {
+  for (
+    const image
+    of root.querySelectorAll(
+      "[data-overworld-preview]"
+    )
+  ) {
+    const update =
+      () =>
+        renderOverworldPreview(
+          image,
+          zoomed
+        );
+
+    if (
+      image.complete &&
+      image.naturalWidth
+    ) {
+      update();
+    }
+
+    else {
+      image.addEventListener(
+        "load",
+        update,
+        {
+          once: true
+        }
+      );
+    }
+  }
+
+
+  for (
+    const image
+    of root.querySelectorAll(
+      ".pokemon-asset-preview > img:not([data-overworld-preview])"
+    )
+  ) {
+    const update =
+      () =>
+        sizePreviewElement(
+          image,
+          image.naturalWidth,
+          image.naturalHeight,
+          zoomed
+        );
+
+    if (
+      image.complete &&
+      image.naturalWidth
+    ) {
+      update();
+    }
+
+    else {
+      image.addEventListener(
+        "load",
+        update,
+        {
+          once: true
+        }
+      );
+    }
+  }
+}
+
+
+async function createOverworldFrameBlob(sheetBlob, entry) {
+  const grid = getOverworldFrameGrid(entry);
+
+  if (!grid) return null;
+
+  const bitmap = await createImageBitmap(sheetBlob);
+
+  try {
+    const frameW = bitmap.width / grid.columns;
+    const frameH = bitmap.height / grid.rows;
+
+    if (
+      !Number.isInteger(frameW) ||
+      !Number.isInteger(frameH)
+    ) {
+      return null;
+    }
+
+    const canvas = document.createElement("canvas");
+
+    canvas.width = frameW;
+    canvas.height = frameH;
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.drawImage(
+      bitmap,
+      0, 0,
+      frameW, frameH,
+      0, 0,
+      frameW, frameH
+    );
+
+    return await canvasToBlob(canvas);
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function prepareActorAssets(entry) {
+  if (entry.sheetLayout === "gen1Vertical6") {
+    const prepared = await prepareVertical6(entry);
+
+    return {
+      ...prepared,
+      tokenPath: prepared.portraitPath
+    };
+  }
+
+  const isPokemon = entry.category === "pokemon";
+
+  const response = await fetch(entry.sheet);
+
+  if (!response.ok) {
+    throw new Error(
+      `Falha baixando ${entry.name}: HTTP ${response.status}`
+    );
+  }
+
+  const sheetBlob = await response.blob();
+
+  const sheetPath =
+    await uploadBlob(
+      sheetBlob,
+      safeFilename(
+        isPokemon ? "pokemon-sheet" : "person-sheet",
+        entry,
+        entry.sheet
+      )
+    )
+    ?? entry.sheet;
+
+  let tokenPath = sheetPath;
+
+  const tokenBlob =
+    await createOverworldFrameBlob(sheetBlob, entry);
+
+  if (tokenBlob) {
+    tokenPath =
+      await uploadBlob(
+        tokenBlob,
+        safeFilename(
+          isPokemon
+            ? "pokemon-overworld"
+            : "person-overworld",
+          entry
+        )
+      )
+      ?? tokenPath;
+  }
+
+  let portraitPath =
+    tokenPath
+    ?? sheetPath
+    ?? "icons/svg/mystery-man.svg";
+
+  if (entry.portrait) {
+    portraitPath =
+      await persistRemoteAsset(
+        entry.portrait,
+        safeFilename(
+          isPokemon
+            ? "pokemon-portrait"
+            : "person-portrait",
+          entry,
+          entry.portrait
+        )
+      )
+      ?? portraitPath;
+  }
+
+  return {
+    sheetPath,
+    portraitPath,
+    tokenPath
+  };
+}
+
+async function prepareActorDefinition(
+  entry
 ) {
   const isPokemon =
     entry.category === "pokemon";
 
   const {
     sheetPath,
-    portraitPath
+    portraitPath,
+    tokenPath
   } =
     await prepareActorAssets(entry);
 
@@ -518,7 +941,7 @@ async function createActorFromEntry(
 
   const moduleFlags = {
     schemaVersion:
-      7,
+      9,
 
     kind:
       isPokemon
@@ -566,7 +989,10 @@ async function createActorFromEntry(
         sheetPath,
 
       portrait:
-        portraitPath
+        portraitPath,
+
+      overworld:
+        tokenPath
     },
 
     animation
@@ -591,6 +1017,25 @@ async function createActorFromEntry(
     };
   }
 
+  return {
+    portraitPath,
+    tokenPath,
+    visualScale,
+    moduleFlags,
+    prototypeFlags
+  };
+}
+
+
+async function createActorFromEntry(
+  entry,
+  folderId = null
+) {
+  const definition =
+    await prepareActorDefinition(
+      entry
+    );
+
   const actor =
     await Actor
       .implementation
@@ -606,7 +1051,7 @@ async function createActorFromEntry(
           : {}),
 
         img:
-          portraitPath,
+          definition.portraitPath,
 
         prototypeToken: {
           name:
@@ -620,13 +1065,13 @@ async function createActorFromEntry(
 
           texture: {
             src:
-              portraitPath,
+              definition.tokenPath,
 
             scaleX:
-              visualScale,
+              definition.visualScale,
 
             scaleY:
-              visualScale
+              definition.visualScale
           },
 
           lockRotation:
@@ -638,18 +1083,18 @@ async function createActorFromEntry(
               .NEUTRAL,
 
           flags:
-            prototypeFlags
+            definition.prototypeFlags
         },
 
         flags: {
           [MODULE_ID]:
-            moduleFlags
+            definition.moduleFlags
         }
       });
 
   if (!actor) {
     throw new Error(
-      `Não foi possível criar ${entry.name}`
+      `Nao foi possivel criar ${entry.name}`
     );
   }
 
@@ -657,11 +1102,209 @@ async function createActorFromEntry(
 }
 
 
+async function ensureActorCurrent(
+  actor,
+  entry
+) {
+  const current =
+    actor.flags?.[
+      MODULE_ID
+    ]
+    ??
+    {};
+
+  if (
+    Number(
+      current.schemaVersion
+      ?? 0
+    ) >= 9
+    &&
+    current.assets?.overworld
+  ) {
+    return actor;
+  }
+
+  const definition =
+    await prepareActorDefinition(
+      entry
+    );
+
+  await actor.update({
+    img:
+      definition.portraitPath,
+
+    prototypeToken: {
+      texture: {
+        src:
+          definition.tokenPath,
+
+        scaleX:
+          definition.visualScale,
+
+        scaleY:
+          definition.visualScale
+      },
+
+      lockRotation:
+        true,
+
+      flags:
+        definition.prototypeFlags
+    },
+
+    flags: {
+      [MODULE_ID]:
+        definition.moduleFlags
+    }
+  });
+
+  return actor;
+}
+
+
+function rememberedActorFolderId() {
+  const id =
+    String(
+      game.settings.get(
+        MODULE_ID,
+        "lastActorFolder"
+      )
+      ??
+      ""
+    );
+
+  if (!id) {
+    return null;
+  }
+
+  const folder =
+    game.folders.get(id);
+
+  return (
+    folder?.type === "Actor"
+      ? id
+      : null
+  );
+}
+
+
+async function getOrCreateActorForEntry(
+  entry
+) {
+  const existing =
+    game.actors.find(
+      actor =>
+        actor.getFlag(
+          MODULE_ID,
+          "assetId"
+        )
+        ===
+        entry.id
+    );
+
+  if (existing) {
+    return ensureActorCurrent(
+      existing,
+      entry
+    );
+  }
+
+  return createActorFromEntry(
+    entry,
+    rememberedActorFolderId()
+  );
+}
+
+
+async function placeActorToken(
+  actor,
+  position
+) {
+  if (
+    !canvas?.ready ||
+    !canvas.scene
+  ) {
+    throw new Error(
+      "Abra uma Scene antes de colocar o token."
+    );
+  }
+
+  const token =
+    await actor.getTokenDocument();
+
+  const gridSize =
+    Number(
+      canvas.dimensions?.size
+      ??
+      canvas.grid?.size
+      ??
+      canvas.scene.grid?.size
+      ??
+      100
+    );
+
+  const width =
+    Number(
+      token.width
+      ??
+      1
+    );
+
+  const height =
+    Number(
+      token.height
+      ??
+      1
+    );
+
+  const centerX =
+    Number(position.x);
+
+  const centerY =
+    Number(position.y);
+
+  token.updateSource({
+    x:
+      centerX
+      -
+      (
+        width
+        *
+        gridSize
+        /
+        2
+      ),
+
+    y:
+      centerY
+      -
+      (
+        height
+        *
+        gridSize
+        /
+        2
+      )
+  });
+
+  await canvas.scene
+    .createEmbeddedDocuments(
+      "Token",
+      [
+        token.toObject()
+      ]
+    );
+}
+
+
 /* --------------------------------------------------------- */
 /* PROPS                                                     */
 /* --------------------------------------------------------- */
 
-async function placeProp(entry) {
+async function placeProp(
+  entry,
+  position = null
+) {
   if (
     !canvas?.ready ||
     !canvas.scene
@@ -696,6 +1339,8 @@ async function placeProp(entry) {
 
   const centerX =
     Number(
+      position?.x
+      ??
       pivot?.x
       ??
       canvas.scene.width / 2
@@ -703,6 +1348,8 @@ async function placeProp(entry) {
 
   const centerY =
     Number(
+      position?.y
+      ??
       pivot?.y
       ??
       canvas.scene.height / 2
@@ -730,6 +1377,143 @@ async function placeProp(entry) {
         }
       }]
     );
+}
+
+
+/* --------------------------------------------------------- */
+/* DRAG & DROP                                               */
+/* --------------------------------------------------------- */
+
+function findCatalogEntry(
+  catalog,
+  category,
+  id
+) {
+  return (
+    catalog?.[category]
+      ?.find(
+        entry =>
+          entry.id === id
+      )
+    ??
+    null
+  );
+}
+
+
+export async function openPokemonChallengeEditor(actor) {
+  if (!game.user.isGM || !actor) return null;
+  if (actor.getFlag(MODULE_ID, "pokemonBuilder") !== true) {
+    throw new Error("Este Challenge não foi criado pelo Pokémon Builder.");
+  }
+
+  const catalog = await loadCatalog();
+  const assetId = actor.getFlag(MODULE_ID, "assetId");
+  const pokemonId = Number(actor.getFlag(MODULE_ID, "pokemonId") ?? 0);
+  const entry = (catalog.pokemon ?? []).find(item =>
+    (assetId && item.id === assetId)
+    || (pokemonId && Number(item.pokemonId ?? item.dex) === pokemonId)
+  );
+
+  if (!entry) throw new Error("Não encontrei este Pokémon no catálogo atual.");
+  return openPokemonBuilder(entry, prepareActorDefinition, { existingActor: actor });
+}
+
+export async function handlePokemonImporterCanvasDrop(
+  data
+) {
+  if (
+    !game.user.isGM ||
+    data?.type
+      !==
+      POKEMON_IMPORTER_DRAG_TYPE ||
+    data?.moduleId
+      !==
+      MODULE_ID
+  ) {
+    return false;
+  }
+
+  if (
+    !canvas?.ready ||
+    !canvas.scene
+  ) {
+    ui.notifications.warn(
+      "Abra uma Scene primeiro."
+    );
+
+    return true;
+  }
+
+  const category =
+    String(
+      data.category
+      ??
+      ""
+    );
+
+  const id =
+    String(
+      data.id
+      ??
+      ""
+    );
+
+  const catalog =
+    await loadCatalog();
+
+  const entry =
+    findCatalogEntry(
+      catalog,
+      category,
+      id
+    );
+
+  if (!entry) {
+    throw new Error(
+      `Asset nao encontrado: ${category}:${id}`
+    );
+  }
+
+  const position = {
+    x:
+      Number(data.x),
+
+    y:
+      Number(data.y)
+  };
+
+  if (
+    !Number.isFinite(position.x) ||
+    !Number.isFinite(position.y)
+  ) {
+    throw new Error(
+      "O Foundry nao forneceu coordenadas validas para o drop."
+    );
+  }
+
+  if (
+    category === "props"
+  ) {
+    await placeProp(
+      entry,
+      position
+    );
+
+    return true;
+  }
+
+  const actor =
+    await getOrCreateActorForEntry(
+      entry
+    );
+
+  await placeActorToken(
+    actor,
+    position
+  );
+
+  return true;
 }
 
 
@@ -923,7 +1707,7 @@ class PokemonImporterApp
 
     position: {
       width:
-        820,
+        1100,
 
       height:
         760
@@ -958,6 +1742,9 @@ class PokemonImporterApp
   selected =
     new Map();
 
+  previewZoomed =
+    true;
+
   async _prepareContext(options) {
     const context =
       await super._prepareContext(options);
@@ -970,6 +1757,11 @@ class PokemonImporterApp
         (catalog[this.activeTab] ?? [])
           .map(entry => ({
             ...entry,
+
+            pokedexUrl:
+              this.activeTab === "pokemon"
+                ? getPokemonDbUrl(entry)
+                : null,
 
             checked:
               this.selected.has(
@@ -1010,10 +1802,10 @@ class PokemonImporterApp
             isAnimated:
               !!entry.animation,
 
-            previewVertical6:
-              entry.previewMode
-              ===
-              "vertical6"
+            ...getImporterPreviewData(
+              entry,
+              this.activeTab
+            )
           }));
 
       return {
@@ -1026,6 +1818,9 @@ class PokemonImporterApp
 
         selectedCount:
           this.selected.size,
+
+        previewZoomed:
+          this.previewZoomed,
 
         peopleCount:
           catalog.people.length,
@@ -1115,6 +1910,12 @@ class PokemonImporterApp
       );
 
 
+    refreshImporterPreviews(
+      this.element,
+      this.previewZoomed
+    );
+
+
     /* ABAS */
 
     for (
@@ -1148,6 +1949,63 @@ class PokemonImporterApp
         }
       );
     }
+
+
+    /* ZOOM DAS PREVIEWS */
+
+    this.element
+      .querySelector(
+        "[data-action='togglePreviewZoom']"
+      )
+      ?.addEventListener(
+        "click",
+
+        event => {
+          this.previewZoomed =
+            !this.previewZoomed;
+
+          const shell =
+            this.element.querySelector(
+              ".pokemon-importer-shell"
+            );
+
+          shell?.classList.toggle(
+            "preview-zoomed",
+            this.previewZoomed
+          );
+
+          refreshImporterPreviews(
+            this.element,
+            this.previewZoomed
+          );
+
+          const button =
+            event.currentTarget;
+
+          button.classList.toggle(
+            "active",
+            this.previewZoomed
+          );
+
+          button.setAttribute(
+            "aria-pressed",
+            String(this.previewZoomed)
+          );
+
+          const icon =
+            button.querySelector("i");
+
+          icon?.classList.toggle(
+            "fa-magnifying-glass-plus",
+            !this.previewZoomed
+          );
+
+          icon?.classList.toggle(
+            "fa-magnifying-glass-minus",
+            this.previewZoomed
+          );
+        }
+      );
 
 
     /* BUSCA + FILTRO */
@@ -1241,6 +2099,221 @@ class PokemonImporterApp
       "change",
       applyFilter
     );
+
+
+    /* POKEDEX */
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-pokedex-url]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          openPokemonDb(
+            button.dataset.pokedexUrl
+          );
+        }
+      );
+    }
+
+
+    /* POKEMON BUILDER */
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-pokemon-builder]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+
+        async event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const id =
+            button.dataset
+              .pokemonBuilder;
+
+          if (!id) return;
+
+          const oldHTML =
+            button.innerHTML;
+
+          button.disabled =
+            true;
+
+          button.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i> Challenge';
+
+          try {
+            const catalog =
+              await loadCatalog();
+
+            const entry =
+              catalog.pokemon.find(
+                item =>
+                  item.id === id
+              );
+
+            if (!entry) {
+              throw new Error(
+                "Pokemon nao encontrado no catalogo."
+              );
+            }
+
+            await openPokemonBuilder(
+              entry,
+              prepareActorDefinition
+            );
+
+          } catch (error) {
+            console.error(
+              "Pokemon LITM Tools | Builder:",
+              error
+            );
+
+            ui.notifications.error(
+              error?.message
+              ??
+              "Falha no Pokemon Builder."
+            );
+
+          } finally {
+            if (
+              button?.isConnected
+            ) {
+              button.disabled =
+                false;
+
+              button.innerHTML =
+                oldHTML;
+            }
+          }
+        }
+      );
+    }
+
+
+    /* POKEMON THEME BUILDER */
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-pokemon-theme-builder]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+        async event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const id = button.dataset.pokemonThemeBuilder;
+          if (!id) return;
+
+          const oldHTML = button.innerHTML;
+          button.disabled = true;
+          button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Tema';
+
+          try {
+            const catalog = await loadCatalog();
+            const entry = catalog.pokemon.find(item => item.id === id);
+            if (!entry) throw new Error("Pokemon nao encontrado no catalogo.");
+
+            await openPokemonTrainerThemeBuilder(
+              entry,
+              prepareActorDefinition
+            );
+          } catch (error) {
+            console.error("Pokemon LITM Tools | Theme Builder:", error);
+            ui.notifications.error(error?.message ?? "Falha ao criar Tema Pokémon.");
+          } finally {
+            if (button?.isConnected) {
+              button.disabled = false;
+              button.innerHTML = oldHTML;
+            }
+          }
+        }
+      );
+    }
+
+
+    /* POKEMON CARD DRAG FIX */
+    for (const card of this.element.querySelectorAll("[data-asset-card]")) {
+      card.draggable = true;
+      for (const image of card.querySelectorAll("img")) image.draggable = false;
+      for (const button of card.querySelectorAll("button")) button.draggable = false;
+    }
+
+    /* ARRASTAR PARA A SCENE */
+
+    for (
+      const card
+      of this.element
+        .querySelectorAll(
+          "[data-asset-card]"
+        )
+    ) {
+      card.addEventListener(
+        "dragstart",
+
+        event => {
+          const transfer =
+            event.dataTransfer;
+
+          const category =
+            card.dataset.category;
+
+          const id =
+            card.dataset.assetId;
+
+          if (
+            !transfer ||
+            !category ||
+            !id
+          ) {
+            event.preventDefault();
+            return;
+          }
+
+          transfer.effectAllowed =
+            "copy";
+
+          const dragPayload =
+            JSON.stringify({
+              type: POKEMON_IMPORTER_DRAG_TYPE,
+              moduleId: MODULE_ID,
+              category,
+              id
+            });
+
+          transfer.setData("text/plain", dragPayload);
+          transfer.setData("application/json", dragPayload);
+
+          card.classList.add(
+            "dragging"
+          );
+        }
+      );
+
+      card.addEventListener(
+        "dragend",
+
+        () => {
+          card.classList.remove(
+            "dragging"
+          );
+        }
+      );
+    }
 
 
     /* CHECKBOX */
@@ -1578,4 +2651,42 @@ export async function openPokemonImporter() {
   });
 
   return importerApp;
+}
+
+
+
+/* --------------------------------------------------------- */
+/* PUBLIC ASSET SERVICE                                      */
+/* --------------------------------------------------------- */
+
+export async function loadPokemonAssetCatalog() {
+  return loadCatalog();
+}
+
+export function getPokemonAssetPreviewData(
+  entry,
+  activeTab
+) {
+  return getImporterPreviewData(
+    entry,
+    activeTab
+  );
+}
+
+export function refreshPokemonAssetPreviews(
+  root,
+  zoomed = false
+) {
+  return refreshImporterPreviews(
+    root,
+    zoomed
+  );
+}
+
+export async function preparePokemonActorDefinition(
+  entry
+) {
+  return prepareActorDefinition(
+    entry
+  );
 }

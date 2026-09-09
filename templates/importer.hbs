@@ -1,4 +1,4 @@
-﻿<div class="pokemon-importer-shell">
+<div class="pokemon-importer-shell{{#if previewZoomed}} preview-zoomed{{/if}}">
 
   <header class="pokemon-importer-header">
 
@@ -140,6 +140,16 @@
         Limpar seleção
       </button>
 
+      <button
+        type="button"
+        data-action="togglePreviewZoom"
+        class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+        aria-pressed="{{#if previewZoomed}}true{{else}}false{{/if}}"
+      >
+        <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+        Zoom
+      </button>
+
     </div>
 
   </header>
@@ -162,6 +172,9 @@
           data-asset-card
           data-search="{{search}}"
           data-person-type="{{personType}}"
+          data-category="{{category}}"
+          data-asset-id="{{id}}"
+          draggable="true"
         >
 
           <label class="pokemon-select-box">
@@ -179,12 +192,20 @@
 
           <div class="pokemon-asset-preview">
 
-            {{#if previewVertical6}}
+            {{#if previewCropped}}
 
-              <div
-                class="pokemon-vertical6-preview"
-                style="background-image:url('{{preview}}')"
-              ></div>
+              <div class="pokemon-overworld-preview">
+
+                <img
+                  src="{{preview}}"
+                  alt="{{name}}"
+                  loading="lazy"
+                  data-overworld-preview
+                  data-preview-columns="{{previewColumns}}"
+                  data-preview-rows="{{previewRows}}"
+                >
+
+              </div>
 
             {{else}}
 
@@ -220,6 +241,50 @@
               </small>
 
             {{/if}}
+
+            {{#if ../isPokemon}}
+
+              <div class="pokemon-asset-actions">
+
+                <button
+                  type="button"
+                  class="pokemon-builder-link"
+                  data-pokemon-builder="{{id}}"
+                  title="Criar Pokémon como Challenge"
+                >
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                  Challenge
+                </button>
+
+                <button
+                  type="button"
+                  class="pokemon-theme-builder-link"
+                  data-pokemon-theme-builder="{{id}}"
+                  title="Criar diretamente como Tema de um treinador-jogador"
+                >
+                  <i class="fa-solid fa-book-open"></i>
+                  Tema
+                </button>
+
+
+                {{#if pokedexUrl}}
+
+                  <button
+                    type="button"
+                    class="pokemon-pokedex-link"
+                    data-pokedex-url="{{pokedexUrl}}"
+                    title="Abrir no Pok&eacute;monDB"
+                  >
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    Pok&eacute;dex
+                  </button>
+
+                {{/if}}
+
+              </div>
+
+            {{/if}}
+
 
             {{#if isAnimated}}
 

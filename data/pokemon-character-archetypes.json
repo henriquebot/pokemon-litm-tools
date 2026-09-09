@@ -1,0 +1,287 @@
+{
+  "version": 1,
+  "archetypes": [
+    {
+      "id": "pokemon-inicial",
+      "name": "O Inicial",
+      "description": "Jovem, inexperiente e cheio de potencial. Sua jornada gira em torno de descoberta e crescimento.",
+      "themes": [
+        {
+          "name": "Primeiros Passos",
+          "powerTags": [
+            "Aprender observando",
+            "Tentar algo novo",
+            "Levantar depois de errar"
+          ],
+          "weaknessTags": [
+            "Ainda tenho muito a aprender"
+          ],
+          "quest": "Quem vou me tornar?"
+        },
+        {
+          "name": "Potencial Adormecido",
+          "powerTags": [
+            "Surpreender quando importa",
+            "Força que ainda estou descobrindo",
+            "Superar meus próprios limites"
+          ],
+          "weaknessTags": [
+            "Não sei do que sou capaz"
+          ],
+          "quest": "O que existe dentro de mim?"
+        },
+        {
+          "name": "Curiosidade",
+          "powerTags": [
+            "Explorar o desconhecido",
+            "Perceber coisas novas",
+            "Seguir minha curiosidade"
+          ],
+          "weaknessTags": [
+            "Curioso demais"
+          ],
+          "quest": "O que existe além do que conheço?"
+        },
+        {
+          "name": "Primeiros Laços",
+          "powerTags": [
+            "Confiar em quem me acolheu",
+            "Aprender com meus companheiros",
+            "Proteger meus novos amigos"
+          ],
+          "weaknessTags": [
+            "Medo de perder quem encontrei"
+          ],
+          "quest": "Onde é o meu lugar?"
+        }
+      ]
+    },
+    {
+      "id": "pokemon-guardiao",
+      "name": "O Guardião",
+      "description": "Protetor de um território, grupo ou pessoa. Sua jornada gira em torno de responsabilidade e resistência.",
+      "themes": [
+        {
+          "name": "Aquilo que Protejo",
+          "powerTags": [
+            "Entrar na frente do perigo",
+            "Nunca abandonar quem depende de mim",
+            "Perceber ameaças"
+          ],
+          "weaknessTags": [
+            "Assumo riscos pelos outros"
+          ],
+          "quest": "Até onde devo ir para proteger?"
+        },
+        {
+          "name": "Meu Território",
+          "powerTags": [
+            "Conhecer cada caminho",
+            "Sentir quando algo está errado",
+            "Usar o ambiente a meu favor"
+          ],
+          "weaknessTags": [
+            "Desconfiado de invasores"
+          ],
+          "quest": "O que faz deste lugar meu lar?"
+        },
+        {
+          "name": "Resistência",
+          "powerTags": [
+            "Aguentar firme",
+            "Continuar mesmo ferido",
+            "Não ceder à pressão"
+          ],
+          "weaknessTags": [
+            "Demoro a admitir que preciso de ajuda"
+          ],
+          "quest": "Quanto peso consigo carregar?"
+        },
+        {
+          "name": "Responsabilidade",
+          "powerTags": [
+            "Manter a calma em crise",
+            "Tomar decisões difíceis",
+            "Ser alguém em quem confiar"
+          ],
+          "weaknessTags": [
+            "Levo tudo para mim"
+          ],
+          "quest": "Quem protege o protetor?"
+        }
+      ]
+    },
+    {
+      "id": "pokemon-errante",
+      "name": "O Errante",
+      "description": "Viajante, deslocado ou buscador. Sua jornada gira em torno de liberdade, adaptação e encontrar seu lugar.",
+      "themes": [
+        {
+          "name": "Vida Livre",
+          "powerTags": [
+            "Ir aonde quiser",
+            "Improvisar no caminho",
+            "Não depender de conforto"
+          ],
+          "weaknessTags": [
+            "Detesto me sentir preso"
+          ],
+          "quest": "O que liberdade significa para mim?"
+        },
+        {
+          "name": "Sempre em Movimento",
+          "powerTags": [
+            "Conhecer rotas e atalhos",
+            "Adaptar-se rápido",
+            "Dormir em qualquer lugar"
+          ],
+          "weaknessTags": [
+            "Dificuldade de criar raízes"
+          ],
+          "quest": "Existe algum lugar onde eu queira ficar?"
+        },
+        {
+          "name": "Instinto",
+          "powerTags": [
+            "Sentir perigo",
+            "Encontrar recursos",
+            "Confiar nos sentidos"
+          ],
+          "weaknessTags": [
+            "Confio demais no meu instinto"
+          ],
+          "quest": "Quando devo confiar em alguém além de mim?"
+        },
+        {
+          "name": "Minha Busca",
+          "powerTags": [
+            "Seguir pistas",
+            "Não desistir do objetivo",
+            "Cruzar grandes distâncias"
+          ],
+          "weaknessTags": [
+            "Minha busca me afasta do presente"
+          ],
+          "quest": "O que estou realmente procurando?"
+        }
+      ]
+    },
+    {
+      "id": "pokemon-sem-memorias",
+      "name": "Sem Memórias",
+      "description": "Você despertou sem saber quem era, de onde veio ou por que está aqui. Sua jornada gira em torno de identidade, pistas e um passado que insiste em voltar.",
+      "themes": [
+        {
+          "name": "Fragmentos Perdidos",
+          "powerTags": [
+            "Reconhecer algo sem saber de onde",
+            "Lembranças em flashes",
+            "Seguir pistas sobre meu passado"
+          ],
+          "weaknessTags": [
+            "Não sei em quem confiar"
+          ],
+          "quest": "Quem eu era antes de tudo isso?"
+        },
+        {
+          "name": "Instintos que Restaram",
+          "powerTags": [
+            "Meu corpo se lembra",
+            "Reagir antes de pensar",
+            "Confiar nos sentidos"
+          ],
+          "weaknessTags": [
+            "Não entendo meus próprios impulsos"
+          ],
+          "quest": "O que meus instintos dizem sobre quem eu sou?"
+        },
+        {
+          "name": "Quem Sou Eu?",
+          "powerTags": [
+            "Reinventar a mim mesmo",
+            "Questionar certezas",
+            "Escolher quem quero ser"
+          ],
+          "weaknessTags": [
+            "Crise de identidade"
+          ],
+          "quest": "Sou definido pelo passado ou pelas minhas escolhas?"
+        },
+        {
+          "name": "Ecos do Passado",
+          "powerTags": [
+            "Reconhecer pessoas ou lugares",
+            "Sonhos reveladores",
+            "Sentir quando algo é familiar"
+          ],
+          "weaknessTags": [
+            "O passado pode me assustar"
+          ],
+          "quest": "Estou preparado para descobrir a verdade?"
+        }
+      ]
+    },
+    {
+      "id": "pokemon-humano-transformado",
+      "name": "Humano Transformado em Pokémon",
+      "description": "Você tinha uma vida humana e agora vive em um corpo Pokémon. Sua jornada gira em torno de adaptação, identidade e decidir se deseja recuperar o que perdeu.",
+      "themes": [
+        {
+          "name": "Mente Humana",
+          "powerTags": [
+            "Pensar como uma pessoa",
+            "Conhecimentos da vida humana",
+            "Entender costumes humanos"
+          ],
+          "weaknessTags": [
+            "Ainda penso como se tivesse mãos"
+          ],
+          "quest": "Quanto da minha antiga vida ainda define quem sou?"
+        },
+        {
+          "name": "Corpo Pokémon",
+          "powerTags": [
+            "Descobrir minhas novas capacidades",
+            "Aprender a usar este corpo",
+            "Sentidos Pokémon"
+          ],
+          "weaknessTags": [
+            "Ainda não conheço meus próprios limites"
+          ],
+          "quest": "Como faço deste corpo realmente meu?"
+        },
+        {
+          "name": "Duas Vidas",
+          "powerTags": [
+            "Ver os dois lados",
+            "Entender humanos e Pokémon",
+            "Experiência de outra vida"
+          ],
+          "weaknessTags": [
+            "Não pertenço completamente a nenhum dos dois mundos"
+          ],
+          "quest": "Onde é meu verdadeiro lugar?"
+        },
+        {
+          "name": "Quero Voltar?",
+          "powerTags": [
+            "Lembrar por quem vale a pena lutar",
+            "Não esquecer meu objetivo",
+            "Enfrentar o impossível para encontrar respostas"
+          ],
+          "weaknessTags": [
+            "Dividido entre passado e presente"
+          ],
+          "quest": "Se eu puder voltar a ser humano, ainda vou querer?"
+        }
+      ]
+    },
+    {
+      "id": "pokemon-custom",
+      "name": "Personalizado",
+      "description": "Monte livremente seus Temas usando sugestões dos perfis de Personagem Pokémon.",
+      "allPresets": true,
+      "themes": []
+    }
+  ]
+}
