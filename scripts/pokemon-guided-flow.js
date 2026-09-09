@@ -979,7 +979,7 @@ async function chooseThreatOrConsequence(source, action) {
 
 async function chooseConsequenceEffect(source, action, sceneId) {
   const targets = consequenceTargets(sceneId, source.tokenId);
-  if (!targets.length) throw new Error("NÃ£o hÃ¡ personagens disponÃ­veis na cena.");
+  if (!targets.length) throw new Error("Não há personagens disponíveis na cena.");
 
   const scene = game.scenes.get(sceneId);
   const actorForTarget = target => scene?.tokens?.get(target.id)?.actor;
