@@ -3926,6 +3926,41 @@ has(
   gap: 3px;
   margin-top: 4px;
   padding-top: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.pokemon-chat-move-actions > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.pokemon-chat-move-actions > .pokemon-chat-matchup-badges {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  gap: 3px;
+}
+
+.pokemon-chat-move-actions > .pokemon-chat-vfx-buttons {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.pokemon-chat-move-actions[data-pokemon-move-type],
+.pokemon-litm-roll-package[data-pokemon-move-type] {
+  border-inline-start: 3px solid var(--pokemon-move-type-color);
+  padding-inline-start: 6px;
+}
+
+.pokemon-litm-mechanic-badge.pokemon-move-type-badge {
+  border-inline-start: 3px solid var(--pokemon-move-type-color, currentColor);
+  font-weight: 600;
+}
+
+.pokemon-litm-mechanic-badge.pokemon-matchup-immune {
+  font-weight: 700;
+  border-style: dashed;
 }
 
 .pokemon-chat-vfx-buttons {
@@ -3935,16 +3970,27 @@ has(
   gap: 3px;
 }
 
-.pokemon-chat-move-actions .pokemon-chat-vfx-icon {
-  width: 26px;
-  min-width: 26px;
-  height: 24px;
-  min-height: 24px;
+.pokemon-chat-move-actions .pokemon-chat-vfx-icon,
+.pokemon-consequence-vfx .pokemon-chat-vfx-icon {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  margin: 0;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 26px;
+  flex: 0 0 28px;
+}
+
+.pokemon-consequence-vfx {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  margin-inline-start: 5px;
+  vertical-align: middle;
 }
 
 .pokemon-chat-vfx-icon i {
