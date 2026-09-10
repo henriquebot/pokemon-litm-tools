@@ -27,6 +27,11 @@ import {
   activatePokemonFollowers
 } from "./pokemon-follower.js";
 
+
+import {
+  activatePokemonTokenDrop
+} from "./pokemon-token-drop.js";
+
 import {
   activatePokemonVisualStability
 } from "./pokemon-visual-stability.js";
@@ -44,7 +49,8 @@ import {
   deployPokemonTheme,
   recollectPokemonTheme,
   isPokemonThemeCanvasDrop,
-  handlePokemonThemeCanvasDrop
+  handlePokemonThemeCanvasDrop,
+  playPokemonPokeballVfx
 } from "./pokemon-combat.js";
 
 import {
@@ -75,6 +81,8 @@ Hooks.once("init", () => {
 
   activatePokemonFollowers();
 
+  activatePokemonTokenDrop();
+
   console.log(
     "Pok\u00e9mon LITM Tools | Inicializando v0.8.0-dev"
   );
@@ -103,7 +111,8 @@ Hooks.once("init", () => {
     deletePokemonCombatProjection,
     migratePokemonChallengesLitmFirst,
     pokemonLitmCombatSelfTest,
-    pokemonGuidedFlowSelfTest
+    pokemonGuidedFlowSelfTest,
+    playPokemonPokeballVfx
   };
 });
 

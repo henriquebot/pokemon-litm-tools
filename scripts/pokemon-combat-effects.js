@@ -72,17 +72,17 @@ const TYPE_COLORS = {
 
 const JB2A_PATHS = {
   fire: ["jb2a.fire_bolt"],
-  water: ["jb2a.water_bolt"],
+  water: ["jb2a.water_splash", "jb2a.energy_beam", "jb2a.bullet.01"],
   electric: ["jb2a.lightning_bolt", "jb2a.chain_lightning"],
   grass: ["jb2a.energy_beam", "jb2a.entangle"],
-  ice: ["jb2a.ray_of_frost", "jb2a.ice_shard"],
+  ice: ["jb2a.ray_of_frost", "jb2a.energy_beam"],
   fighting: ["jb2a.unarmed_strike"],
-  poison: ["jb2a.poison_spray", "jb2a.energy_beam"],
-  ground: ["jb2a.boulder_toss", "jb2a.bullet.01"],
+  poison: ["jb2a.energy_beam", "jb2a.bullet.01"],
+  ground: ["jb2a.bullet.01"],
   flying: ["jb2a.gust_of_wind", "jb2a.bullet.01"],
   psychic: ["jb2a.energy_beam"],
   bug: ["jb2a.energy_beam", "jb2a.bullet.01"],
-  rock: ["jb2a.boulder_toss", "jb2a.bullet.01"],
+  rock: ["jb2a.bullet.01"],
   ghost: ["jb2a.eldritch_blast", "jb2a.energy_beam"],
   dragon: ["jb2a.energy_beam"],
   dark: ["jb2a.eldritch_blast", "jb2a.energy_beam"],
@@ -114,12 +114,9 @@ const JB2A_TYPE_COLOR_KEYS = {
 
 const JB2A_INHERENT_TYPE_PATHS = new Set([
   "jb2a.fire_bolt",
-  "jb2a.water_bolt",
+  "jb2a.water_splash",
   "jb2a.ray_of_frost",
-  "jb2a.ice_shard",
-  "jb2a.poison_spray",
-  "jb2a.gust_of_wind",
-  "jb2a.boulder_toss"
+  "jb2a.gust_of_wind"
 ]);
 
 function authorityGM() {
@@ -623,8 +620,8 @@ function databasePath(candidates, type = "normal") {
   for (const root of candidates ?? []) {
     let discovered = [];
     try {
-      if (typeof getPathsUnder === "function") {
-        const found = getPathsUnder.call(database, root, true);
+      if (typeof getPathsUnder === "function" && exists(root)) {
+        const found = getPathsUnder.call(database, root, { fullyQualified: true });
         if (Array.isArray(found)) discovered = found;
         else if (found && typeof found[Symbol.iterator] === "function") discovered = [...found];
       }
@@ -3864,7 +3861,7 @@ function selectedMoveBindingsForActor(
 }
 
 
-function selectedMoveFromActorState(
+function selectedMoveContextFromActorState(
   actor
 ) {
   const rows =
@@ -3873,8 +3870,19 @@ function selectedMoveFromActorState(
     );
 
   return rows.length === 1
-    ? rows[0].move
+    ? rows[0]
     : null;
+}
+
+function selectedMoveFromActorState(
+  actor
+) {
+  return (
+    selectedMoveContextFromActorState(
+      actor
+    )?.move
+    ?? null
+  );
 }
 
 
@@ -7700,10 +7708,156 @@ function normalizeMoveSearch(
 }
 
 
+function associatedPokemonSourceToken(
+  actor,
+  move,
+  sourceThemeId = null,
+  sourceInstanceId = null
+) {
+  const scene =
+    canvas?.scene;
+
+  if (!scene) {
+    return null;
+  }
+
+  return (
+    scene.tokens?.find(
+      token => {
+        const combatActor =
+          token.actor;
+
+        const trainerId =
+          token.getFlag?.(
+            MODULE_ID,
+            "sourceTrainerActorId"
+          )
+          ??
+          token.getFlag?.(
+            MODULE_ID,
+            "trainerActorId"
+          )
+          ??
+          combatActor?.getFlag?.(
+            MODULE_ID,
+            "sourceTrainerActorId"
+          )
+          ??
+          null;
+
+        if (trainerId !== actor?.id) {
+          return false;
+        }
+
+        const tokenThemeId =
+          token.getFlag?.(
+            MODULE_ID,
+            "sourceThemeId"
+          )
+          ??
+          token.getFlag?.(
+            MODULE_ID,
+            "pokemonThemeId"
+          )
+          ??
+          combatActor?.getFlag?.(
+            MODULE_ID,
+            "sourceThemeId"
+          )
+          ??
+          null;
+
+        const tokenInstanceId =
+          token.getFlag?.(
+            MODULE_ID,
+            "pokemonInstanceId"
+          )
+          ??
+          combatActor?.getFlag?.(
+            MODULE_ID,
+            "pokemonInstanceId"
+          )
+          ??
+          null;
+
+        if (
+          sourceInstanceId
+          &&
+          tokenInstanceId === sourceInstanceId
+        ) {
+          return true;
+        }
+
+        if (
+          sourceThemeId
+          &&
+          tokenThemeId === sourceThemeId
+        ) {
+          return true;
+        }
+
+        if (
+          sourceThemeId
+          ||
+          sourceInstanceId
+        ) {
+          return false;
+        }
+
+        if (
+          moveForActor(
+            combatActor,
+            move?.id
+          )
+        ) {
+          return true;
+        }
+
+        const sourceTheme =
+          tokenThemeId
+            ? actor?.items?.get?.(
+                tokenThemeId
+              )
+            : null;
+
+        return !!sourceTheme
+          &&
+          movesFromPokemonItem(
+            sourceTheme
+          ).some(
+            row =>
+              row?.id === move?.id
+          );
+      }
+    )
+    ?? null
+  );
+}
+
 function sourceTokenForMessageActor(
   actor,
-  move
+  move,
+  message = null
 ) {
+  const frozenTokenId =
+    message?.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceTokenId"
+    )
+    ?? null;
+
+  if (frozenTokenId) {
+    const frozen =
+      canvas?.scene?.tokens?.get?.(
+        frozenTokenId
+      )
+      ?? null;
+
+    if (frozen?.actor) {
+      return frozen;
+    }
+  }
+
   const ownMoves =
     actor?.getFlag?.(
       MODULE_ID,
@@ -7731,43 +7885,26 @@ function sourceTokenForMessageActor(
     );
   }
 
-  const combatPokemon =
-    canvas?.scene?.tokens?.find(
-      token => {
-        const combatActor =
-          token.actor;
-
-        const sameTrainer =
-          combatActor?.getFlag?.(
-            MODULE_ID,
-            "sourceTrainerActorId"
-          ) === actor?.id;
-
-        if (!sameTrainer) return false;
-
-        if (moveForActor(combatActor, move?.id)) {
-          return true;
-        }
-
-        const sourceThemeId =
-          combatActor?.getFlag?.(
-            MODULE_ID,
-            "sourceThemeId"
-          );
-
-        const sourceTheme =
-          sourceThemeId
-            ? actor?.items?.get?.(sourceThemeId)
-            : null;
-
-        return !!sourceTheme
-          && movesFromPokemonItem(sourceTheme)
-            .some(row => row?.id === move?.id);
-      }
+  const sourceThemeId =
+    message?.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceThemeId"
     )
     ?? null;
 
-  return combatPokemon;
+  const sourceInstanceId =
+    message?.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceInstanceId"
+    )
+    ?? null;
+
+  return associatedPokemonSourceToken(
+    actor,
+    move,
+    sourceThemeId,
+    sourceInstanceId
+  );
 }
 
 
@@ -7851,10 +7988,14 @@ function onPreCreateChatMessage(
     );
 
   } else if (actor) {
-    const move =
-      selectedMoveFromActorState(
+    const selected =
+      selectedMoveContextFromActorState(
         actor
       );
+
+    const move =
+      selected?.move
+      ?? null;
 
     if (move?.id) {
       update[
@@ -7863,6 +8004,94 @@ function onPreCreateChatMessage(
         + ".pokemonMoveId"
       ] =
         move.id;
+
+      let sourceThemeId =
+        null;
+
+      let sourceInstanceId =
+        null;
+
+      if (
+        selected?.item?.getFlag?.(
+          MODULE_ID,
+          "pokemonTheme"
+        ) === true
+      ) {
+        sourceThemeId =
+          selected.item.id;
+
+        sourceInstanceId =
+          selected.item.getFlag?.(
+            MODULE_ID,
+            "pokemonInstanceId"
+          )
+          ?? null;
+      }
+
+      if (
+        actor.getFlag?.(
+          MODULE_ID,
+          "combatProjection"
+        ) === true
+      ) {
+        sourceThemeId =
+          actor.getFlag?.(
+            MODULE_ID,
+            "sourceThemeId"
+          )
+          ?? sourceThemeId;
+
+        sourceInstanceId =
+          actor.getFlag?.(
+            MODULE_ID,
+            "pokemonInstanceId"
+          )
+          ?? sourceInstanceId;
+      }
+
+      if (sourceThemeId) {
+        update[
+          "flags."
+          + MODULE_ID
+          + ".pokemonSourceThemeId"
+        ] =
+          sourceThemeId;
+      }
+
+      if (sourceInstanceId) {
+        update[
+          "flags."
+          + MODULE_ID
+          + ".pokemonSourceInstanceId"
+        ] =
+          sourceInstanceId;
+      }
+
+      const sourceToken =
+        associatedPokemonSourceToken(
+          actor,
+          move,
+          sourceThemeId,
+          sourceInstanceId
+        )
+        ??
+        (
+          actor.getFlag?.(
+            MODULE_ID,
+            "combatProjection"
+          ) === true
+            ? sourceTokenForActor(actor)
+            : null
+        );
+
+      if (sourceToken?.id) {
+        update[
+          "flags."
+          + MODULE_ID
+          + ".pokemonSourceTokenId"
+        ] =
+          sourceToken.id;
+      }
     }
   }
 
@@ -7886,6 +8115,42 @@ async function moveFromChatMessage(
       )
       ?? ""
     ).trim();
+
+  const sourceThemeId =
+    message.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceThemeId"
+    )
+    ?? null;
+
+  if (
+    flaggedId
+    &&
+    sourceThemeId
+  ) {
+    const sourceTheme =
+      actor?.items?.get?.(
+        sourceThemeId
+      )
+      ?? null;
+
+    const themeMove =
+      sourceTheme
+        ? movesFromPokemonItem(
+            sourceTheme
+          ).find(
+            row =>
+              row?.id === flaggedId
+          )
+        : null;
+
+    if (themeMove) {
+      return enrichMoveForActor(
+        actor,
+        themeMove
+      );
+    }
+  }
 
   if (flaggedId) {
     const move =
@@ -9945,7 +10210,7 @@ async function onRenderPokemonChatMessage(
 
   const sourceToken = () => {
     if (sceneId && sceneId !== canvas?.scene?.id) throw new Error("Abra a cena onde a rolagem foi feita.");
-    const token = sourceTokenForMessageActor(actor, move);
+    const token = sourceTokenForMessageActor(actor, move, message);
     if (!token) throw new Error("Token do Pokémon não encontrado.");
     return token.document ?? token;
   };

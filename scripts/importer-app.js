@@ -27,6 +27,128 @@ const importerWarnings = new Set();
 const SAFE_STATIC_FALLBACK =
   "icons/svg/mystery-man.svg";
 
+
+/*
+ * Trainer Classes representam um arquétipo visual, não uma pessoa única.
+ * Ao arrastar para a Scene, o Importer oferece um nome de treinador e cria
+ * uma instância nova. Isso evita que "Youngster Joey" em uma rota vire o
+ * mesmo Actor que outro Youngster em outra rota.
+ */
+const TRAINER_NAME_POOLS = [
+  {
+    match: /youngster|jovem|garoto/,
+    names: ["Joey", "Mikey", "Ben", "Timmy", "Calvin", "Ian", "Albert", "Warren"]
+  },
+  {
+    match: /lass|garota/,
+    names: ["Janice", "Sally", "Robin", "Dana", "Connie", "Alice", "Linda", "Carrie"]
+  },
+  {
+    match: /bug catcher|bug_catcher|apanhador.*inseto|caçador.*inseto/,
+    names: ["Rick", "Doug", "Wade", "Benny", "Al", "Josh", "Arnie", "Don"]
+  },
+  {
+    match: /hiker|montanhista/,
+    names: ["Anthony", "Russell", "Phillip", "Daniel", "Parry", "Benjamin", "Erik", "Bailey"]
+  },
+  {
+    match: /camper|campista/,
+    names: ["Roland", "Todd", "Barry", "Jerry", "Lloyd", "Dean", "Sid", "Ted"]
+  },
+  {
+    match: /picnicker|piquenique/,
+    names: ["Liz", "Gina", "Erin", "Tiffany", "Heidi", "Kim", "Diana", "Hope"]
+  },
+  {
+    match: /swimmer|nadador/,
+    names: ["Simon", "Luis", "Matthew", "Darrin", "Elaine", "Denise", "Kaylee", "Susie"]
+  },
+  {
+    match: /fisherman|pescador/,
+    names: ["Ralph", "Tully", "Henry", "Marvin", "Wilton", "Dale", "Ned", "Kyle"]
+  },
+  {
+    match: /sailor|marinheiro/,
+    names: ["Huey", "Terrell", "Ernest", "Duncan", "Eugene", "Harry", "Kent", "Jeff"]
+  },
+  {
+    match: /bird keeper|bird_keeper|criador.*ave/,
+    names: ["Abe", "Toby", "Theo", "Jose", "Perry", "Roy", "Vance", "Boris"]
+  },
+  {
+    match: /biker|motoqueiro/,
+    names: ["Dwayne", "Harris", "Zeke", "Charles", "Ruben", "Gerald", "Lao", "Virgil"]
+  },
+  {
+    match: /black belt|black_belt|faixa.*preta/,
+    names: ["Kenji", "Lao", "Yoshi", "Nob", "Kiyo", "Takashi", "Hitoshi", "Koichi"]
+  },
+  {
+    match: /psychic|psíquic|psiquic|medium/,
+    names: ["Mark", "Franklin", "Greg", "Tasha", "Nathan", "Jared", "Elliot", "Doris"]
+  },
+  {
+    match: /scientist|cientista/,
+    names: ["Ross", "Mitch", "Jed", "Taylor", "Travis", "Rich", "Braydon", "Lowell"]
+  },
+  {
+    match: /ranger/,
+    names: ["Mason", "Beth", "Kelly", "Jackson", "Logan", "Aria", "Cole", "Nina"]
+  },
+  {
+    match: /ace trainer|cooltrainer|ace_trainer|treinador.*ace/,
+    names: ["Nick", "Gwen", "Reena", "Blake", "Cody", "Megan", "Dennis", "Irene"]
+  },
+  {
+    match: /beauty|bela|modelo/,
+    names: ["Victoria", "Cassie", "Samantha", "Valerie", "Olivia", "Rachael", "Julia", "Bridget"]
+  },
+  {
+    match: /gentleman|cavalheiro/,
+    names: ["Thomas", "Preston", "Alfred", "Walter", "Edward", "Clifford", "Milton", "Brooks"]
+  },
+  {
+    match: /pokéfan|pokefan|pokémon fan|pokemon fan/,
+    names: ["Beverly", "Derek", "Ruth", "Joshua", "Alex", "Georgia", "Trevor", "Jaime"]
+  },
+  {
+    match: /rocket|grunt|recruta/,
+    names: ["Grant", "Rex", "Cole", "Nash", "Mara", "Tess", "Vera", "Jett"]
+  }
+];
+
+const TRAINER_FALLBACK_NAMES = [
+  "Alex", "Casey", "Jordan", "Taylor", "Morgan", "Riley",
+  "Sam", "Jamie", "Drew", "Robin", "Cameron", "Avery"
+];
+
+function normalizedTrainerClass(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isTrainerClassEntry(entry) {
+  return entry?.category === "people"
+    && entry?.personType === "trainer-class";
+}
+
+function trainerNamePool(entry) {
+  const key = normalizedTrainerClass(entry?.name);
+  return TRAINER_NAME_POOLS.find(row => row.match.test(key))?.names
+    ?? TRAINER_FALLBACK_NAMES;
+}
+
+function trainerNameAt(entry, index = 0) {
+  const pool = trainerNamePool(entry);
+  const safeIndex = ((Number(index) || 0) % pool.length + pool.length) % pool.length;
+  return pool[safeIndex];
+}
+
 function warnImporterOnce(
   key,
   message,
@@ -1454,6 +1576,11 @@ async function createActorFromEntry(
         type:
           "litm-npc",
 
+        system: {
+          editMode:
+            false
+        },
+
         ...(folderId
           ? { folder: folderId }
           : {}),
@@ -1504,6 +1631,25 @@ async function createActorFromEntry(
     throw new Error(
       `Nao foi possivel criar ${entry.name}`
     );
+  }
+
+  /*
+   * Foundry normalmente honra folder no create. O update é um segundo gate
+   * deliberado para instalações em que o create chegou a devolver o Actor na
+   * raiz (bug observado no teste do v0.8.1).
+   */
+  if (folderId) {
+    const actualFolderId =
+      actor.folder?.id
+      ?? actor.folder
+      ?? null;
+
+    if (actualFolderId !== folderId) {
+      await actor.update({
+        folder:
+          folderId
+      });
+    }
   }
 
   return actor;
@@ -1706,18 +1852,23 @@ function rememberedActorFolderId() {
 
 async function getOrCreateActorForEntry(
   entry,
-  resolveFolderForNew = null
+  resolveFolderForNew = null,
+  {
+    forceNew = false
+  } = {}
 ) {
   const existing =
-    game.actors.find(
-      actor =>
-        actor.getFlag(
-          MODULE_ID,
-          "assetId"
-        )
-        ===
-        entry.id
-    );
+    forceNew
+      ? null
+      : game.actors.find(
+          actor =>
+            actor.getFlag(
+              MODULE_ID,
+              "assetId"
+            )
+            ===
+            entry.id
+        );
 
   if (existing) {
     return ensureActorCurrent(
@@ -2038,18 +2189,35 @@ export async function handlePokemonImporterCanvasDrop(
   const catalog =
     await loadCatalog();
 
-  const entry =
+  const catalogEntry =
     findCatalogEntry(
       catalog,
       category,
       id
     );
 
-  if (!entry) {
+  if (!catalogEntry) {
     throw new Error(
       `Asset nao encontrado: ${category}:${id}`
     );
   }
+
+  const requestedName =
+    String(
+      data.nameOverride
+      ??
+      ""
+    )
+      .trim();
+
+  const entry =
+    requestedName
+      ? {
+          ...catalogEntry,
+          name:
+            requestedName
+        }
+      : catalogEntry;
 
   const position = {
     x:
@@ -2079,13 +2247,32 @@ export async function handlePokemonImporterCanvasDrop(
     return true;
   }
 
+  const forceNew =
+    isTrainerClassEntry(
+      catalogEntry
+    )
+    &&
+    (
+      data.forceNew === true
+      ||
+      data.forceNew === "true"
+      ||
+      !!requestedName
+    );
+
+  const scene =
+    canvas.scene;
+
   const actor =
     await getOrCreateActorForEntry(
       entry,
       () =>
         getOrCreateSceneActorFolder(
-          canvas.scene
-        )
+          scene
+        ),
+      {
+        forceNew
+      }
     );
 
   await placeActorToken(
@@ -2322,6 +2509,13 @@ class PokemonImporterApp
   selected =
     new Map();
 
+
+  trainerNames =
+    new Map();
+
+  trainerNameIndexes =
+    new Map();
+
   previewZoomed =
     true;
 
@@ -2347,6 +2541,32 @@ class PokemonImporterApp
               this.selected.has(
                 `${entry.category}:${entry.id}`
               ),
+
+            canChooseTrainerName:
+              this.activeTab === "people"
+              &&
+              isTrainerClassEntry(
+                entry
+              ),
+
+            trainerName:
+              this.activeTab === "people"
+              &&
+              isTrainerClassEntry(
+                entry
+              )
+                ? (
+                    this.trainerNames.get(
+                      entry.id
+                    )
+                    ??
+                    trainerNameAt(
+                      entry,
+                      this.trainerNameIndexes.get(entry.id)
+                      ?? 0
+                    )
+                  )
+                : entry.name,
 
             meta:
               this.activeTab === "pokemon"
@@ -2826,6 +3046,112 @@ class PokemonImporterApp
     }
 
 
+    /* NOMES DE TRAINER CLASS */
+
+    for (
+      const input
+      of this.element.querySelectorAll(
+        "[data-trainer-name]"
+      )
+    ) {
+      input.addEventListener(
+        "pointerdown",
+        event =>
+          event.stopPropagation()
+      );
+
+      input.addEventListener(
+        "input",
+        () => {
+          const id =
+            input.dataset.trainerName;
+
+          if (!id) return;
+
+          this.trainerNames.set(
+            id,
+            input.value
+          );
+        }
+      );
+    }
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-next-trainer-name]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const card =
+            button.closest(
+              "[data-asset-card]"
+            );
+
+          const id =
+            button.dataset.nextTrainerName;
+
+          const input =
+            card?.querySelector(
+              "[data-trainer-name]"
+            );
+
+          if (
+            !card
+            ||
+            !id
+            ||
+            !input
+          ) {
+            return;
+          }
+
+          const entry = {
+            id,
+            category:
+              "people",
+            personType:
+              "trainer-class",
+            name:
+              card.dataset.entryName
+              ?? ""
+          };
+
+          const nextIndex =
+            (
+              this.trainerNameIndexes.get(id)
+              ?? 0
+            )
+            + 1;
+
+          const name =
+            trainerNameAt(
+              entry,
+              nextIndex
+            );
+
+          this.trainerNameIndexes.set(
+            id,
+            nextIndex
+          );
+
+          this.trainerNames.set(
+            id,
+            name
+          );
+
+          input.value =
+            name;
+        }
+      );
+    }
+
+
     /* POKEMON CARD DRAG FIX */
     for (const card of this.element.querySelectorAll("[data-asset-card]")) {
       card.draggable = true;
@@ -2867,12 +3193,32 @@ class PokemonImporterApp
           transfer.effectAllowed =
             "copy";
 
+          const nameInput =
+            card.querySelector(
+              "[data-trainer-name]"
+            );
+
+          const nameOverride =
+            String(
+              nameInput?.value
+              ??
+              ""
+            )
+              .trim();
+
           const dragPayload =
             JSON.stringify({
               type: POKEMON_IMPORTER_DRAG_TYPE,
               moduleId: MODULE_ID,
               category,
-              id
+              id,
+
+              nameOverride:
+                nameOverride
+                || null,
+
+              forceNew:
+                !!nameInput
             });
 
           transfer.setData("text/plain", dragPayload);
@@ -3110,8 +3456,33 @@ class PokemonImporterApp
               button.innerHTML =
                 `<i class="fa-solid fa-spinner fa-spin"></i> ${done + 1}/${total}`;
 
+              const selectedTrainerName =
+                isTrainerClassEntry(
+                  entry
+                )
+                  ? String(
+                      this.trainerNames.get(
+                        entry.id
+                      )
+                      ??
+                      trainerNameAt(
+                        entry,
+                        this.trainerNameIndexes.get(
+                          entry.id
+                        )
+                        ?? 0
+                      )
+                    ).trim()
+                  : "";
+
               await createActorFromEntry(
-                entry,
+                selectedTrainerName
+                  ? {
+                      ...entry,
+                      name:
+                        selectedTrainerName
+                    }
+                  : entry,
                 folderId
               );
 

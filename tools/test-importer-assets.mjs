@@ -128,7 +128,7 @@ ok(
   importer.includes("async function getOrCreateSceneActorFolder(")
   && importer.includes("folder.name === sceneName")
   && importer.includes("resolveFolderForNew")
-  && importer.includes("getOrCreateSceneActorFolder(\n          canvas.scene")
+  && /getOrCreateSceneActorFolder\(\s*(?:canvas\.scene|scene)\s*\)/.test(importer)
 );
 
 ok(
@@ -259,6 +259,24 @@ assert.equal(
   ),
   false,
   "estado schema 10 válido não exige reparo"
+);
+
+ok(
+  "Actors novos do Importer abrem em modo de jogo",
+  (importer.includes("editMode:") && importer.includes("system: {"))
+);
+
+ok(
+  "Trainer Class possui nome escolhido no drag e cria instância nova",
+  importer.includes("const TRAINER_NAME_POOLS =")
+  && importer.includes("nameOverride:")
+  && importer.includes("forceNew:")
+);
+
+ok(
+  "Actor novo confirma a pasta após create",
+  importer.includes("bug observado no teste do v0.8.1")
+  && importer.includes("actualFolderId")
 );
 
 console.log("Pokemon LITM Tools | importer asset tests passed");

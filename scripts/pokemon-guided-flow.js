@@ -177,7 +177,14 @@ function messageTargetIds(message) {
   return Array.isArray(ids) ? ids : [];
 }
 
-function postMiniCard({ icon = "fa-sparkles", title, body = "", css = "", consequenceVfx = null }) {
+function postMiniCard({
+  icon = "fa-sparkles",
+  title,
+  body = "",
+  css = "",
+  consequenceVfx = null,
+  speakerAlias = "Pokémon LITM Tools"
+}) {
   const content = [
     '<div class="pokemon-guided-mini-card ' + esc(css) + '">',
     '<i class="fa-solid ' + esc(icon) + '"></i>',
@@ -188,10 +195,31 @@ function postMiniCard({ icon = "fa-sparkles", title, body = "", css = "", conseq
 
   return ChatMessage.create({
     content,
-    speaker: ChatMessage.getSpeaker(),
-    ...(consequenceVfx ? { flags: { [MODULE_ID]: { consequenceVfx } } } : {})
+
+    /*
+     * Mini-cards são mensagens de interface/narração.
+     * Nunca herdam silenciosamente o token controlado pelo usuário.
+     */
+    speaker: {
+      alias:
+        String(
+          speakerAlias
+          || "Pokémon LITM Tools"
+        )
+    },
+
+    ...(consequenceVfx
+      ? {
+          flags: {
+            [MODULE_ID]: {
+              consequenceVfx
+            }
+          }
+        }
+      : {})
   });
 }
+
 
 function targetRowsForMessage(message) {
   const scene = game.scenes.get(messageSceneId(message));
@@ -206,12 +234,116 @@ function targetRowsForMessage(message) {
 }
 
 function spendContextForMessage(message) {
-  const actorId = message?.speaker?.actor ?? null;
-  const actor = actorId ? game.actors.get(actorId) : null;
-  const scene = game.scenes.get(messageSceneId(message));
-  const sourceToken = scene?.tokens?.find(token => token.actor?.id === actorId) ?? null;
-  return { actor, scene, sourceToken, targets: targetRowsForMessage(message) };
+  const actorId =
+    message?.speaker?.actor
+    ?? null;
+
+  const actor =
+    actorId
+      ? game.actors.get(actorId)
+      : null;
+
+  const scene =
+    game.scenes.get(
+      messageSceneId(message)
+    );
+
+  const frozenSourceTokenId =
+    message?.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceTokenId"
+    )
+    ?? null;
+
+  const sourceThemeId =
+    message?.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceThemeId"
+    )
+    ?? null;
+
+  let sourceToken =
+    frozenSourceTokenId
+      ? scene?.tokens?.get(
+          frozenSourceTokenId
+        )
+      : null;
+
+  if (
+    !sourceToken
+    &&
+    sourceThemeId
+  ) {
+    sourceToken =
+      scene?.tokens?.find(
+        token => {
+          const tokenThemeId =
+            token.getFlag?.(
+              MODULE_ID,
+              "sourceThemeId"
+            )
+            ??
+            token.getFlag?.(
+              MODULE_ID,
+              "pokemonThemeId"
+            )
+            ??
+            token.actor?.getFlag?.(
+              MODULE_ID,
+              "sourceThemeId"
+            )
+            ??
+            null;
+
+          const trainerId =
+            token.getFlag?.(
+              MODULE_ID,
+              "sourceTrainerActorId"
+            )
+            ??
+            token.getFlag?.(
+              MODULE_ID,
+              "trainerActorId"
+            )
+            ??
+            token.actor?.getFlag?.(
+              MODULE_ID,
+              "sourceTrainerActorId"
+            )
+            ??
+            null;
+
+          return (
+            tokenThemeId === sourceThemeId
+            &&
+            trainerId === actorId
+          );
+        }
+      )
+      ?? null;
+  }
+
+  sourceToken =
+    sourceToken
+    ??
+    scene?.tokens?.find(
+      token =>
+        token.actor?.id === actorId
+    )
+    ??
+    null;
+
+  return {
+    actor,
+    scene,
+    sourceToken,
+    targets:
+      targetRowsForMessage(
+        message
+      )
+  };
 }
+
 
 async function requestGuidedGM(action, payload) {
   const gm = authorityGM();
@@ -387,44 +519,113 @@ function featSuggestion(moveName) {
 }
 
 async function handleFeatSpend(message) {
-  if (remainingPower(message) < 1) throw new Error("Power insuficiente.");
-  const moveName = message.getFlag?.(MODULE_ID, "pokemonMoveId") ?? "a ação";
-  const suggestions = featSuggestion(moveName);
+  if (remainingPower(message) < 1) {
+    throw new Error("Power insuficiente.");
+  }
+
+  const moveName =
+    message.getFlag?.(
+      MODULE_ID,
+      "pokemonMoveId"
+    )
+    ?? "a ação";
+
+  const suggestions =
+    featSuggestion(
+      moveName
+    );
+
   const options = [
-    ...suggestions.map((text, index) => '<option value="' + index + '">' + esc(text) + '</option>'),
-    '<option value="custom">Outro feito…</option>'
+    '<option value="narrated">Outro efeito — descreva em voz alta</option>',
+    ...suggestions.map(
+      (text, index) =>
+        '<option value="' + index + '">' + esc(text) + '</option>'
+    )
   ].join("");
 
-  const choice = await foundry.applications.api.DialogV2.input({
-    window: { title: "Feito extra" },
-    content:
-      '<div class="pokemon-guided-dialog">'
-      + '<label>Sugestão<select name="suggestion">' + options + '</select></label>'
-      + '<label>O que mais sua ação consegue fazer?<textarea name="text" rows="3" placeholder="Descreva o feito extra."></textarea></label>'
-      + '</div>',
-    ok: { label: "Gastar 1 Power", icon: "fa-solid fa-bolt" },
-    modal: true
-  });
-  if (!choice) return;
+  const choice =
+    await foundry.applications.api.DialogV2.input({
+      window: {
+        title:
+          "Feito extra"
+      },
 
-  const index = Number(choice.suggestion);
-  const text = String(choice.text ?? "").trim()
-    || (Number.isInteger(index) ? suggestions[index] : "");
-  if (!text) throw new Error("Descreva o feito extra.");
+      content:
+        '<div class="pokemon-guided-dialog">'
+        + '<label>Sugestão<select name="suggestion">' + options + '</select></label>'
+        + '<small>Não precisa escrever. Você pode simplesmente dizer ao grupo o que sua ação também consegue fazer.</small>'
+        + '<label>Opcional<textarea name="text" rows="3" placeholder="Se quiser, registre o efeito aqui."></textarea></label>'
+        + '</div>',
 
-  await spendPokemonPower(message, {
-    type: "feat",
-    cost: 1,
-    label: "Feito extra: " + text
-  });
+      ok: {
+        label:
+          "Gastar 1 Power",
+
+        icon:
+          "fa-solid fa-bolt"
+      },
+
+      modal:
+        true
+    });
+
+  if (!choice) {
+    return;
+  }
+
+  const index =
+    Number(
+      choice.suggestion
+    );
+
+  const typed =
+    String(
+      choice.text
+      ?? ""
+    )
+      .trim();
+
+  const text =
+    typed
+    ||
+    (
+      Number.isInteger(index)
+      &&
+      suggestions[index]
+        ? suggestions[index]
+        : "Efeito extra narrado em jogo"
+    );
+
+  await spendPokemonPower(
+    message,
+    {
+      type:
+        "feat",
+
+      cost:
+        1,
+
+      label:
+        "Feito extra: "
+        + text
+    }
+  );
 
   await postMiniCard({
-    icon: "fa-bolt",
-    title: "Feito extra",
-    body: text,
-    css: "feat"
+    icon:
+      "fa-bolt",
+
+    title:
+      "Feito extra",
+
+    body:
+      text,
+
+    css:
+      "feat"
   });
 }
+
 
 function singleUseSuggestions(message) {
   const moveId = String(message.getFlag?.(MODULE_ID, "pokemonMoveId") ?? "").toLowerCase();
@@ -1080,7 +1281,8 @@ async function resolveGuidedConsequence(message, source) {
       title: source.kind === "pokemon"
         ? source.name + " usou " + actionName + "!"
         : source.name + " · " + actionName,
-      css: "threat"
+      css: "threat",
+      speakerAlias: source.name
     });
     await message.setFlag(MODULE_ID, "guidedConsequenceResolved", {
       mode: "threat",
@@ -1116,6 +1318,7 @@ async function resolveGuidedConsequence(message, source) {
       : source.name + " · " + actionName,
     body: summary,
     css: "consequence",
+    speakerAlias: source.name,
     consequenceVfx: {
       sceneId: messageSceneId(message),
       sourceTokenId: source.tokenId,
@@ -1132,6 +1335,566 @@ async function resolveGuidedConsequence(message, source) {
     at: Date.now()
   });
 }
+
+function challengeSheetSourceToken(actor) {
+  const scene =
+    canvas?.scene;
+
+  if (
+    !scene
+    ||
+    !actor
+  ) {
+    return null;
+  }
+
+  const tokenId =
+    actor.token?.id
+    ?? actor.parent?.id
+    ?? null;
+
+  if (tokenId) {
+    const direct =
+      scene.tokens?.get?.(
+        tokenId
+      );
+
+    if (direct?.actor) {
+      return direct;
+    }
+  }
+
+  return (
+    sceneTokensList(scene).find(
+      token =>
+        token.actor === actor
+    )
+    ??
+    sceneTokensList(scene).find(
+      token =>
+        token.actor?.id === actor.id
+    )
+    ??
+    null
+  );
+}
+
+function challengeActionSummary(action) {
+  return [
+    String(
+      action?.description
+      ?? ""
+    ).trim(),
+
+    ...(
+      Array.isArray(action?.list)
+        ? action.list
+        : []
+    )
+      .map(
+        row =>
+          String(row ?? "")
+            .trim()
+      )
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+async function announceChallengeThreatFromSheet(
+  actor,
+  action
+) {
+  const actionName =
+    String(
+      action?.name
+      ?? "Ameaça"
+    );
+
+  await postMiniCard({
+    icon:
+      "fa-triangle-exclamation",
+
+    title:
+      actor.name
+      + " · "
+      + actionName,
+
+    body:
+      challengeActionSummary(
+        action
+      ),
+
+    css:
+      "threat",
+
+    speakerAlias:
+      actor.name
+  });
+}
+
+function challengeMoveForSheetAction(
+  actor,
+  action,
+  actionIndex = -1
+) {
+  if (
+    !isPokemonChallenge(
+      actor
+    )
+  ) {
+    return null;
+  }
+
+  const moves =
+    actor.getFlag?.(
+      MODULE_ID,
+      "moves"
+    )
+    ??
+    actor.flags?.[MODULE_ID]?.moves
+    ??
+    [];
+
+  if (
+    !Array.isArray(moves)
+    ||
+    !moves.length
+  ) {
+    return null;
+  }
+
+  const normalize =
+    value =>
+      String(value ?? "")
+        .normalize("NFD")
+        .replace(
+          /[\u0300-\u036f]/g,
+          ""
+        )
+        .trim()
+        .toLocaleLowerCase();
+
+  const actionId =
+    String(
+      action?.id
+      ?? ""
+    ).trim();
+
+  const actionName =
+    normalize(
+      action?.name
+    );
+
+  const matched =
+    moves.find(
+      move =>
+        actionId
+        &&
+        String(
+          move?.id
+          ?? ""
+        ).trim() === actionId
+    )
+    ??
+    moves.find(
+      move =>
+        actionName
+        &&
+        [
+          move?.name,
+          move?.englishName
+        ]
+          .map(normalize)
+          .filter(Boolean)
+          .includes(
+            actionName
+          )
+    )
+    ??
+    null;
+
+  if (matched) {
+    return matched;
+  }
+
+  const nativeActions =
+    Array.isArray(
+      actor.system
+        ?.threatsAndConsequences
+    )
+      ? actor.system
+          .threatsAndConsequences
+      : [];
+
+  if (
+    Number.isInteger(
+      actionIndex
+    )
+    &&
+    actionIndex >= 0
+    &&
+    moves.length
+      === nativeActions.length
+  ) {
+    return (
+      moves[actionIndex]
+      ?? null
+    );
+  }
+
+  return null;
+}
+
+async function applyChallengeConsequenceFromSheet(
+  actor,
+  action,
+  actionIndex = -1
+) {
+  const scene =
+    canvas?.scene;
+
+  if (!scene) {
+    throw new Error(
+      "Abra a Scene do Challenge antes de aplicar a consequência."
+    );
+  }
+
+  const sourceToken =
+    challengeSheetSourceToken(
+      actor
+    );
+
+  const pokemonMove =
+    challengeMoveForSheetAction(
+      actor,
+      action,
+      actionIndex
+    );
+
+  const effectiveAction =
+    pokemonMove
+    ?? action;
+
+  const source = {
+    id:
+      "sheet:"
+      + (
+          sourceToken?.id
+          ?? actor.id
+        ),
+
+    kind:
+      pokemonMove
+        ? "pokemon"
+        : "npc",
+
+    label:
+      (
+        pokemonMove
+          ? "Pokémon · "
+          : "NPC · "
+      )
+      + actor.name,
+
+    name:
+      actor.name,
+
+    actorId:
+      actor.id,
+
+    tokenId:
+      sourceToken?.id
+      ?? null,
+
+    actions: [
+      effectiveAction
+    ]
+  };
+
+  const chosen =
+    await chooseConsequenceEffect(
+      source,
+      effectiveAction,
+      scene.id
+    );
+
+  if (!chosen) {
+    return;
+  }
+
+  const result =
+    await applyGuidedChallengeConsequence({
+      sceneId:
+        scene.id,
+
+      sourceActorId:
+        actor.id,
+
+      sourceTokenId:
+        source.tokenId,
+
+      moveId:
+        pokemonMove?.id
+        ?? null,
+
+      targetTokenIds:
+        chosen.targetTokenIds,
+
+      effect:
+        chosen.effect
+    });
+
+  const summary =
+    (
+      result?.report
+      ?? []
+    )
+      .map(row => {
+        if (row.immune) {
+          return (
+            (row.targetName ?? "Alvo")
+            + " · imune"
+          );
+        }
+
+        if (row.resisted) {
+          return (
+            (row.targetName ?? "Alvo")
+            + " · resistiu"
+          );
+        }
+
+        return (
+          (row.targetName ?? "Alvo")
+          + " · "
+          + (
+              row.applied?.join(", ")
+              || "sem alteração"
+            )
+          + (
+              row.multiplierLabel
+                ? " (" + row.multiplierLabel + ")"
+                : ""
+            )
+        );
+      })
+      .join(" · ");
+
+  await postMiniCard({
+    icon:
+      "fa-burst",
+
+    title:
+      actor.name
+      + " · "
+      + String(
+          effectiveAction?.name
+          ?? "Consequência"
+        ),
+
+    body:
+      summary,
+
+    css:
+      "consequence",
+
+    speakerAlias:
+      actor.name,
+
+    consequenceVfx: {
+      sceneId:
+        scene.id,
+
+      sourceTokenId:
+        source.tokenId,
+
+      sourceActorId:
+        actor.id,
+
+      targetTokenIds:
+        (
+          result?.report
+          ?? []
+        )
+          .map(
+            row =>
+              row.tokenId
+          )
+          .filter(Boolean),
+
+      type:
+        pokemonMove?.type
+        ?? "normal"
+    }
+  });
+}
+
+
+function decorateChallengeQuickActions(
+  actor,
+  root
+) {
+  if (
+    !game.user.isGM
+    ||
+    actor?.type !== "litm-npc"
+    ||
+    !root
+    ||
+    actor.system?.editMode === true
+  ) {
+    return;
+  }
+
+  const actions =
+    Array.isArray(
+      actor.system?.threatsAndConsequences
+    )
+      ? actor.system.threatsAndConsequences
+      : [];
+
+  if (!actions.length) {
+    return;
+  }
+
+  const rows =
+    root.querySelectorAll(
+      ".npc-threats-and-consequences-container > .entry"
+    );
+
+  rows.forEach(
+    (row, index) => {
+      if (
+        row.querySelector(
+          "[data-pokemon-challenge-quick-actions]"
+        )
+      ) {
+        return;
+      }
+
+      const action =
+        actions[index];
+
+      if (!action) {
+        return;
+      }
+
+      const host =
+        row.querySelector(
+          ".entry-header"
+        )
+        ?? row;
+
+      const controls =
+        document.createElement(
+          "span"
+        );
+
+      controls.className =
+        "pokemon-challenge-quick-actions";
+
+      controls.dataset
+        .pokemonChallengeQuickActions =
+          "true";
+
+      const threat =
+        document.createElement(
+          "button"
+        );
+
+      threat.type =
+        "button";
+
+      threat.textContent =
+        "📣";
+
+      threat.title =
+        "Anunciar Ameaça no chat";
+
+      threat.setAttribute(
+        "aria-label",
+        threat.title
+      );
+
+      threat.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          void announceChallengeThreatFromSheet(
+            actor,
+            action
+          ).catch(error => {
+            console.error(
+              "Pokemon LITM Tools | Ameaça do Challenge:",
+              error
+            );
+
+            ui.notifications.error(
+              error?.message
+              ?? "Não foi possível anunciar a Ameaça."
+            );
+          });
+        }
+      );
+
+      const consequence =
+        document.createElement(
+          "button"
+        );
+
+      consequence.type =
+        "button";
+
+      consequence.textContent =
+        "💥";
+
+      consequence.title =
+        "Aplicar Consequência";
+
+      consequence.setAttribute(
+        "aria-label",
+        consequence.title
+      );
+
+      consequence.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          void applyChallengeConsequenceFromSheet(
+            actor,
+            action,
+            index
+          ).catch(error => {
+            console.error(
+              "Pokemon LITM Tools | Consequência do Challenge:",
+              error
+            );
+
+            ui.notifications.error(
+              error?.message
+              ?? "Não foi possível aplicar a Consequência."
+            );
+          });
+        }
+      );
+
+      controls.append(
+        threat,
+        consequence
+      );
+
+      host.append(
+        controls
+      );
+    }
+  );
+}
+
 
 function decorateGmConsequencePanel(message, root) {
   if (!game.user.isGM || !root || root.querySelector("[data-pokemon-guided-consequence]")) return;
@@ -1315,7 +2078,7 @@ async function replaceBossTokensWithPhase(finalActor, phaseActor) {
   return tokens.length;
 }
 
-async function openBossGenerator(actor) {
+async function openBossGenerator(actor, draft = null) {
   if (!game.user.isGM) return;
   const finalActor = bossWorldActor(actor);
   if (!isPokemonChallenge(finalActor)) throw new Error("Este botão é exclusivo de Challenge Pokémon.");
@@ -1337,7 +2100,7 @@ async function openBossGenerator(actor) {
     content:
       '<div class="pokemon-guided-dialog">'
       + '<label>Base da Fase 1<select name="candidate">'
-      + candidates.map((candidate, index) => '<option value="' + index + '">' + esc(candidate.label) + '</option>').join("")
+      + candidates.map((candidate, index) => '<option value="' + index + '"' + (Number(draft?.candidateIndex) === index ? ' selected' : '') + '>' + esc(candidate.label) + '</option>').join("")
       + '</select></label>'
       + '<p>Depois de escolher a sugestão, você poderá editar completamente o nome e o Limit.</p>'
       + '</div>',
@@ -1345,24 +2108,88 @@ async function openBossGenerator(actor) {
     modal: true
   });
   if (!choice) return;
-  const candidate = candidates[Number(choice.candidate)] ?? candidates[0];
-  const tier = bossTierForMight(finalActor);
 
-  const custom = await foundry.applications.api.DialogV2.input({
+  const candidateIndex =
+    Number(choice.candidate);
+
+  const candidate =
+    candidates[candidateIndex]
+    ?? candidates[0];
+
+  const tier =
+    bossTierForMight(
+      finalActor
+    );
+
+  const priorCustom =
+    Number(draft?.candidateIndex) === candidateIndex
+      ? draft?.custom
+      : null;
+
+  const customResult = await foundry.applications.api.DialogV2.wait({
     window: { title: finalActor.name + " · Fase 1" },
     position: { width: 600 },
     content:
       '<div class="pokemon-guided-dialog">'
-      + '<label>Nome da fase<input name="phaseName" type="text" value="' + esc(candidate.phaseName) + '"></label>'
-      + '<label>Limit<input name="limit" type="text" value="' + esc(candidate.limit) + '"></label>'
-      + '<label>Tier do Limit<select name="tier">' + [1,2,3,4,5,6].map(value => '<option value="' + value + '"' + (value === tier ? ' selected' : '') + '>' + value + '</option>').join("") + '</select></label>'
-      + '<label>Descrição<textarea name="description" rows="4">' + esc(candidate.description) + '</textarea></label>'
-      + '<label class="pokemon-guided-check"><input type="checkbox" name="replaceTokens" checked> Substituir o Pokémon pela Fase 1 na cena atual</label>'
+      + '<label>Nome da fase<input name="phaseName" type="text" value="' + esc(priorCustom?.phaseName ?? candidate.phaseName) + '"></label>'
+      + '<label>Limit<input name="limit" type="text" value="' + esc(priorCustom?.limit ?? candidate.limit) + '"></label>'
+      + '<label>Tier do Limit<select name="tier">' + [1,2,3,4,5,6].map(value => '<option value="' + value + '"' + (value === Number(priorCustom?.tier ?? tier) ? ' selected' : '') + '>' + value + '</option>').join("") + '</select></label>'
+      + '<label>Descrição<textarea name="description" rows="4">' + esc(priorCustom?.description ?? candidate.description) + '</textarea></label>'
+      + '<label class="pokemon-guided-check"><input type="checkbox" name="replaceTokens"' + (priorCustom?.replaceTokens === false ? '' : ' checked') + '> Substituir o Pokémon pela Fase 1 na cena atual</label>'
       + '</div>',
-    ok: { label: "Criar Fase 1", icon: "fa-solid fa-layer-group" },
+    buttons: [
+      {
+        action: "back",
+        label: "← Voltar",
+        icon: "fa-solid fa-arrow-left",
+        callback: (_event, button) => ({
+          action: "back",
+          values: {
+            phaseName: button.form.elements.phaseName.value,
+            limit: button.form.elements.limit.value,
+            tier: button.form.elements.tier.value,
+            description: button.form.elements.description.value,
+            replaceTokens: button.form.elements.replaceTokens.checked
+          }
+        })
+      },
+      {
+        action: "create",
+        label: "Criar Fase 1",
+        icon: "fa-solid fa-layer-group",
+        default: true,
+        callback: (_event, button) => ({
+          action: "create",
+          values: {
+            phaseName: button.form.elements.phaseName.value,
+            limit: button.form.elements.limit.value,
+            tier: button.form.elements.tier.value,
+            description: button.form.elements.description.value,
+            replaceTokens: button.form.elements.replaceTokens.checked
+          }
+        })
+      }
+    ],
+    rejectClose: false,
     modal: true
   });
-  if (!custom) return;
+
+  if (!customResult) return;
+
+  if (customResult.action === "back") {
+    return openBossGenerator(
+      finalActor,
+      {
+        candidateIndex,
+        custom:
+          customResult.values
+      }
+    );
+  }
+
+  const custom =
+    customResult.values
+    ?? {};
 
   const phaseName = String(custom.phaseName ?? "").trim() || candidate.phaseName;
   const limit = String(custom.limit ?? "").trim() || candidate.limit;
@@ -1626,6 +2453,7 @@ function onRenderGuidedActorSheet(app, html) {
   const actor = app?.actor ?? app?.document ?? app?.object ?? null;
   if (!root || actor?.documentName !== "Actor") return;
   decorateBurnedChallengeTags(actor, root);
+  decorateChallengeQuickActions(actor, root);
   decorateBossHeader(actor, root);
 }
 

@@ -102,7 +102,8 @@ function pokeballSequenceAvailable() {
 
 async function animatePokemonTokenNative(
   tokenDoc,
-  mode
+  mode,
+  restoreAfter = false
 ) {
   const object =
     pokemonCombatTokenObject(
@@ -247,6 +248,8 @@ async function animatePokemonTokenNative(
 
   if (
     mode === "deploy"
+    ||
+    restoreAfter === true
   ) {
     try {
       mesh.alpha =
@@ -268,7 +271,8 @@ async function animatePokemonTokenNative(
 async function playPokeballVfxLocal(
   sceneId,
   tokenId,
-  mode
+  mode,
+  restoreAfter = false
 ) {
   if (
     canvas?.scene?.id
@@ -396,7 +400,8 @@ async function playPokeballVfxLocal(
 
   await animatePokemonTokenNative(
     tokenDoc,
-    mode
+    mode,
+    restoreAfter
   );
 }
 
@@ -404,7 +409,8 @@ async function playPokeballVfxLocal(
 async function broadcastPokeballVfx(
   sceneId,
   tokenId,
-  mode
+  mode,
+  restoreAfter = false
 ) {
   game.socket.emit(
     SOCKET_NAME,
@@ -417,16 +423,35 @@ async function broadcastPokeballVfx(
 
       sceneId,
       tokenId,
-      mode
+      mode,
+      restoreAfter
     }
   );
 
   await playPokeballVfxLocal(
     sceneId,
     tokenId,
-    mode
+    mode,
+    restoreAfter
   );
 }
+
+export async function playPokemonPokeballVfx(
+  sceneId,
+  tokenId,
+  mode = "deploy",
+  restoreAfter = false
+) {
+  return broadcastPokeballVfx(
+    sceneId,
+    tokenId,
+    mode === "recollect"
+      ? "recollect"
+      : "deploy",
+    restoreAfter === true
+  );
+}
+
 
 function randomId() {
   return foundry.utils.randomID(16);
@@ -758,7 +783,7 @@ async function deployDirect({
   }
 
   if (getPokemonFollowerThemeId(trainer) === theme.id) {
-    await setPokemonFollowerTheme(trainer, null);
+    await setPokemonFollowerTheme(trainer, null, { vfx: false });
 
     const duplicates = scene.tokens
       .filter(token =>
@@ -860,7 +885,7 @@ async function recollectDirect({
   }
 
   if (theme && getPokemonFollowerThemeId(trainer) === theme.id) {
-    await setPokemonFollowerTheme(trainer, null);
+    await setPokemonFollowerTheme(trainer, null, { vfx: false });
   }
 
   const ids = scene.tokens
@@ -963,7 +988,8 @@ function onSocket(message) {
     void playPokeballVfxLocal(
       message.sceneId,
       message.tokenId,
-      message.mode
+      message.mode,
+      message.restoreAfter === true
     );
 
     return;
