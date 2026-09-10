@@ -22,6 +22,38 @@ const {
 
 let importerApp = null;
 let catalogCache = null;
+const importerWarnings = new Set();
+
+const SAFE_STATIC_FALLBACK =
+  "icons/svg/mystery-man.svg";
+
+function warnImporterOnce(
+  key,
+  message,
+  error = null
+) {
+  if (error) {
+    console.warn(
+      `Pokemon LITM Tools | ${message}`,
+      error
+    );
+  }
+  else {
+    console.warn(
+      `Pokemon LITM Tools | ${message}`
+    );
+  }
+
+  if (importerWarnings.has(key)) {
+    return;
+  }
+
+  importerWarnings.add(key);
+
+  globalThis.ui
+    ?.notifications
+    ?.warn?.(message);
+}
 
 
 /* --------------------------------------------------------- */
@@ -152,24 +184,37 @@ async function uploadBlob(
       }
     );
 
-  const uploaded =
-    await foundry
-      .applications
-      .apps
-      .FilePicker
-      .uploadPersistent(
-        MODULE_ID,
-        "",
-        file,
-        {
-          overwrite:
-            true
-        },
-        {
-          notify:
-            false
-        }
-      );
+  let uploaded = null;
+
+  try {
+    uploaded =
+      await foundry
+        .applications
+        .apps
+        .FilePicker
+        .uploadPersistent(
+          MODULE_ID,
+          "",
+          file,
+          {
+            overwrite:
+              true
+          },
+          {
+            notify:
+              false
+          }
+        );
+  }
+  catch (error) {
+    warnImporterOnce(
+      "persistent-upload-fallback",
+      "Não foi possível salvar alguns assets no armazenamento persistente. O Importer usará um fallback seguro.",
+      error
+    );
+
+    return null;
+  }
 
   const storedPath =
     uploaded?.path
@@ -177,7 +222,14 @@ async function uploadBlob(
     ?? uploaded?.file
     ?? null;
 
-  if (!storedPath) return null;
+  if (!storedPath) {
+    warnImporterOnce(
+      "persistent-upload-fallback",
+      "O armazenamento persistente não retornou um caminho de arquivo. O Importer usará um fallback seguro."
+    );
+
+    return null;
+  }
 
   const separator =
     storedPath.includes("?")
@@ -202,26 +254,43 @@ async function persistRemoteAsset(
 ) {
   if (!url) return null;
 
-  const response =
-    await fetch(url);
+  try {
+    const response =
+      await fetch(url);
 
-  if (!response.ok) {
-    throw new Error(
-      `Falha baixando ${filename}: HTTP ${response.status}`
+    if (!response.ok) {
+      warnImporterOnce(
+        "remote-asset-fetch-failed",
+        "Alguns assets remotos não puderam ser copiados. O Importer usará a URL original quando isso for seguro.",
+        new Error(
+          `Falha baixando ${filename}: HTTP ${response.status}`
+        )
+      );
+
+      return url;
+    }
+
+    const blob =
+      await response.blob();
+
+    return (
+      await uploadBlob(
+        blob,
+        filename
+      )
+      ??
+      url
     );
   }
+  catch (error) {
+    warnImporterOnce(
+      "remote-asset-fetch-failed",
+      "Alguns assets remotos não puderam ser copiados. O Importer usará a URL original quando isso for seguro.",
+      error
+    );
 
-  const blob =
-    await response.blob();
-
-  return (
-    await uploadBlob(
-      blob,
-      filename
-    )
-    ??
-    url
-  );
+    return url;
+  }
 }
 
 
@@ -504,6 +573,238 @@ function cleanAnimation(animation) {
 /* --------------------------------------------------------- */
 /* CRIAR ACTOR                                               */
 /* --------------------------------------------------------- */
+
+function normalizedImagePath(
+  value
+) {
+  return String(value ?? "")
+    .trim()
+    .split(/[?#]/, 1)[0];
+}
+
+function isPlaceholderImagePath(
+  value
+) {
+  const normalized =
+    normalizedImagePath(value)
+      .toLowerCase();
+
+  if (!normalized) {
+    return false;
+  }
+
+  return (
+    normalized.endsWith(
+      "/icon-challenge.svg"
+    )
+    ||
+    normalized.endsWith(
+      "/mystery-man.svg"
+    )
+    ||
+    normalized ===
+      "icons/svg/mystery-man.svg"
+  );
+}
+
+function isUsableStaticImagePath(
+  value
+) {
+  return Boolean(
+    normalizedImagePath(value)
+  );
+}
+
+function isUsableDylanSheetPath(
+  value
+) {
+  return (
+    isUsableStaticImagePath(value)
+    &&
+    !isPlaceholderImagePath(value)
+  );
+}
+
+function sameImagePath(
+  left,
+  right
+) {
+  const a =
+    normalizedImagePath(left);
+
+  const b =
+    normalizedImagePath(right);
+
+  return Boolean(
+    a &&
+    b &&
+    a === b
+  );
+}
+
+function dylanStateInvalid(
+  flags
+) {
+  return Boolean(
+    flags?.spritesheet === true
+    &&
+    !isUsableDylanSheetPath(
+      flags?.sheetsrc
+    )
+  );
+}
+
+function actorNeedsAssetRepair(
+  actor,
+  current
+) {
+  if (
+    Number(
+      current?.schemaVersion
+      ?? 0
+    ) < 10
+  ) {
+    return true;
+  }
+
+  const portrait =
+    current?.assets?.portrait;
+
+  const overworld =
+    current?.assets?.overworld;
+
+  if (
+    !isUsableStaticImagePath(portrait)
+    ||
+    !isUsableStaticImagePath(overworld)
+  ) {
+    return true;
+  }
+
+  const actorImg =
+    actor?.img;
+
+  const tokenImg =
+    actor?.prototypeToken
+      ?.texture
+      ?.src;
+
+  if (
+    isPlaceholderImagePath(actorImg)
+    &&
+    !isPlaceholderImagePath(portrait)
+  ) {
+    return true;
+  }
+
+  if (
+    isPlaceholderImagePath(tokenImg)
+    &&
+    !isPlaceholderImagePath(overworld)
+  ) {
+    return true;
+  }
+
+  const sheet =
+    current?.assets?.spritesheet;
+
+  if (
+    current?.animation
+    &&
+    sheet
+    &&
+    sameImagePath(
+      actorImg,
+      sheet
+    )
+    &&
+    !sameImagePath(
+      portrait,
+      sheet
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    current?.animation
+    &&
+    sheet
+    &&
+    sameImagePath(
+      tokenImg,
+      sheet
+    )
+    &&
+    !sameImagePath(
+      overworld,
+      sheet
+    )
+  ) {
+    return true;
+  }
+
+  return dylanStateInvalid(
+    actor?.prototypeToken
+      ?.flags?.[DYLAN_ID]
+  );
+}
+
+function tokenNeedsAssetRepair(
+  token,
+  current,
+  entry,
+  definition
+) {
+  const tokenImg =
+    token?.texture?.src;
+
+  if (
+    !isUsableStaticImagePath(tokenImg)
+    ||
+    isPlaceholderImagePath(tokenImg)
+  ) {
+    return true;
+  }
+
+  if (
+    dylanStateInvalid(
+      token?.flags?.[DYLAN_ID]
+    )
+  ) {
+    return true;
+  }
+
+  const oldSheet =
+    current?.assets?.spritesheet
+    ??
+    entry?.sheet
+    ??
+    null;
+
+  const hadAnimation =
+    Boolean(
+      current?.animation
+      ??
+      entry?.animation
+    );
+
+  return Boolean(
+    hadAnimation
+    &&
+    oldSheet
+    &&
+    sameImagePath(
+      tokenImg,
+      oldSheet
+    )
+    &&
+    !sameImagePath(
+      definition?.tokenPath,
+      oldSheet
+    )
+  );
+}
 
 function getOverworldFrameGrid(entry) {
   const animation = cleanAnimation(entry.animation);
@@ -836,18 +1137,62 @@ async function createOverworldFrameBlob(sheetBlob, entry) {
 }
 
 async function prepareActorAssets(entry) {
+  const isPokemon =
+    entry.category === "pokemon";
+
   if (entry.sheetLayout === "gen1Vertical6") {
-    const prepared = await prepareVertical6(entry);
+    const prepared =
+      await prepareVertical6(entry);
+
+    let portraitPath =
+      prepared.portraitPath
+      ??
+      null;
+
+    if (entry.portrait) {
+      portraitPath =
+        await persistRemoteAsset(
+          entry.portrait,
+          safeFilename(
+            isPokemon
+              ? "pokemon-portrait"
+              : "person-portrait",
+            entry,
+            entry.portrait
+          )
+        )
+        ??
+        portraitPath;
+    }
+
+    const safeStatic =
+      portraitPath
+      ??
+      SAFE_STATIC_FALLBACK;
 
     return {
-      ...prepared,
-      tokenPath: prepared.portraitPath
+      sheetPath:
+        prepared.sheetPath
+        ??
+        null,
+
+      animationSheetPath:
+        prepared.sheetPath
+        ??
+        null,
+
+      portraitPath:
+        safeStatic,
+
+      tokenPath:
+        prepared.portraitPath
+        ??
+        safeStatic
     };
   }
 
-  const isPokemon = entry.category === "pokemon";
-
-  const response = await fetch(entry.sheet);
+  const response =
+    await fetch(entry.sheet);
 
   if (!response.ok) {
     throw new Error(
@@ -855,42 +1200,66 @@ async function prepareActorAssets(entry) {
     );
   }
 
-  const sheetBlob = await response.blob();
+  const sheetBlob =
+    await response.blob();
 
-  const sheetPath =
+  const animation =
+    cleanAnimation(
+      entry.animation
+    );
+
+  const uploadedSheetPath =
     await uploadBlob(
       sheetBlob,
       safeFilename(
-        isPokemon ? "pokemon-sheet" : "person-sheet",
+        isPokemon
+          ? "pokemon-sheet"
+          : "person-sheet",
         entry,
         entry.sheet
       )
-    )
-    ?? entry.sheet;
+    );
 
-  let tokenPath = sheetPath;
+  const sheetPath =
+    uploadedSheetPath
+    ??
+    entry.sheet
+    ??
+    null;
 
-  const tokenBlob =
-    await createOverworldFrameBlob(sheetBlob, entry);
+  const animationSheetPath =
+    animation
+      ? uploadedSheetPath
+      : null;
 
-  if (tokenBlob) {
-    tokenPath =
-      await uploadBlob(
-        tokenBlob,
-        safeFilename(
-          isPokemon
-            ? "pokemon-overworld"
-            : "person-overworld",
-          entry
-        )
-      )
-      ?? tokenPath;
+  let tokenPath =
+    animation
+      ? null
+      : sheetPath;
+
+  if (animation) {
+    const tokenBlob =
+      await createOverworldFrameBlob(
+        sheetBlob,
+        entry
+      );
+
+    if (tokenBlob) {
+      tokenPath =
+        await uploadBlob(
+          tokenBlob,
+          safeFilename(
+            isPokemon
+              ? "pokemon-overworld"
+              : "person-overworld",
+            entry
+          )
+        );
+    }
   }
 
   let portraitPath =
-    tokenPath
-    ?? sheetPath
-    ?? "icons/svg/mystery-man.svg";
+    null;
 
   if (entry.portrait) {
     portraitPath =
@@ -903,12 +1272,44 @@ async function prepareActorAssets(entry) {
           entry,
           entry.portrait
         )
-      )
-      ?? portraitPath;
+      );
+  }
+
+  if (!animation) {
+    tokenPath =
+      tokenPath
+      ??
+      portraitPath
+      ??
+      SAFE_STATIC_FALLBACK;
+
+    portraitPath =
+      portraitPath
+      ??
+      tokenPath
+      ??
+      SAFE_STATIC_FALLBACK;
+  }
+  else {
+    const safeStatic =
+      tokenPath
+      ??
+      portraitPath
+      ??
+      SAFE_STATIC_FALLBACK;
+
+    tokenPath =
+      safeStatic;
+
+    portraitPath =
+      portraitPath
+      ??
+      safeStatic;
   }
 
   return {
     sheetPath,
+    animationSheetPath,
     portraitPath,
     tokenPath
   };
@@ -922,6 +1323,7 @@ async function prepareActorDefinition(
 
   const {
     sheetPath,
+    animationSheetPath,
     portraitPath,
     tokenPath
   } =
@@ -941,7 +1343,7 @@ async function prepareActorDefinition(
 
   const moduleFlags = {
     schemaVersion:
-      9,
+      10,
 
     kind:
       isPokemon
@@ -1003,7 +1405,13 @@ async function prepareActorDefinition(
       moduleFlags
   };
 
-  if (animation) {
+  if (
+    animation
+    &&
+    isUsableDylanSheetPath(
+      animationSheetPath
+    )
+  ) {
     prototypeFlags[
       DYLAN_ID
     ] = {
@@ -1013,7 +1421,7 @@ async function prepareActorDefinition(
         true,
 
       sheetsrc:
-        sheetPath
+        animationSheetPath
     };
   }
 
@@ -1102,6 +1510,93 @@ async function createActorFromEntry(
 }
 
 
+async function repairPlacedActorTokens(
+  actor,
+  entry,
+  current,
+  definition
+) {
+  const dylanFlags =
+    definition.prototypeFlags?.[
+      DYLAN_ID
+    ]
+    ??
+    null;
+
+  for (
+    const scene
+    of game.scenes ?? []
+  ) {
+    const updates = [];
+
+    for (
+      const token
+      of scene.tokens ?? []
+    ) {
+      if (
+        token.actorId
+          !== actor.id
+      ) {
+        continue;
+      }
+
+      if (
+        !tokenNeedsAssetRepair(
+          token,
+          current,
+          entry,
+          definition
+        )
+      ) {
+        continue;
+      }
+
+      const update = {
+        _id:
+          token.id,
+
+        "texture.src":
+          definition.tokenPath,
+
+        [`flags.${MODULE_ID}`]:
+          definition.moduleFlags
+      };
+
+      if (dylanFlags) {
+        update[
+          `flags.${DYLAN_ID}`
+        ] =
+          dylanFlags;
+      }
+      else {
+        update[
+          `flags.-=${DYLAN_ID}`
+        ] =
+          null;
+      }
+
+      updates.push(update);
+    }
+
+    if (!updates.length) {
+      continue;
+    }
+
+    try {
+      await scene.updateEmbeddedDocuments(
+        "Token",
+        updates
+      );
+    }
+    catch (error) {
+      console.warn(
+        `Pokemon LITM Tools | Não foi possível reparar tokens antigos de ${actor.name} em ${scene.name}.`,
+        error
+      );
+    }
+  }
+}
+
 async function ensureActorCurrent(
   actor,
   entry
@@ -1114,12 +1609,10 @@ async function ensureActorCurrent(
     {};
 
   if (
-    Number(
-      current.schemaVersion
-      ?? 0
-    ) >= 9
-    &&
-    current.assets?.overworld
+    !actorNeedsAssetRepair(
+      actor,
+      current
+    )
   ) {
     return actor;
   }
@@ -1129,34 +1622,57 @@ async function ensureActorCurrent(
       entry
     );
 
-  await actor.update({
+  const dylanFlags =
+    definition.prototypeFlags?.[
+      DYLAN_ID
+    ]
+    ??
+    null;
+
+  const update = {
     img:
       definition.portraitPath,
 
-    prototypeToken: {
-      texture: {
-        src:
-          definition.tokenPath,
+    "prototypeToken.texture.src":
+      definition.tokenPath,
 
-        scaleX:
-          definition.visualScale,
+    "prototypeToken.texture.scaleX":
+      definition.visualScale,
 
-        scaleY:
-          definition.visualScale
-      },
+    "prototypeToken.texture.scaleY":
+      definition.visualScale,
 
-      lockRotation:
-        true,
+    "prototypeToken.lockRotation":
+      true,
 
-      flags:
-        definition.prototypeFlags
-    },
+    [`prototypeToken.flags.${MODULE_ID}`]:
+      definition.moduleFlags,
 
-    flags: {
-      [MODULE_ID]:
-        definition.moduleFlags
-    }
-  });
+    [`flags.${MODULE_ID}`]:
+      definition.moduleFlags
+  };
+
+  if (dylanFlags) {
+    update[
+      `prototypeToken.flags.${DYLAN_ID}`
+    ] =
+      dylanFlags;
+  }
+  else {
+    update[
+      `prototypeToken.flags.-=${DYLAN_ID}`
+    ] =
+      null;
+  }
+
+  await actor.update(update);
+
+  await repairPlacedActorTokens(
+    actor,
+    entry,
+    current,
+    definition
+  );
 
   return actor;
 }
@@ -1189,7 +1705,8 @@ function rememberedActorFolderId() {
 
 
 async function getOrCreateActorForEntry(
-  entry
+  entry,
+  resolveFolderForNew = null
 ) {
   const existing =
     game.actors.find(
@@ -1209,9 +1726,14 @@ async function getOrCreateActorForEntry(
     );
   }
 
+  const folderId =
+    resolveFolderForNew
+      ? await resolveFolderForNew()
+      : rememberedActorFolderId();
+
   return createActorFromEntry(
     entry,
-    rememberedActorFolderId()
+    folderId
   );
 }
 
@@ -1419,6 +1941,60 @@ export async function openPokemonChallengeEditor(actor) {
   return openPokemonBuilder(entry, prepareActorDefinition, { existingActor: actor });
 }
 
+async function getOrCreateSceneActorFolder(
+  scene
+) {
+  const sceneName =
+    String(
+      scene?.name
+      ??
+      ""
+    )
+      .trim();
+
+  if (!sceneName) {
+    return null;
+  }
+
+  const existing =
+    game.folders.find(
+      folder =>
+        folder.type === "Actor"
+        &&
+        folder.name === sceneName
+    );
+
+  if (existing) {
+    return existing.id;
+  }
+
+  try {
+    const folder =
+      await Folder.create({
+        name:
+          sceneName,
+
+        type:
+          "Actor"
+      });
+
+    return (
+      folder?.id
+      ??
+      null
+    );
+  }
+  catch (error) {
+    warnImporterOnce(
+      `scene-folder-failed:${scene?.id ?? sceneName}`,
+      `Não foi possível criar a pasta de Actors da Scene “${sceneName}”. O Actor será importado na raiz.`,
+      error
+    );
+
+    return null;
+  }
+}
+
 export async function handlePokemonImporterCanvasDrop(
   data
 ) {
@@ -1505,7 +2081,11 @@ export async function handlePokemonImporterCanvasDrop(
 
   const actor =
     await getOrCreateActorForEntry(
-      entry
+      entry,
+      () =>
+        getOrCreateSceneActorFolder(
+          canvas.scene
+        )
     );
 
   await placeActorToken(
