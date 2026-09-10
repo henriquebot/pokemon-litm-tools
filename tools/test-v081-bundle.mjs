@@ -13,6 +13,8 @@ const main = read("scripts/main.js");
 const tokenDrop = read("scripts/pokemon-token-drop.js");
 const styles = read("styles/importer.css");
 const creatorTemplate = read("templates/character-creator.hbs");
+const creator = read("scripts/character-creator-app.js");
+const links = read("scripts/pokemon-links.js");
 
 function ok(name, value) {
   assert.equal(Boolean(value), true, name);
@@ -228,7 +230,10 @@ ok(
   creatorTemplate.includes("pokemon-character-type-card")
   && creatorTemplate.includes("pokemon-team-customization-tabs")
   && styles.includes(".pokemon-character-type-card.selected::after")
-  && styles.includes("grid-template-columns:\n    minmax(210px, 280px)")
+  && creatorTemplate.includes("pokemon-team-customization-workspace")
+  && creatorTemplate.includes("pokemon-team-customization-picker")
+  && creatorTemplate.includes('data-role="pokemon-customization-search"')
+  && styles.includes("grid-template-columns:\n    minmax(0, 11fr)\n    minmax(0, 9fr)")
 );
 
 ok(
@@ -244,7 +249,7 @@ ok(
   guided.includes("Pergunta sugerida")
   && guided.includes("Vou fazer a pergunta em voz alta")
   && guided.includes("subjectLabel")
-  && guided.includes('subtitle:\n      "Sobre " + subjectLabel')
+  && guided.includes('subtitle:\n      "Sobre: " + subjectLabel')
 );
 
 ok(
@@ -267,5 +272,38 @@ ok(
   && main.includes("pokemon-actor-kind-badge")
   && styles.includes(".pokemon-actor-kind-challenge")
 );
+
+// Execute the small pure production helpers without bootstrapping Foundry UI.
+function pureHelper(source, name, bindings = {}) {
+  const declaration = source.match(new RegExp("export function " + name + "\\([^]*?\\n\\}"))?.[0];
+  assert.ok(declaration, "helper exists: " + name);
+  return Function(...Object.keys(bindings), declaration.replace(/^export /, "") + "\nreturn " + name)(...Object.values(bindings));
+}
+
+const spriteLabel = pureHelper(creator, "formatCharacterSpriteLabel");
+for (const [input, expected] of [
+  ["Trainer Acetrainer F Pe 01mbms4g", "Trainer Acetrainer F"],
+  ["Trainer Acetrainer M Pe 01xyz", "Trainer Acetrainer M"],
+  ["Trainer Acetrainer F", "Trainer Acetrainer F"],
+  ["Trainer Farmer Pe 01xyz", "Trainer Farmer Pe 01xyz"],
+  ["Trainer FM Pe 01xyz", "Trainer FM Pe 01xyz"],
+  ["Professor Oak", "Professor Oak"],
+  ["Trainer\tF\tPe 01xyz", "Trainer\tF"],
+  ["", ""]
+]) assert.equal(spriteLabel(input), expected, "human sprite label: " + input);
+ok("labels de sprites cortam após F/M isolado e preservam nomes sem gênero", true);
+ok("label humano não substitui identificadores do asset", creatorTemplate.includes('data-asset-id="{{id}}"')
+  && creatorTemplate.includes('data-asset-name="{{name}}"') && creatorTemplate.includes('{{displayName}}'));
+
+const isChallenge = pureHelper(links, "isPokemonChallenge", { MODULE_ID: "pokemon-litm-tools" });
+const flagged = type => ({ documentName: "Actor", type, getFlag: () => true });
+assert.equal(isChallenge(flagged("litm-npc")), true);
+for (const type of ["litm-character", "litm-journey", "pokemon", "other", undefined]) {
+  assert.equal(isChallenge(flagged(type)), false, "old builder flag cannot override Actor type: " + type);
+}
+assert.equal(Boolean(isChallenge(null)), false);
+assert.equal(isChallenge({ ...flagged("litm-npc"), documentName: "Item" }), false);
+assert.equal(isChallenge({ ...flagged("litm-npc"), getFlag: () => false }), false);
+ok("controle do Criador de Challenge exige Actor litm-npc mesmo com flag antiga", true);
 
 console.log("Pokemon LITM Tools | v0.8.1 bundle tests passed");

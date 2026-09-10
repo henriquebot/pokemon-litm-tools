@@ -407,21 +407,30 @@ function sourceTokenForActor(actor) {
   return token?.document ?? token ?? null;
 }
 
-function replayVfxTargetIds(frozenTargetIds) {
-  const scene = canvas?.scene;
-
-  const frozen = [...new Set(
-    [...(frozenTargetIds ?? [])]
-      .filter(id => !!scene?.tokens?.get(id))
+function replayVfxTargetIds(frozenTargetIds, scene = canvas?.scene, currentTargets = game.user?.targets ?? []) {
+  const current = [...new Set(
+    [...currentTargets]
+      .map(target => target?.document ?? target)
+      .filter(token => {
+        const sceneId = token?.parent?.id ?? token?.scene?.id;
+        return (!sceneId || sceneId === scene?.id) && !!scene?.tokens?.get(token?.id);
+      })
+      .map(token => token.id)
   )];
+  if (current.length) return current;
 
-  if (frozen.length) return frozen;
+  return [...new Set(frozenTargetIds ?? [])]
+    .filter(id => !!scene?.tokens?.get(id));
+}
 
-  return [...new Set(
-    [...(game.user?.targets ?? [])]
-      .map(target => target?.document?.id ?? target?.id)
-      .filter(id => !!scene?.tokens?.get(id))
-  )];
+function isSelfVfxTarget(target) {
+  return ["self", "user", "users-field"].includes(String(target ?? "").toLowerCase());
+}
+
+function moveReplayVfxTargetIds(move, source, frozenTargetIds, scene = canvas?.scene, currentTargets = game.user?.targets ?? []) {
+  return isSelfVfxTarget(move?.target)
+    ? (scene?.tokens?.get(source?.id) ? [source.id] : [])
+    : replayVfxTargetIds(frozenTargetIds, scene, currentTargets);
 }
 
 function tokenObject(tokenDoc) {
@@ -7334,9 +7343,11 @@ function iconActionButton(title, icon, handler) {
   return button;
 }
 
-function consequenceVfxActions(data, scene) {
+function consequenceVfxActions(data, scene, currentTargets = []) {
   if (!data || !scene || scene.id !== data.sceneId) return [];
-  const targetTokenIds = [...new Set(data.targetTokenIds ?? [])]
+  const targetTokenIds = moveReplayVfxTargetIds(
+    { target: data.moveTarget }, { id: data.sourceTokenId }, data.targetTokenIds, scene, currentTargets
+  )
     .filter(id => !!scene.tokens?.get(id)?.actor);
   if (!targetTokenIds.length) return [];
 
@@ -7361,7 +7372,7 @@ function consequenceVfxActions(data, scene) {
 
 async function replayConsequenceVfx(data, mode) {
   // Resolve os documentos novamente: tokens podem ter saído da cena desde o card.
-  const action = consequenceVfxActions(data, canvas?.scene).find(row => row.mode === mode);
+  const action = consequenceVfxActions(data, canvas?.scene, game.user?.targets ?? []).find(row => row.mode === mode);
   if (!action) throw new Error("Abra a cena da consequência e verifique os tokens envolvidos.");
   const type = Object.hasOwn(TYPE_COLORS, data.type) ? data.type : "normal";
   if (mode === "target") {
@@ -7376,8 +7387,13 @@ async function replayConsequenceVfx(data, mode) {
 function decorateConsequenceVfx(message, root) {
   if (!game.user.isGM || root.querySelector(".pokemon-consequence-vfx")) return;
   const data = message.getFlag?.(MODULE_ID, "consequenceVfx");
-  const actions = consequenceVfxActions(data, canvas?.scene);
-  if (!actions.length) return;
+  const scene = canvas?.scene;
+  if (!data || !scene || scene.id !== data.sceneId) return;
+  // Os botões continuam disponíveis para selecionar outro alvo depois de renderizar o card.
+  const actions = [{ mode: "target", title: "VFX no alvo", icon: "fa-wand-magic-sparkles" }];
+  if (scene.tokens?.get(data.sourceTokenId)?.actor && !isSelfVfxTarget(data.moveTarget)) {
+    actions.push({ mode: "source-target", title: "VFX atacante → alvo", icon: "fa-arrow-right-long" });
+  }
   const controls = document.createElement("span");
   controls.className = "pokemon-consequence-vfx";
   for (const action of actions) {
@@ -10220,10 +10236,7 @@ async function onRenderPokemonChatMessage(
   buttons.append(
     iconActionButton("VFX no Token", "fa-wand-magic-sparkles", async () => {
       const source = sourceToken();
-      const selfTarget = ["self", "user", "users-field"].includes(String(move?.target ?? "").toLowerCase());
-      const ids = selfTarget
-        ? [source.id]
-        : replayVfxTargetIds(frozenTargetIds);
+      const ids = moveReplayVfxTargetIds(move, source, frozenTargetIds);
 
       if (!ids.length) {
         throw new Error(
@@ -10509,9 +10522,23 @@ export async function pokemonLitmCombatSelfTest() {
       "Não foi possível reverter com segurança:"
     );
 
-  checks.vfxCurrentTargetFallback =
-    typeof replayVfxTargetIds === "function"
-    && replayVfxTargetIds.toString().includes("game.user?.targets");
+  const vfxScene = { id: "scene", tokens: new Map([
+    ["current", { id: "current", actor: {} }],
+    ["frozen", { id: "frozen", actor: {} }],
+    ["source", { id: "source", actor: {} }]
+  ]) };
+  const currentVfxTargets = [{ document: { id: "current", parent: vfxScene } }];
+  checks.vfxCurrentTargetPriority =
+    replayVfxTargetIds(["frozen"], vfxScene, currentVfxTargets).join() === "current"
+    && replayVfxTargetIds(["frozen", "missing", "frozen"], vfxScene, []).join() === "frozen"
+    && replayVfxTargetIds(["frozen"], vfxScene, [{ id: "current", parent: { id: "other" } }]).join() === "frozen"
+    && replayVfxTargetIds(["missing"], vfxScene, [{ id: "missing" }]).length === 0;
+  checks.vfxSelfTargetPreserved = ["self", "user", "users-field"].every(target =>
+    moveReplayVfxTargetIds({ target }, { id: "source" }, ["frozen"], vfxScene, currentVfxTargets).join() === "source"
+  );
+  checks.consequenceVfxCurrentTargetPriority = consequenceVfxActions({
+    sceneId: "scene", sourceTokenId: "source", targetTokenIds: ["frozen"]
+  }, vfxScene, currentVfxTargets).every(action => action.targetTokenIds.join() === "current");
 
   checks.consequenceVfxControlsInstalled = consequenceVfxControlsSelfTest();
 

@@ -4203,48 +4203,116 @@ has(
 
 /* Personalização do time: Pokémon à esquerda, detalhes e golpes à direita */
 .pokemon-team-customization-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pokemon-team-customization-workspace {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns:
-    minmax(210px, 280px)
-    minmax(0, 1fr);
-  grid-template-rows:
-    auto
-    auto
-    minmax(0, 1fr);
-  column-gap: 18px;
+    minmax(0, 11fr)
+    minmax(0, 9fr);
+  gap: 18px;
+  min-height: 0;
+  margin-top: 8px;
   align-items: stretch;
   overflow: hidden;
 }
 
-.pokemon-team-customization-page > h2,
-.pokemon-team-customization-page > p {
-  grid-column: 1 / -1;
+.pokemon-team-customization-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 8px;
+  background: rgb(255 255 255 / .025);
+}
+
+.pokemon-team-customization-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.pokemon-team-customization-search input {
+  width: 100%;
+  min-width: 0;
+  font-weight: normal;
 }
 
 .pokemon-team-customization-page
 .pokemon-team-customization-tabs {
-  grid-column: 1;
-  grid-row: 3;
+  flex: 1 1 auto;
   min-height: 0;
-  margin: 8px 0 0;
+  margin: 0;
   padding-right: 5px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  align-content: start;
   overflow-y: auto;
 }
 
 .pokemon-team-customization-page
 .pokemon-team-customization-tabs button {
-  flex: 0 0 auto;
+  min-height: 90px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 7px;
+  background: rgb(0 0 0 / .08);
+}
+
+.pokemon-team-customization-page
+.pokemon-team-customization-tabs button.active {
+  border-color: var(--color-border-highlight);
+  background: rgb(255 255 255 / .08);
+}
+
+.pokemon-team-customization-page
+.pokemon-team-customization-tabs button[hidden] {
+  display: none;
+}
+
+.pokemon-team-customization-empty {
+  margin: 0;
+  opacity: .7;
 }
 
 .pokemon-team-customization-page
 .pokemon-team-customization-list {
-  grid-column: 2;
-  grid-row: 3;
+  display: block;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   padding-right: 5px;
+}
+
+.pokemon-team-customization-workspace .pokemon-team-customization-card {
+  background: rgb(255 255 255 / .025);
+}
+
+.pokemon-team-customization-workspace .pokemon-team-customization-grid label,
+.pokemon-team-customization-workspace .pokemon-team-customization-grid select {
+  min-width: 0;
+}
+
+.pokemon-team-customization-workspace .pokemon-team-customization-grid select {
+  width: 100%;
+}
+
+.pokemon-team-customization-workspace .pokemon-team-moves {
+  border-top: 1px solid var(--color-border-light-primary);
+  padding-top: 14px;
+}
+
+.pokemon-team-customization-workspace .pokemon-team-move-options {
+  grid-template-columns: 1fr;
+  max-height: none;
+  overflow: visible;
 }
 
 /* Biblioteca de Challenges no Importer */
@@ -4267,9 +4335,15 @@ has(
   margin-top: 4px;
 }
 
-.pokemon-challenge-library-path {
+.pokemon-challenge-library-roles,
+.pokemon-challenge-library-limits {
   white-space: normal;
   overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.pokemon-challenge-library-limits {
+  font-weight: 600;
 }
 
 .pokemon-challenge-library-empty {
@@ -4322,16 +4396,19 @@ has(
 
 @media (max-width: 760px) {
   .pokemon-team-customization-page {
-    display: flex;
-    flex-direction: column;
     overflow: auto;
+  }
+
+  .pokemon-team-customization-workspace {
+    flex: 0 0 auto;
+    grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .pokemon-team-customization-page
   .pokemon-team-customization-tabs {
-    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    overflow: visible;
+    max-height: 240px;
   }
 
   .pokemon-team-customization-page

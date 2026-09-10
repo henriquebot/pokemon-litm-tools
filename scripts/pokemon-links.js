@@ -86,9 +86,11 @@ function appRoot(app, html) {
   );
 }
 
-function isPokemonChallenge(doc) {
+export function isPokemonChallenge(doc) {
   return (
     doc?.documentName === "Actor"
+    &&
+    doc.type === "litm-npc"
     &&
     doc?.getFlag?.(
       MODULE_ID,

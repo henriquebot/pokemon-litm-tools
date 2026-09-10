@@ -287,7 +287,7 @@
 
                     <img
                       src="{{preview}}"
-                      alt="{{name}}"
+                      alt="{{displayName}}"
                       loading="lazy"
                       data-overworld-preview
                       data-preview-columns="{{previewColumns}}"
@@ -300,7 +300,7 @@
 
                   <img
                     src="{{preview}}"
-                    alt="{{name}}"
+                    alt="{{displayName}}"
                     loading="lazy"
                   >
 
@@ -311,8 +311,8 @@
 
               <div class="pokemon-asset-info">
 
-                <strong title="{{name}}">
-                  {{name}}
+                <strong title="{{displayName}}">
+                  {{displayName}}
                 </strong>
 
                 {{#if meta}}
@@ -687,21 +687,37 @@
         Defina Natureza, Habilidade, gênero, fraqueza e de 1 a 4 golpes para cada Pokémon inicial.
       </p>
 
-      <nav class="pokemon-team-customization-tabs">
-        {{#each pokemonProfiles}}
-          <button
-            type="button"
-            data-pokemon-customization-slot="{{slot}}"
-            class="{{#if active}}active{{/if}}"
-          >
-            <img src="{{preview}}" alt="{{name}}">
-            <span>Pokémon {{number}}</span>
-            <strong>{{name}}</strong>
-          </button>
-        {{/each}}
-      </nav>
+      <div class="pokemon-team-customization-workspace">
+        <aside class="pokemon-team-customization-picker" aria-label="Escolher Pokémon da equipe">
+          <label class="pokemon-team-customization-search">
+            <span>Escolha um Pokémon da equipe</span>
+            <input
+              type="search"
+              data-role="pokemon-customization-search"
+              value="{{pokemonCustomizationSearch}}"
+              placeholder="Buscar Pokémon da equipe..."
+              autocomplete="off"
+            >
+          </label>
+          <nav class="pokemon-team-customization-tabs" aria-label="Pokémon da equipe">
+            {{#each pokemonProfiles}}
+              <button
+                type="button"
+                data-pokemon-customization-slot="{{slot}}"
+                data-pokemon-customization-search="Pokémon {{number}} {{name}}"
+                class="{{#if active}}active{{/if}}"
+                aria-pressed="{{#if active}}true{{else}}false{{/if}}"
+              >
+                <img src="{{preview}}" alt="{{name}}">
+                <span>Pokémon {{number}} · {{moveCount}} / 4 golpes</span>
+                <strong>{{name}}</strong>
+              </button>
+            {{/each}}
+          </nav>
+          <p class="pokemon-team-customization-empty" data-pokemon-customization-empty hidden>Nenhum Pokémon da equipe encontrado.</p>
+        </aside>
 
-      <div class="pokemon-team-customization-list">
+      <div class="pokemon-team-customization-list" role="region" aria-label="Detalhes e golpes do Pokémon selecionado">
 
         {{#each pokemonProfiles}}
           <article class="pokemon-team-customization-card" {{#unless active}}hidden{{/unless}}>
@@ -780,6 +796,7 @@
           </article>
         {{/each}}
 
+      </div>
       </div>
 
     </section>

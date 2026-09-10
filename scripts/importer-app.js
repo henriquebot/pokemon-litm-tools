@@ -35,102 +35,108 @@ const SAFE_STATIC_FALLBACK =
  * mesmo Actor que outro Youngster em outra rota.
  */
 const TRAINER_NAME_POOLS = [
-  {
-    match: /youngster|jovem|garoto/,
-    names: ["Joey", "Mikey", "Ben", "Timmy", "Calvin", "Ian", "Albert", "Warren"]
-  },
-  {
-    match: /lass|garota/,
-    names: ["Janice", "Sally", "Robin", "Dana", "Connie", "Alice", "Linda", "Carrie"]
-  },
-  {
-    match: /bug catcher|bug_catcher|apanhador.*inseto|caçador.*inseto/,
-    names: ["Rick", "Doug", "Wade", "Benny", "Al", "Josh", "Arnie", "Don"]
-  },
-  {
-    match: /hiker|montanhista/,
-    names: ["Anthony", "Russell", "Phillip", "Daniel", "Parry", "Benjamin", "Erik", "Bailey"]
-  },
-  {
-    match: /camper|campista/,
-    names: ["Roland", "Todd", "Barry", "Jerry", "Lloyd", "Dean", "Sid", "Ted"]
-  },
-  {
-    match: /picnicker|piquenique/,
-    names: ["Liz", "Gina", "Erin", "Tiffany", "Heidi", "Kim", "Diana", "Hope"]
-  },
-  {
-    match: /swimmer|nadador/,
-    names: ["Simon", "Luis", "Matthew", "Darrin", "Elaine", "Denise", "Kaylee", "Susie"]
-  },
-  {
-    match: /fisherman|pescador/,
-    names: ["Ralph", "Tully", "Henry", "Marvin", "Wilton", "Dale", "Ned", "Kyle"]
-  },
-  {
-    match: /sailor|marinheiro/,
-    names: ["Huey", "Terrell", "Ernest", "Duncan", "Eugene", "Harry", "Kent", "Jeff"]
-  },
-  {
-    match: /bird keeper|bird_keeper|criador.*ave/,
-    names: ["Abe", "Toby", "Theo", "Jose", "Perry", "Roy", "Vance", "Boris"]
-  },
-  {
-    match: /biker|motoqueiro/,
-    names: ["Dwayne", "Harris", "Zeke", "Charles", "Ruben", "Gerald", "Lao", "Virgil"]
-  },
-  {
-    match: /black belt|black_belt|faixa.*preta/,
-    names: ["Kenji", "Lao", "Yoshi", "Nob", "Kiyo", "Takashi", "Hitoshi", "Koichi"]
-  },
-  {
-    match: /psychic|psíquic|psiquic|medium/,
-    names: ["Mark", "Franklin", "Greg", "Tasha", "Nathan", "Jared", "Elliot", "Doris"]
-  },
-  {
-    match: /scientist|cientista/,
-    names: ["Ross", "Mitch", "Jed", "Taylor", "Travis", "Rich", "Braydon", "Lowell"]
-  },
-  {
-    match: /ranger/,
-    names: ["Mason", "Beth", "Kelly", "Jackson", "Logan", "Aria", "Cole", "Nina"]
-  },
-  {
-    match: /ace trainer|cooltrainer|ace_trainer|treinador.*ace/,
-    names: ["Nick", "Gwen", "Reena", "Blake", "Cody", "Megan", "Dennis", "Irene"]
-  },
-  {
-    match: /beauty|bela|modelo/,
-    names: ["Victoria", "Cassie", "Samantha", "Valerie", "Olivia", "Rachael", "Julia", "Bridget"]
-  },
-  {
-    match: /gentleman|cavalheiro/,
-    names: ["Thomas", "Preston", "Alfred", "Walter", "Edward", "Clifford", "Milton", "Brooks"]
-  },
-  {
-    match: /pokéfan|pokefan|pokémon fan|pokemon fan/,
-    names: ["Beverly", "Derek", "Ruth", "Joshua", "Alex", "Georgia", "Trevor", "Jaime"]
-  },
-  {
-    match: /rocket|grunt|recruta/,
-    names: ["Grant", "Rex", "Cole", "Nash", "Mara", "Tess", "Vera", "Jett"]
-  }
+  { id: "youngster", match: /youngster|jovem|garoto/ },
+  { id: "lass", match: /\blass\b|garota/ },
+  { id: "bugCatcher", match: /bug catcher|bug maniac|apanhador.*inseto|cacador.*inseto/ },
+  { id: "hiker", match: /hiker|montanhista/ },
+  { id: "camper", match: /camper|campista/ },
+  { id: "picnicker", match: /picnicker|piquenique/ },
+  { id: "swimmer", match: /swimmer|nadador/ },
+  { id: "fisherman", match: /fisherman|pescador/ },
+  { id: "sailor", match: /sailor|marinheiro/ },
+  { id: "birdKeeper", match: /bird keeper|criador.*ave/ },
+  { id: "biker", match: /biker|cue ball|motoqueiro/ },
+  { id: "blackBelt", match: /black belt|faixa.*preta/ },
+  { id: "psychic", match: /psychic|psiquic|medium/ },
+  { id: "scientist", match: /scientist|cientista|super nerd|engineer/ },
+  { id: "ranger", match: /ranger/ },
+  { id: "aceTrainer", match: /ace trainer|cooltrainer|treinador.*ace/ },
+  { id: "beauty", match: /beauty|bela|modelo/ },
+  { id: "gentleman", match: /gentleman|cavalheiro/ },
+  { id: "pokefan", match: /pokefan|pokemon fan/ },
+  { id: "grunt", match: /rocket|grunt|recruta/ }
 ];
 
+// Emergency pools keep the picker usable if the bundled JSON cannot be read.
 const TRAINER_FALLBACK_NAMES = [
-  "Alex", "Casey", "Jordan", "Taylor", "Morgan", "Riley",
-  "Sam", "Jamie", "Drew", "Robin", "Cameron", "Avery"
+  "Alex", "Alexis", "Angel", "Ariel", "Ash", "Aspen", "Aubrey", "Avery",
+  "Bailey", "Blair", "Blake", "Brett", "Briar", "Brook", "Brooklyn", "Cameron",
+  "Carey", "Casey", "Cedar", "Charlie", "Chris", "Cody", "Corey", "Dakota",
+  "Dallas", "Dana", "Darcy", "Devin", "Dorian", "Drew", "Dylan", "Eden",
+  "Ellery", "Ellis", "Emerson", "Emery", "Finley", "Florian", "Frankie", "Glenn",
+  "Gray", "Harley", "Harper", "Hayden", "Hollis", "Indigo", "Jamie", "Jay",
+  "Jesse", "Jordan", "Jules", "Kai", "Kendall", "Kennedy", "Kim", "Lane",
+  "Lee", "Lennox", "Linden", "Logan", "Marion", "Marley", "Micah", "Morgan",
+  "Oakley", "Parker", "Pat", "Peyton", "Phoenix", "Quinn", "Reese", "Remy",
+  "Riley", "River", "Robin", "Rory", "Rowan", "Sage", "Sam", "Sasha",
+  "Sawyer", "Shannon", "Shawn", "Shiloh", "Sky", "Skyler", "Spencer", "Sterling",
+  "Sydney", "Taylor", "Terry", "Toby", "Tracy", "Val"
 ];
-
 const TRAINER_MALE_FALLBACK_NAMES = [
-  "Ethan", "Lucas", "Caleb", "Nate", "Victor", "Hugo",
-  "Theo", "Leo", "Bruno", "Felix", "Marco", "Noah"
+  "Aaron", "Alex", "Angelo", "Atsushi", "Barny", "Benjamin", "Blake", "Brenden",
+  "Bryant", "Cameron", "Charlie", "Chris", "Coby", "Conner", "Corey", "Dalton",
+  "Darrin", "Dawson", "Demetrius", "Dirk", "Drew", "Dylan", "Edmond", "Elijah",
+  "Ethan", "Fernando", "Fredrick", "Gerald", "Greg", "Hayden", "Hideo", "Hugo",
+  "Jace", "Jamal", "Jasper", "Jeremy", "John", "Jose", "Jovan", "Kayden",
+  "Kent", "Koji", "Lawson", "Leonel", "Logan", "Lukas", "Marc", "Mason",
+  "Milo", "Nash", "Nicolas", "Norton", "Paul", "Phillip", "Ramiro", "Reed",
+  "Rick", "Rodney", "Ruben", "Sawyer", "Simon", "Takao", "Timmy", "Travis"
+];
+const TRAINER_FEMALE_FALLBACK_NAMES = [
+  "Abigail", "Alexia", "Alice", "Alize", "Alyssa", "Amira", "Angelina", "Anya",
+  "Athena", "Becky", "Beverly", "Brenda", "Brooke", "Carlee", "Carolina", "Celia",
+  "Charlie", "Claire", "Cora", "Cyndy", "Dana", "Darcy", "Denise", "Donny",
+  "Gabrielle", "Grace", "Haley", "Heidi", "Imani", "Isabel", "Isobel", "Janae",
+  "Jasmine", "Jennifer", "Joana", "Johanna", "Kara", "Katelyn", "Katie", "Kaylee",
+  "Kelsey", "Kyra", "Lauren", "Linda", "Lori", "Madeline", "Maria", "Marley",
+  "Maura", "Melissa", "Miriam", "Nancy", "Nikki", "Paige", "Paula", "Reli",
+  "Robin", "Ruth", "Sarah", "Sharon", "Shelby", "Simon", "Sophie", "Sylvia"
 ];
 
-const TRAINER_FEMALE_FALLBACK_NAMES = [
-  "Lyra", "May", "Rosa", "Serena", "Dawn", "Nina",
-  "Clara", "Iris", "Luna", "Maya", "Sofia", "Elena"
-];
+let trainerNameData = null;
+let trainerNameDataPromise = null;
+
+async function loadTrainerNamePools() {
+  if (!trainerNameDataPromise) {
+    trainerNameDataPromise = (async () => {
+      try {
+        const response = await fetch(
+          `modules/${MODULE_ID}/data/trainer-name-pools.json`
+        );
+        if (!response.ok) throw new Error(`Nomes HTTP ${response.status}`);
+        const data = await response.json();
+        if (
+          !data?.classes
+          || !["male", "female", "neutral"].every(
+            gender => uniqueTrainerNames(data.fallbacks?.[gender]).length
+          )
+        ) {
+          throw new Error("Pools de nomes inválidos");
+        }
+        trainerNameData = data;
+      } catch (error) {
+        warnImporterOnce(
+          "trainer-name-pools",
+          "Não foi possível ler os nomes locais; usando os nomes de reserva.",
+          error
+        );
+      }
+      return trainerNameData;
+    })();
+  }
+  return trainerNameDataPromise;
+}
+
+function uniqueTrainerNames(names) {
+  const seen = new Set();
+  return (Array.isArray(names) ? names : []).filter(name => {
+    if (typeof name !== "string" || !name.trim()) return false;
+    const key = name.trim().toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map(name => name.trim());
+}
 
 function normalizedTrainerClass(value) {
   return String(value ?? "")
@@ -140,6 +146,8 @@ function normalizedTrainerClass(value) {
     .replace(/[_-]+/g, " ")
     .replace(/\bbugcatcher\b/g, "bug catcher")
     .replace(/\bblackbelt\b/g, "black belt")
+    .replace(/\bacetrainer\b/g, "ace trainer")
+    .replace(/\bbirdkeeper\b/g, "bird keeper")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -157,7 +165,7 @@ function isGenericPersonEntry(entry) {
     && entry?.provider !== "hgss-sprites";
 }
 
-function inferPersonGender(entry) {
+export function inferPersonGender(entry) {
   const explicit = normalizedTrainerClass(entry?.gender);
   if (["female", "feminino", "f"].includes(explicit)) return "female";
   if (["male", "masculino", "m"].includes(explicit)) return "male";
@@ -165,6 +173,10 @@ function inferPersonGender(entry) {
   const key = normalizedTrainerClass(
     [entry?.name, entry?.id, entry?.group].filter(Boolean).join(" ")
   );
+
+  // An explicit asset marker wins even over a traditionally gendered class.
+  if (/(?:^|\s)(?:f|female)(?:\s|$)/.test(key)) return "female";
+  if (/(?:^|\s)(?:m|male)(?:\s|$)/.test(key)) return "male";
 
   if (
     /(?:^|\s)(?:f|female|girl|woman|lass|beauty|picnicker|maid|nurse|mother|mom|granny)(?:\s|$)/.test(key)
@@ -175,7 +187,7 @@ function inferPersonGender(entry) {
 
   if (
     /(?:^|\s)(?:m|male|boy|man|youngster|gentleman|hiker|fisherman|sailor|camper|father|dad|gramps)(?:\s|$)/.test(key)
-    || /black ?belt\b|bug ?catcher\b/.test(key)
+    || /black ?belt\b|bug ?catcher\b|bird keeper\b|biker\b|scientist\b/.test(key)
   ) {
     return "male";
   }
@@ -198,43 +210,61 @@ function stableTrainerNameOffset(entry, length) {
   return hash % length;
 }
 
-function trainerNamePool(entry) {
+export function trainerNamePool(entry, data = trainerNameData) {
   const key = normalizedTrainerClass(entry?.name);
   const gender = inferPersonGender(entry);
+  const fallbackKey = gender === "unknown" ? "neutral" : gender;
+  const emergency = gender === "female"
+    ? TRAINER_FEMALE_FALLBACK_NAMES
+    : gender === "male"
+      ? TRAINER_MALE_FALLBACK_NAMES
+      : TRAINER_FALLBACK_NAMES;
+  const localFallback = uniqueTrainerNames(data?.fallbacks?.[fallbackKey]);
+  const fallback = localFallback.length ? localFallback : emergency;
+  const classId = TRAINER_NAME_POOLS.find(row => row.match.test(key))?.id;
+  const classData = data?.classes?.[classId];
+  const classNames = uniqueTrainerNames(
+    gender === "unknown"
+      ? [...(classData?.male ?? []), ...(classData?.female ?? [])]
+      : classData?.[gender]
+  );
 
-  /*
-   * Sprites que declaram M/F no próprio nome têm prioridade de gênero.
-   * Isso evita, por exemplo, um Swimmer F receber um nome masculino de uma
-   * pool de classe historicamente mista.
-   */
-  const explicitGenderInAsset =
-    /(?:^|\s)(?:m|male|f|female)(?:\s|$)/.test(
-      normalizedTrainerClass(
-        [entry?.name, entry?.id].filter(Boolean).join(" ")
-      )
-    );
+  if (!classNames.length) return fallback;
 
-  if (explicitGenderInAsset) {
-    if (gender === "female") return TRAINER_FEMALE_FALLBACK_NAMES;
-    if (gender === "male") return TRAINER_MALE_FALLBACK_NAMES;
-  }
-
-  const classPool = TRAINER_NAME_POOLS.find(row => row.match.test(key))?.names;
-  if (classPool?.length) return classPool;
-
-  if (gender === "female") return TRAINER_FEMALE_FALLBACK_NAMES;
-  if (gender === "male") return TRAINER_MALE_FALLBACK_NAMES;
-  return TRAINER_FALLBACK_NAMES;
+  // Use the class AND its gender, then widen short pools without duplicates.
+  // Sequential selection exhausts at least 48 names before repeating.
+  const minimumSize = Math.max(48, classNames.length);
+  return uniqueTrainerNames([...classNames, ...fallback])
+    .slice(0, minimumSize);
 }
 
-function trainerNameAt(entry, index = 0) {
-  const pool = trainerNamePool(entry);
+export function trainerNameAt(entry, index = 0, data = trainerNameData) {
+  const pool = trainerNamePool(entry, data);
   const baseIndex = stableTrainerNameOffset(entry, pool.length);
+  const offset = Number.isFinite(Number(index)) ? Math.trunc(Number(index)) : 0;
   const safeIndex =
-    ((baseIndex + (Number(index) || 0)) % pool.length + pool.length)
-    % pool.length;
+    ((baseIndex + offset) % pool.length + pool.length) % pool.length;
 
   return pool[safeIndex];
+}
+
+export function nextTrainerNameChoice(
+  entry,
+  index = 0,
+  currentName = "",
+  data = trainerNameData
+) {
+  let nextIndex = (Number(index) || 0) + 1;
+  let name = trainerNameAt(entry, nextIndex, data);
+  // A manually entered name can coincide with the next suggestion.
+  if (
+    name.toLocaleLowerCase()
+    === String(currentName).trim().toLocaleLowerCase()
+  ) {
+    nextIndex += 1;
+    name = trainerNameAt(entry, nextIndex, data);
+  }
+  return { index: nextIndex, name };
 }
 
 
@@ -2564,7 +2594,37 @@ function folderParentId(folder) {
     : parent?.id ?? null;
 }
 
-function challengeLibraryData() {
+/*
+ * mist-engine-fvtt/module/data/actor-npc.mjs defines roles: string[] and
+ * limits: { name: string, value: string, consequence: string }[].
+ * Keep textual values (including "-" or infinity) exactly as on the sheet.
+ * https://github.com/MrTheBino/mist-engine-fvtt/blob/main/module/data/actor-npc.mjs
+ */
+export function challengeLibraryDetails(actor) {
+  const system = actor?.system ?? {};
+  const roles = Array.isArray(system.roles)
+    ? system.roles
+    : typeof system.roles === "string"
+      ? system.roles.split(",")
+      : [];
+  const rolesLabel = roles
+    .filter(role => typeof role === "string")
+    .map(role => role.trim())
+    .filter(Boolean)
+    .join(" · ");
+  const limitsLabel = (Array.isArray(system.limits) ? system.limits : [])
+    .map(limit => {
+      const name = String(limit?.name ?? "").trim();
+      const value = String(limit?.value ?? "").trim();
+      return name ? [name, value].filter(Boolean).join(" ") : "";
+    })
+    .filter(Boolean)
+    .join(" · ");
+
+  return { rolesLabel, limitsLabel };
+}
+
+export function challengeLibraryData() {
   const folders =
     Array.from(game.folders ?? [])
       .filter(folder => folder?.type === "Actor");
@@ -2661,6 +2721,7 @@ function challengeLibraryData() {
       .map(actor => {
         const folderId = actorFolderId(actor);
         const folderPath = pathFor(folderId);
+        const details = challengeLibraryDetails(actor);
 
         return {
           actorId: actor.id,
@@ -2669,8 +2730,9 @@ function challengeLibraryData() {
           img: actor.img,
           folderId,
           folderPath,
+          ...details,
           search:
-            [actor.name, folderPath]
+            [actor.name, details.rolesLabel, details.limitsLabel, folderPath]
               .filter(Boolean)
               .join(" ")
               .toLocaleLowerCase()
@@ -2830,8 +2892,10 @@ class PokemonImporterApp
     }
 
     try {
-      const catalog =
-        await loadCatalog();
+      const [catalog] = await Promise.all([
+        loadCatalog(),
+        this.activeTab === "people" ? loadTrainerNamePools() : null
+      ]);
 
       const items =
         (catalog[this.activeTab] ?? [])
@@ -3487,18 +3551,11 @@ class PokemonImporterApp
               ?? ""
           };
 
-          const nextIndex =
-            (
-              this.trainerNameIndexes.get(id)
-              ?? 0
-            )
-            + 1;
-
-          const name =
-            trainerNameAt(
-              entry,
-              nextIndex
-            );
+          const { index: nextIndex, name } = nextTrainerNameChoice(
+            entry,
+            this.trainerNameIndexes.get(id) ?? 0,
+            input.value
+          );
 
           this.trainerNameIndexes.set(
             id,

@@ -222,6 +222,7 @@
               data-challenge-uuid="{{uuid}}"
               data-folder-id="{{folderId}}"
               data-search="{{search}}"
+              title="{{folderPath}}"
               draggable="true"
             >
 
@@ -245,9 +246,17 @@
                   {{name}}
                 </strong>
 
-                <small class="pokemon-challenge-library-path">
-                  {{folderPath}}
-                </small>
+                {{#if rolesLabel}}
+                  <small class="pokemon-challenge-library-roles">
+                    {{rolesLabel}}
+                  </small>
+                {{/if}}
+
+                {{#if limitsLabel}}
+                  <small class="pokemon-challenge-library-limits">
+                    {{limitsLabel}}
+                  </small>
+                {{/if}}
 
                 <button
                   type="button"

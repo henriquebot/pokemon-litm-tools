@@ -32,10 +32,10 @@ async function load(url) {
   let source = await readFile(url, "utf8");
   if (url.pathname.endsWith("/pokemon-combat-effects.js")) {
     // Expose private helpers only inside this isolated test VM.
-    source += "\nexport { replayVfxTargetIds, consequenceVfxActions, floatingSpendState, rollbackContextSpendEntry, litmModulePromises, applyFloatingSpendDelta, applyEffectsToActor };\n";
+    source += "\nexport { replayVfxTargetIds, moveReplayVfxTargetIds, consequenceVfxActions, floatingSpendState, rollbackContextSpendEntry, litmModulePromises, applyFloatingSpendDelta, applyEffectsToActor };\n";
   }
   if (url.pathname.endsWith("/pokemon-guided-flow.js")) {
-    source += "\nexport { consequenceSourcesForScene, activeConsequenceSources, retainPhaseOneSources, recordPhaseOneSources, decorateGmConsequencePanel };\n";
+    source += "\nexport { consequenceSourcesForScene, activeConsequenceSources, retainPhaseOneSources, recordPhaseOneSources, decorateGmConsequencePanel, onTargetGuidedToken };\n";
   }
   const module = new vm.SourceTextModule(source, {
     context,
@@ -83,16 +83,37 @@ assert.equal(combat.replayVfxTargetIds([]).length, 0);
 gm.targets.add({ document: target });
 assert.deepEqual(Array.from(combat.replayVfxTargetIds([])), ["target"], "late target fallback");
 assert.deepEqual(Array.from(combat.replayVfxTargetIds(["stale"])), ["target"], "stale frozen fallback");
+const frozen = { id: "frozen", actor };
+scene.tokens.set(frozen.id, frozen);
+assert.deepEqual(Array.from(combat.replayVfxTargetIds(["frozen"])), ["target"], "CURRENT TARGET > FROZEN TARGET");
+gm.targets.add({ document: target });
+assert.deepEqual(Array.from(combat.replayVfxTargetIds(["frozen"])), ["target"], "current target IDs deduplicated");
+gm.targets.clear();
+gm.targets.add({ document: { id: "target", parent: { id: "other-scene" } } });
+assert.deepEqual(Array.from(combat.replayVfxTargetIds(["frozen"])), ["frozen"], "target from another Scene ignored even if ID collides");
 gm.targets.clear();
 gm.targets.add({ id: "stale" });
 assert.equal(combat.replayVfxTargetIds([]).length, 0, "stale current target ignored");
 assert.deepEqual(Array.from(combat.replayVfxTargetIds(["target"])), ["target"], "frozen valid target retained");
-console.log("PASS VFX late/current/stale targets");
+console.log("PASS VFX CURRENT TARGET > FROZEN TARGET, late/stale/cross-scene targets");
 
 const source = { id: "source", actor: { id: "source-actor" } };
 scene.tokens.set(source.id, source);
 const vfx = { sceneId: scene.id, sourceTokenId: source.id, targetTokenIds: [target.id] };
 assert.equal(combat.consequenceVfxActions(vfx, scene).length, 2);
+gm.targets.clear();
+gm.targets.add({ document: frozen });
+for (const action of combat.consequenceVfxActions(vfx, scene, gm.targets)) {
+  assert.deepEqual(Array.from(action.targetTokenIds), ["frozen"], "consequence/threat replay uses the current target");
+}
+for (const selfTarget of ["self", "user", "users-field"]) {
+  assert.deepEqual(Array.from(combat.moveReplayVfxTargetIds({ target: selfTarget }, source, [target.id])), [source.id], "self move keeps source");
+  const actions = combat.consequenceVfxActions({ ...vfx, moveTarget: selfTarget }, scene, gm.targets);
+  assert.equal(actions.length, 1, "self consequence only has target VFX");
+  assert.deepEqual(Array.from(actions[0].targetTokenIds), [source.id], "self consequence keeps source");
+}
+assert.equal(combat.consequenceVfxActions(vfx, { ...scene, id: "other-scene" }, gm.targets).length, 0, "card from another Scene ignored");
+gm.targets.clear();
 scene.tokens.delete(source.id);
 assert.equal(combat.consequenceVfxActions(vfx, scene).length, 1, "removed source keeps target VFX only");
 scene.tokens.delete(target.id);
@@ -183,3 +204,114 @@ scene.tokens.delete("boss-final-token");
 const sourcesAfterBossLeaves = guided.activeConsequenceSources(scene.id);
 assert.equal(sourcesAfterBossLeaves.some(s => s.tokenId === phaseOneToken.id), false, "stale Phase 1 source removed after final phase leaves");
 console.log("PASS Boss Phase 1 source retained only while final phase remains");
+
+// Minimal DOM semantics: rebuilding a select defaults to its first option,
+// while assigning value explicitly selects the corresponding source.
+class ConsequenceTestElement {
+  constructor(tag) {
+    this.tag = tag;
+    this.children = [];
+    this.dataset = {};
+    this.listeners = new Map();
+    this.options = [];
+    this.selectedValue = "";
+  }
+  set innerHTML(html) {
+    this.children = [];
+    if (this.tag === "select") {
+      this.options = [...html.matchAll(/<option value="([^"]*)"/g)].map(match => match[1]);
+      this.selectedValue = this.options[0] ?? "";
+    }
+  }
+  get value() { return this.selectedValue; }
+  set value(value) { this.selectedValue = this.options.includes(value) ? value : ""; }
+  setAttribute() {}
+  append(...children) { this.children.push(...children); }
+  addEventListener(type, listener) { this.listeners.set(type, listener); }
+  dispatch(type) { this.listeners.get(type)?.({ preventDefault() {} }); }
+  querySelectorAll(selector) {
+    return this.children.flatMap(child => [
+      ...(selector === "[data-pokemon-guided-consequence]" && child.dataset.pokemonGuidedConsequence ? [child] : []),
+      ...child.querySelectorAll(selector)
+    ]);
+  }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
+}
+
+const previousDocument = context.document;
+let mountedConsequenceRoots = [];
+context.document = {
+  createElement: tag => new ConsequenceTestElement(tag),
+  querySelectorAll: selector => mountedConsequenceRoots.flatMap(root => root.querySelectorAll(selector))
+};
+const panelScene = {
+  id: "consequence-panel-scene",
+  tokens: new Map(["first", "second", "third"].map(id => [id, {
+    id,
+    name: id,
+    actor: { id: "actor-" + id, type: "litm-npc", system: { threatsAndConsequences: [{ name: "Ameaça" }] }, getFlag: () => null }
+  }]))
+};
+context.game.scenes.set(panelScene.id, panelScene);
+const consequenceMessage = {
+  id: "consequence-panel-message",
+  getFlag(scope, key) {
+    if (scope === systemId && key === "detailedSpend") return { consequenceResult: 0 };
+    if (scope === moduleId && key === "rollSceneId") return panelScene.id;
+  }
+};
+function panelTargets(...ids) {
+  gm.targets.clear();
+  for (const id of ids) gm.targets.add({ document: { id, parent: { id: panelScene.id } } });
+}
+function renderConsequencePanel() {
+  const root = new ConsequenceTestElement("div");
+  mountedConsequenceRoots = [root];
+  guided.decorateGmConsequencePanel(consequenceMessage, root);
+  const panel = root.querySelector("[data-pokemon-guided-consequence]");
+  assert.ok(panel, "consequence panel rendered");
+  return panel.children.find(child => child.tag === "select");
+}
+
+panelTargets("second");
+let sourceSelect = renderConsequencePanel();
+assert.equal(sourceSelect.value, "token:second", "exact current Challenge explicitly selected on render");
+sourceSelect.value = "token:first";
+sourceSelect.dispatch("change");
+sourceSelect.dispatch("focus");
+sourceSelect.dispatch("pointerdown");
+guided.onTargetGuidedToken(gm);
+assert.equal(sourceSelect.value, "token:first", "manual choice survives refresh with unchanged targets");
+sourceSelect = renderConsequencePanel();
+assert.equal(sourceSelect.value, "token:first", "manual choice survives card re-render with unchanged targets");
+
+panelTargets("third");
+guided.onTargetGuidedToken({ id: "another-user" });
+assert.equal(sourceSelect.value, "token:first", "other user's targeting hook leaves GM choice alone");
+guided.onTargetGuidedToken(gm);
+assert.equal(sourceSelect.value, "token:third", "GM target change updates the visible dropdown");
+panelTargets("second", "third");
+guided.onTargetGuidedToken(gm);
+assert.equal(sourceSelect.value, "token:second", "ambiguous targets preserve the prioritized-source fallback");
+panelTargets();
+guided.onTargetGuidedToken(gm);
+assert.equal(sourceSelect.value, "token:first", "no targets preserve the first-source fallback");
+
+sourceSelect.value = "token:third";
+sourceSelect.dispatch("change");
+sourceSelect = renderConsequencePanel();
+assert.equal(sourceSelect.value, "token:third", "manual choice without targets also survives re-render");
+panelScene.tokens.delete("third");
+sourceSelect.dispatch("focus");
+assert.equal(sourceSelect.value, "token:first", "removed manual source falls back to an active source");
+panelTargets("second");
+sourceSelect = renderConsequencePanel();
+assert.equal(sourceSelect.value, "token:second", "changed targets also update suggestion during re-render");
+gm.targets.clear();
+gm.targets.add({ document: { id: "second", parent: { id: "other-scene" } } });
+guided.onTargetGuidedToken(gm);
+assert.equal(sourceSelect.value, "token:first", "another Scene's target cannot select a matching local ID");
+gm.targets.clear();
+context.game.scenes.delete(panelScene.id);
+context.document = previousDocument;
+console.log("PASS GM source dropdown: target suggestion, manual selection, target hook, re-render and fallback");
