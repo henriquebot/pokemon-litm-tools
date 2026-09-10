@@ -177,9 +177,58 @@ function messageTargetIds(message) {
   return Array.isArray(ids) ? ids : [];
 }
 
-function postMiniCard({
+function miniCardBodyHtml(body) {
+  const safe =
+    esc(body);
+
+  /*
+   * Replica o markup nativo do Mist Engine para Status.
+   * Ex.: [/s fuga-2] -> <mark class="draggable status">fuga-2</mark>.
+   * As classes e data-* são as mesmas usadas pelo sistema, então o card
+   * recebe a aparência/drag padrão sem expor HTML vindo do texto original.
+   */
+  return safe.replace(
+    /\[\/(sn|s)\s+([^\]]+?)\]/gi,
+    (token, kind, value) => {
+      const raw =
+        String(value ?? "").trim();
+
+      const match =
+        raw.match(/^(.*?)(?:-([1-6]))?$/);
+
+      const name =
+        String(match?.[1] ?? raw).trim();
+
+      const level =
+        Number(match?.[2] ?? 0);
+
+      if (!name) {
+        return token;
+      }
+
+      const negative =
+        String(kind).toLowerCase()
+        ===
+        "sn";
+
+      return (
+        '<mark class="draggable status'
+        + (negative ? ' negative' : '')
+        + '" draggable="true" data-type="status"'
+        + (negative ? ' data-positive="false"' : '')
+        + ' data-name="' + name + '" data-value="' + level + '">'
+        + name
+        + (level ? '-' + level : '')
+        + '</mark>'
+      );
+    }
+  );
+}
+
+async function postMiniCard({
   icon = "fa-sparkles",
   title,
+  subtitle = "",
   body = "",
   css = "",
   consequenceVfx = null,
@@ -189,7 +238,12 @@ function postMiniCard({
     '<div class="pokemon-guided-mini-card ' + esc(css) + '">',
     '<i class="fa-solid ' + esc(icon) + '"></i>',
     '<div><strong>' + esc(title) + '</strong>',
-    body ? '<div>' + esc(body) + '</div>' : "",
+    subtitle
+      ? '<small class="pokemon-guided-mini-subtitle">' + esc(subtitle) + '</small>'
+      : "",
+    body
+      ? '<div>' + miniCardBodyHtml(body) + '</div>'
+      : "",
     '</div></div>'
   ].join("");
 
@@ -197,8 +251,8 @@ function postMiniCard({
     content,
 
     /*
-     * Mini-cards são mensagens de interface/narração.
-     * Nunca herdam silenciosamente o token controlado pelo usuário.
+     * Mantemos um speaker técnico para o documento ChatMessage, mas o
+     * cabeçalho visual é ocultado para mini-cards informativos do módulo.
      */
     speaker: {
       alias:
@@ -208,15 +262,18 @@ function postMiniCard({
         )
     },
 
-    ...(consequenceVfx
-      ? {
-          flags: {
-            [MODULE_ID]: {
+    flags: {
+      [MODULE_ID]: {
+        hideSpeaker:
+          true,
+
+        ...(consequenceVfx
+          ? {
               consequenceVfx
             }
-          }
-        }
-      : {})
+          : {})
+      }
+    }
   });
 }
 
@@ -401,7 +458,13 @@ async function discoverForGM(payload) {
       '<div class="pokemon-guided-dialog">'
       + '<p><strong>' + esc(payload.playerName ?? "Jogador") + '</strong> quer descobrir:</p>'
       + '<blockquote>' + esc(payload.question) + '</blockquote>'
-      + (actor ? '<p>Sobre: <strong>' + esc(actor.name) + '</strong></p>' : "")
+      + (
+          payload.subjectLabel || actor
+            ? '<p>Sobre: <strong>'
+              + esc(payload.subjectLabel ?? actor?.name ?? "o cenário")
+              + '</strong></p>'
+            : ""
+        )
       + '<label>Usar um segredo<select name="secret">' + secretOptions + '</select></label>'
       + '<label>Resposta<textarea name="answer" rows="4" placeholder="O que o personagem descobre?"></textarea></label>'
       + '</div>',
@@ -456,54 +519,198 @@ async function onGuidedSocket(message) {
 }
 
 async function handleDiscoverSpend(message) {
-  if (remainingPower(message) < 1) throw new Error("Power insuficiente.");
-  const targets = targetRowsForMessage(message);
+  if (remainingPower(message) < 1) {
+    throw new Error("Power insuficiente.");
+  }
+
+  const targets =
+    targetRowsForMessage(message);
+
   const options = [
     '<option value="scene">Sobre o cenário</option>',
-    ...targets.map(row => '<option value="token:' + esc(row.id) + '">Sobre ' + esc(row.name) + '</option>'),
+    ...targets.map(
+      row =>
+        '<option value="token:' + esc(row.id) + '">Sobre ' + esc(row.name) + '</option>'
+    ),
     '<option value="other">Outra coisa</option>'
   ].join("");
 
-  const choice = await foundry.applications.api.DialogV2.input({
-    window: { title: "Descobrir um detalhe valioso" },
-    content:
-      '<div class="pokemon-guided-dialog">'
-      + '<label>Quero descobrir<select name="scope">' + options + '</select></label>'
-      + '<label>Pergunta<textarea name="question" rows="3" placeholder="O que você quer descobrir?"></textarea></label>'
-      + '</div>',
-    ok: { label: "Perguntar ao GM", icon: "fa-solid fa-magnifying-glass" },
-    modal: true
-  });
-  if (!choice) return;
+  const questionSuggestions = [
+    "O que é isto / quem é?",
+    "O que quer?",
+    "Está mentindo ou escondendo algo?",
+    "Tem alguma fraqueza?",
+    "O que está acontecendo aqui?",
+    "O que aqui é importante, útil ou valioso?",
+    "Que perigo está escondido?"
+  ];
 
-  const question = String(choice.question ?? "").trim();
-  if (!question) throw new Error("Digite o que você quer descobrir.");
+  const suggestionOptions = [
+    '<option value="">Escolha uma pergunta sugerida…</option>',
+    ...questionSuggestions.map(
+      question =>
+        '<option value="' + esc(question) + '">' + esc(question) + '</option>'
+    )
+  ].join("");
 
-  const targetId = String(choice.scope ?? "").startsWith("token:")
-    ? String(choice.scope).slice(6)
-    : null;
-  const target = targets.find(row => row.id === targetId) ?? null;
+  const choice =
+    await foundry.applications.api.DialogV2.input({
+      window: {
+        title:
+          "Descobrir um detalhe valioso"
+      },
 
-  const response = await requestGuidedGM("discover", {
-    sceneId: messageSceneId(message),
-    targetTokenId: target?.id ?? null,
-    targetActorId: target?.actorId ?? null,
-    playerName: game.user.name,
-    question
-  });
-  if (!response || response.cancelled) return;
+      content:
+        '<div class="pokemon-guided-dialog">'
+        + '<label>Quero descobrir<select name="scope">' + options + '</select></label>'
+        + '<label>Pergunta sugerida<select name="suggestion">' + suggestionOptions + '</select></label>'
+        + '<label>Ou escreva sua pergunta<textarea name="question" rows="3" placeholder="O que você quer descobrir?"></textarea></label>'
+        + '<label class="pokemon-guided-check"><input type="checkbox" name="speakAloud"> Vou fazer a pergunta em voz alta</label>'
+        + '<small>Você pode usar uma sugestão, escrever livremente ou apenas falar a pergunta para o grupo.</small>'
+        + '</div>',
 
-  await spendPokemonPower(message, {
-    type: "discover",
-    cost: 1,
-    label: "Descoberta: " + question
-  });
+      ok: {
+        label:
+          "Perguntar ao GM",
+
+        icon:
+          "fa-solid fa-magnifying-glass"
+      },
+
+      modal:
+        true
+    });
+
+  if (!choice) {
+    return;
+  }
+
+  const typed =
+    String(
+      choice.question
+      ?? ""
+    ).trim();
+
+  const suggested =
+    String(
+      choice.suggestion
+      ?? ""
+    ).trim();
+
+  const speakAloud =
+    [true, "true", "on", "1", 1]
+      .includes(
+        choice.speakAloud
+      );
+
+  const question =
+    typed
+    ||
+    suggested
+    ||
+    (
+      speakAloud
+        ? "Pergunta feita em voz alta"
+        : ""
+    );
+
+  if (!question) {
+    throw new Error(
+      "Escolha uma sugestão, escreva a pergunta ou marque que vai falar em voz alta."
+    );
+  }
+
+  const scope =
+    String(
+      choice.scope
+      ?? "scene"
+    );
+
+  const targetId =
+    scope.startsWith("token:")
+      ? scope.slice(6)
+      : null;
+
+  const target =
+    targets.find(
+      row =>
+        row.id === targetId
+    )
+    ?? null;
+
+  const subjectLabel =
+    target?.name
+    ??
+    (
+      scope === "scene"
+        ? "o cenário"
+        : "outra coisa"
+    );
+
+  const response =
+    await requestGuidedGM(
+      "discover",
+      {
+        sceneId:
+          messageSceneId(message),
+
+        targetTokenId:
+          target?.id
+          ?? null,
+
+        targetActorId:
+          target?.actorId
+          ?? null,
+
+        playerName:
+          game.user.name,
+
+        question,
+
+        subjectLabel
+      }
+    );
+
+  if (
+    !response
+    ||
+    response.cancelled
+  ) {
+    return;
+  }
+
+  await spendPokemonPower(
+    message,
+    {
+      type:
+        "discover",
+
+      cost:
+        1,
+
+      label:
+        "Descoberta: "
+        + question
+    }
+  );
 
   await postMiniCard({
-    icon: "fa-magnifying-glass",
-    title: "Descoberta valiosa",
-    body: question + " — " + response.answer,
-    css: "discover"
+    icon:
+      "fa-magnifying-glass",
+
+    title:
+      "Descoberta valiosa",
+
+    subtitle:
+      "Sobre " + subjectLabel,
+
+    body:
+      question
+      + " — "
+      + response.answer,
+
+    css:
+      "discover"
   });
 }
 
@@ -1282,7 +1489,16 @@ async function resolveGuidedConsequence(message, source) {
         ? source.name + " usou " + actionName + "!"
         : source.name + " · " + actionName,
       css: "threat",
-      speakerAlias: source.name
+      speakerAlias: source.name,
+      consequenceVfx: source.kind === "pokemon"
+        ? {
+            sceneId: messageSceneId(message),
+            sourceTokenId: source.tokenId,
+            sourceActorId: source.actorId,
+            targetTokenIds: messageTargetIds(message),
+            type: action?.type ?? "normal"
+          }
+        : null
     });
     await message.setFlag(MODULE_ID, "guidedConsequenceResolved", {
       mode: "threat",
@@ -1403,13 +1619,42 @@ function challengeActionSummary(action) {
 
 async function announceChallengeThreatFromSheet(
   actor,
-  action
+  action,
+  actionIndex = -1
 ) {
   const actionName =
     String(
       action?.name
       ?? "Ameaça"
     );
+
+  const scene =
+    canvas?.scene
+    ?? null;
+
+  const sourceToken =
+    challengeSheetSourceToken(
+      actor
+    );
+
+  const pokemonMove =
+    challengeMoveForSheetAction(
+      actor,
+      action,
+      actionIndex
+    );
+
+  const targetTokenIds =
+    [...(game.user?.targets ?? [])]
+      .map(
+        target =>
+          target?.document?.id
+          ?? target?.id
+      )
+      .filter(
+        id =>
+          !!scene?.tokens?.get(id)
+      );
 
   await postMiniCard({
     icon:
@@ -1429,7 +1674,30 @@ async function announceChallengeThreatFromSheet(
       "threat",
 
     speakerAlias:
-      actor.name
+      actor.name,
+
+    consequenceVfx:
+      pokemonMove
+      && scene
+      && sourceToken
+      && targetTokenIds.length
+        ? {
+            sceneId:
+              scene.id,
+
+            sourceTokenId:
+              sourceToken.id,
+
+            sourceActorId:
+              actor.id,
+
+            targetTokenIds,
+
+            type:
+              pokemonMove?.type
+              ?? "normal"
+          }
+        : null
   });
 }
 
@@ -1825,7 +2093,8 @@ function decorateChallengeQuickActions(
 
           void announceChallengeThreatFromSheet(
             actor,
-            action
+            action,
+            index
           ).catch(error => {
             console.error(
               "Pokemon LITM Tools | Ameaça do Challenge:",
@@ -2442,6 +2711,30 @@ function decorateBossHeader(actor, root) {
 function onRenderGuidedChat(message, html) {
   const root = chatRoot(html);
   if (!root) return;
+
+  if (
+    message.getFlag?.(
+      MODULE_ID,
+      "hideSpeaker"
+    ) === true
+  ) {
+    const messageRoot =
+      root.matches?.(".chat-message")
+        ? root
+        : root.closest?.(".chat-message")
+          ?? root;
+
+    for (
+      const sender
+      of messageRoot.querySelectorAll(
+        ".message-sender, .message-author"
+      )
+    ) {
+      sender.hidden =
+        true;
+    }
+  }
+
   if (detailedSpend(message)) {
     wireGuidedSpendControls(message, root);
     decorateGmConsequencePanel(message, root);

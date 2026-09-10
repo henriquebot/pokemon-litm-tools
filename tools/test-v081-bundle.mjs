@@ -11,6 +11,8 @@ const follower = read("scripts/pokemon-follower.js");
 const combatLayer = read("scripts/pokemon-combat.js");
 const main = read("scripts/main.js");
 const tokenDrop = read("scripts/pokemon-token-drop.js");
+const styles = read("styles/importer.css");
+const creatorTemplate = read("templates/character-creator.hbs");
 
 function ok(name, value) {
   assert.equal(Boolean(value), true, name);
@@ -198,6 +200,72 @@ ok(
   && !combat.includes(
     "getPathsUnder.call(database, root, true)"
   )
+);
+
+ok(
+  "runtime UX: pessoas genéricas recebem nomes variados por gênero",
+  importer.includes("function isGenericPersonEntry(")
+  && importer.includes("function inferPersonGender(")
+  && importer.includes("stableTrainerNameOffset")
+  && importer.includes("TRAINER_MALE_FALLBACK_NAMES")
+  && importer.includes("TRAINER_FEMALE_FALLBACK_NAMES")
+  && template.includes('data-gender="{{gender}}"')
+);
+
+ok(
+  "runtime UX: biblioteca de Challenges usa Actors existentes e subpastas",
+  importer.includes("function challengeLibraryData(")
+  && importer.includes('"li.directory-item.document"') === false
+  && importer.includes('type:\n                "Actor"')
+  && template.includes('data-tab="challenges"')
+  && template.includes('data-role="challenge-folder"')
+  && template.includes("data-challenge-uuid")
+  && template.includes("Abrir ficha")
+);
+
+ok(
+  "runtime UX: Character Creator mostra seleção e personalização em duas colunas",
+  creatorTemplate.includes("pokemon-character-type-card")
+  && creatorTemplate.includes("pokemon-team-customization-tabs")
+  && styles.includes(".pokemon-character-type-card.selected::after")
+  && styles.includes("grid-template-columns:\n    minmax(210px, 280px)")
+);
+
+ok(
+  "runtime UX: mini-cards escondem speaker e formatam Status",
+  guided.includes("hideSpeaker:\n          true")
+  && guided.includes("function miniCardBodyHtml(")
+  && guided.includes('class="draggable status')
+  && guided.includes('".message-sender, .message-author"')
+);
+
+ok(
+  "runtime UX: descoberta tem perguntas sugeridas, voz alta e assunto",
+  guided.includes("Pergunta sugerida")
+  && guided.includes("Vou fazer a pergunta em voz alta")
+  && guided.includes("subjectLabel")
+  && guided.includes('subtitle:\n      "Sobre " + subjectLabel')
+);
+
+ok(
+  "runtime UX: Ameaça rápida leva VFX ilustrativo",
+  guided.includes("announceChallengeThreatFromSheet(\n  actor,\n  action,\n  actionIndex = -1")
+  && guided.includes("targetTokenIds")
+  && combat.includes(".pokemon-guided-mini-card.threat > div")
+);
+
+ok(
+  "runtime UX: neutralidade não aparece no report de consequência",
+  combat.includes("multiplierLabel: compactPokemonMatchupLabel(multiplier)")
+  && combat.includes("move ? compactPokemonMatchupLabel(multiplier) :")
+);
+
+ok(
+  "runtime UX: sidebar diferencia Personagem e Challenge",
+  main.includes('"renderActorDirectory"')
+  && main.includes("decoratePokemonActorDirectoryKinds")
+  && main.includes("pokemon-actor-kind-badge")
+  && styles.includes(".pokemon-actor-kind-challenge")
 );
 
 console.log("Pokemon LITM Tools | v0.8.1 bundle tests passed");

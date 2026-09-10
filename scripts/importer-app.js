@@ -122,32 +122,121 @@ const TRAINER_FALLBACK_NAMES = [
   "Sam", "Jamie", "Drew", "Robin", "Cameron", "Avery"
 ];
 
+const TRAINER_MALE_FALLBACK_NAMES = [
+  "Ethan", "Lucas", "Caleb", "Nate", "Victor", "Hugo",
+  "Theo", "Leo", "Bruno", "Felix", "Marco", "Noah"
+];
+
+const TRAINER_FEMALE_FALLBACK_NAMES = [
+  "Lyra", "May", "Rosa", "Serena", "Dawn", "Nina",
+  "Clara", "Iris", "Luna", "Maya", "Sofia", "Elena"
+];
+
 function normalizedTrainerClass(value) {
   return String(value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase()
     .replace(/[_-]+/g, " ")
+    .replace(/\bbugcatcher\b/g, "bug catcher")
+    .replace(/\bblackbelt\b/g, "black belt")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function isTrainerClassEntry(entry) {
-  return entry?.category === "people"
-    && entry?.personType === "trainer-class";
+function isGenericPersonEntry(entry) {
+  if (entry?.category !== "people") return false;
+  if (entry?.personType === "trainer-class") return true;
+
+  /*
+   * NPCs do pokemon-assets são sprites genéricos (Child M, Guard, Nurse...).
+   * HGSS contém personagens canônicos como Officer Jenny; esses mantêm o
+   * próprio nome e não recebem uma identidade aleatória.
+   */
+  return entry?.personType === "npc"
+    && entry?.provider !== "hgss-sprites";
+}
+
+function inferPersonGender(entry) {
+  const explicit = normalizedTrainerClass(entry?.gender);
+  if (["female", "feminino", "f"].includes(explicit)) return "female";
+  if (["male", "masculino", "m"].includes(explicit)) return "male";
+
+  const key = normalizedTrainerClass(
+    [entry?.name, entry?.id, entry?.group].filter(Boolean).join(" ")
+  );
+
+  if (
+    /(?:^|\s)(?:f|female|girl|woman|lass|beauty|picnicker|maid|nurse|mother|mom|granny)(?:\s|$)/.test(key)
+    || /lady\b|aromanlady\b/.test(key)
+  ) {
+    return "female";
+  }
+
+  if (
+    /(?:^|\s)(?:m|male|boy|man|youngster|gentleman|hiker|fisherman|sailor|camper|father|dad|gramps)(?:\s|$)/.test(key)
+    || /black ?belt\b|bug ?catcher\b/.test(key)
+  ) {
+    return "male";
+  }
+
+  return "unknown";
+}
+
+function stableTrainerNameOffset(entry, length) {
+  if (!length) return 0;
+
+  const key = normalizedTrainerClass(
+    [entry?.id, entry?.name].filter(Boolean).join(" ")
+  );
+
+  let hash = 0;
+  for (let index = 0; index < key.length; index++) {
+    hash = ((hash * 31) + key.charCodeAt(index)) >>> 0;
+  }
+
+  return hash % length;
 }
 
 function trainerNamePool(entry) {
   const key = normalizedTrainerClass(entry?.name);
-  return TRAINER_NAME_POOLS.find(row => row.match.test(key))?.names
-    ?? TRAINER_FALLBACK_NAMES;
+  const gender = inferPersonGender(entry);
+
+  /*
+   * Sprites que declaram M/F no próprio nome têm prioridade de gênero.
+   * Isso evita, por exemplo, um Swimmer F receber um nome masculino de uma
+   * pool de classe historicamente mista.
+   */
+  const explicitGenderInAsset =
+    /(?:^|\s)(?:m|male|f|female)(?:\s|$)/.test(
+      normalizedTrainerClass(
+        [entry?.name, entry?.id].filter(Boolean).join(" ")
+      )
+    );
+
+  if (explicitGenderInAsset) {
+    if (gender === "female") return TRAINER_FEMALE_FALLBACK_NAMES;
+    if (gender === "male") return TRAINER_MALE_FALLBACK_NAMES;
+  }
+
+  const classPool = TRAINER_NAME_POOLS.find(row => row.match.test(key))?.names;
+  if (classPool?.length) return classPool;
+
+  if (gender === "female") return TRAINER_FEMALE_FALLBACK_NAMES;
+  if (gender === "male") return TRAINER_MALE_FALLBACK_NAMES;
+  return TRAINER_FALLBACK_NAMES;
 }
 
 function trainerNameAt(entry, index = 0) {
   const pool = trainerNamePool(entry);
-  const safeIndex = ((Number(index) || 0) % pool.length + pool.length) % pool.length;
+  const baseIndex = stableTrainerNameOffset(entry, pool.length);
+  const safeIndex =
+    ((baseIndex + (Number(index) || 0)) % pool.length + pool.length)
+    % pool.length;
+
   return pool[safeIndex];
 }
+
 
 function warnImporterOnce(
   key,
@@ -2248,7 +2337,7 @@ export async function handlePokemonImporterCanvasDrop(
   }
 
   const forceNew =
-    isTrainerClassEntry(
+    isGenericPersonEntry(
       catalogEntry
     )
     &&
@@ -2454,6 +2543,157 @@ async function chooseActorFolder() {
 
 
 /* --------------------------------------------------------- */
+/* BIBLIOTECA DE CHALLENGES                                  */
+/* --------------------------------------------------------- */
+
+function actorFolderId(document) {
+  const folder = document?.folder ?? null;
+  return typeof folder === "string"
+    ? folder
+    : folder?.id ?? null;
+}
+
+function folderParentId(folder) {
+  const parent =
+    folder?.folder
+    ?? folder?.parent
+    ?? null;
+
+  return typeof parent === "string"
+    ? parent
+    : parent?.id ?? null;
+}
+
+function challengeLibraryData() {
+  const folders =
+    Array.from(game.folders ?? [])
+      .filter(folder => folder?.type === "Actor");
+
+  const candidates =
+    folders.filter(
+      folder =>
+        String(folder?.name ?? "")
+          .trim()
+          .toLocaleLowerCase()
+        === "challenges"
+    );
+
+  const root =
+    candidates.find(folder => !folderParentId(folder))
+    ?? candidates[0]
+    ?? null;
+
+  if (!root) {
+    return {
+      rootMissing: true,
+      items: [],
+      folders: []
+    };
+  }
+
+  const allowed =
+    new Set([root.id]);
+
+  /*
+   * Resolve subpastas sem depender de profundidade fixa.
+   * O limite evita loop caso exista uma referência de pasta corrompida.
+   */
+  for (let pass = 0; pass <= folders.length; pass++) {
+    let changed = false;
+
+    for (const folder of folders) {
+      if (
+        allowed.has(folder.id)
+        || !allowed.has(folderParentId(folder))
+      ) {
+        continue;
+      }
+
+      allowed.add(folder.id);
+      changed = true;
+    }
+
+    if (!changed) break;
+  }
+
+  const byId =
+    new Map(
+      folders.map(folder => [folder.id, folder])
+    );
+
+  function pathFor(folderId) {
+    const names = [];
+    let current = byId.get(folderId) ?? null;
+    const seen = new Set();
+
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id);
+      names.unshift(String(current.name ?? ""));
+      if (current.id === root.id) break;
+      current = byId.get(folderParentId(current)) ?? null;
+    }
+
+    return names.filter(Boolean).join(" / ");
+  }
+
+  const folderRows =
+    folders
+      .filter(folder => allowed.has(folder.id))
+      .map(folder => ({
+        id: folder.id,
+        name: folder.name,
+        path: pathFor(folder.id)
+      }))
+      .sort((a, b) =>
+        a.path.localeCompare(
+          b.path,
+          undefined,
+          { numeric: true, sensitivity: "base" }
+        )
+      );
+
+  const items =
+    Array.from(game.actors ?? [])
+      .filter(actor =>
+        actor?.type === "litm-npc"
+        && allowed.has(actorFolderId(actor))
+      )
+      .map(actor => {
+        const folderId = actorFolderId(actor);
+        const folderPath = pathFor(folderId);
+
+        return {
+          actorId: actor.id,
+          uuid: actor.uuid,
+          name: actor.name,
+          img: actor.img,
+          folderId,
+          folderPath,
+          search:
+            [actor.name, folderPath]
+              .filter(Boolean)
+              .join(" ")
+              .toLocaleLowerCase()
+        };
+      })
+      .sort((a, b) =>
+        a.name.localeCompare(
+          b.name,
+          undefined,
+          { numeric: true, sensitivity: "base" }
+        )
+      );
+
+  return {
+    rootMissing: false,
+    rootId: root.id,
+    items,
+    folders: folderRows
+  };
+}
+
+
+/* --------------------------------------------------------- */
 /* APP                                                       */
 /* --------------------------------------------------------- */
 
@@ -2523,6 +2763,72 @@ class PokemonImporterApp
     const context =
       await super._prepareContext(options);
 
+    const challengeLibrary =
+      challengeLibraryData();
+
+    if (
+      this.activeTab
+      ===
+      "challenges"
+    ) {
+      const items =
+        challengeLibrary.items;
+
+      return {
+        ...context,
+
+        items,
+
+        itemCount:
+          items.length,
+
+        selectedCount:
+          0,
+
+        previewZoomed:
+          this.previewZoomed,
+
+        peopleCount:
+          catalogCache?.people?.length
+          ?? 0,
+
+        pokemonCount:
+          catalogCache?.pokemon?.length
+          ?? 0,
+
+        propsCount:
+          catalogCache?.props?.length
+          ?? 0,
+
+        challengeCount:
+          items.length,
+
+        challengeFolders:
+          challengeLibrary.folders,
+
+        challengeRootMissing:
+          challengeLibrary.rootMissing,
+
+        isPeople:
+          false,
+
+        isPokemon:
+          false,
+
+        isProps:
+          false,
+
+        isChallenges:
+          true,
+
+        dylanActive:
+          false,
+
+        catalogError:
+          null
+      };
+    }
+
     try {
       const catalog =
         await loadCatalog();
@@ -2542,17 +2848,22 @@ class PokemonImporterApp
                 `${entry.category}:${entry.id}`
               ),
 
+            gender:
+              this.activeTab === "people"
+                ? inferPersonGender(entry)
+                : "unknown",
+
             canChooseTrainerName:
               this.activeTab === "people"
               &&
-              isTrainerClassEntry(
+              isGenericPersonEntry(
                 entry
               ),
 
             trainerName:
               this.activeTab === "people"
               &&
-              isTrainerClassEntry(
+              isGenericPersonEntry(
                 entry
               )
                 ? (
@@ -2631,6 +2942,15 @@ class PokemonImporterApp
         propsCount:
           catalog.props.length,
 
+        challengeCount:
+          challengeLibrary.items.length,
+
+        challengeFolders:
+          [],
+
+        challengeRootMissing:
+          false,
+
         isPeople:
           this.activeTab
           ===
@@ -2645,6 +2965,9 @@ class PokemonImporterApp
           this.activeTab
           ===
           "props",
+
+        isChallenges:
+          false,
 
         dylanActive:
           game.modules
@@ -2683,6 +3006,15 @@ class PokemonImporterApp
         propsCount:
           0,
 
+        challengeCount:
+          challengeLibrary.items.length,
+
+        challengeFolders:
+          [],
+
+        challengeRootMissing:
+          false,
+
         isPeople:
           this.activeTab === "people",
 
@@ -2691,6 +3023,9 @@ class PokemonImporterApp
 
         isProps:
           this.activeTab === "props",
+
+        isChallenges:
+          false,
 
         catalogError:
           error.message
@@ -2820,6 +3155,11 @@ class PokemonImporterApp
         "[data-role='person-type']"
       );
 
+    const challengeFolder =
+      this.element.querySelector(
+        "[data-role='challenge-folder']"
+      );
+
     const applyFilter =
       () => {
         const query =
@@ -2834,13 +3174,18 @@ class PokemonImporterApp
           ??
           "all";
 
+        const wantedFolder =
+          challengeFolder?.value
+          ??
+          "all";
+
         let visible = 0;
 
         for (
           const card
           of this.element
             .querySelectorAll(
-              "[data-asset-card]"
+              "[data-asset-card], [data-challenge-card]"
             )
         ) {
           const haystack =
@@ -2856,6 +3201,11 @@ class PokemonImporterApp
             ??
             "";
 
+          const cardFolder =
+            card.dataset.folderId
+            ??
+            "";
+
           const searchOK =
             !query
             ||
@@ -2866,10 +3216,17 @@ class PokemonImporterApp
             ||
             cardType === wantedType;
 
+          const folderOK =
+            wantedFolder === "all"
+            ||
+            cardFolder === wantedFolder;
+
           const show =
             searchOK
             &&
-            typeOK;
+            typeOK
+            &&
+            folderOK;
 
           card.hidden =
             !show;
@@ -2900,6 +3257,10 @@ class PokemonImporterApp
       applyFilter
     );
 
+    challengeFolder?.addEventListener(
+      "change",
+      applyFilter
+    );
 
     /* POKEDEX */
 
@@ -3116,7 +3477,11 @@ class PokemonImporterApp
             category:
               "people",
             personType:
-              "trainer-class",
+              card.dataset.personType
+              ?? "trainer-class",
+            gender:
+              card.dataset.gender
+              ?? "unknown",
             name:
               card.dataset.entryName
               ?? ""
@@ -3147,6 +3512,101 @@ class PokemonImporterApp
 
           input.value =
             name;
+        }
+      );
+    }
+
+
+    /* BIBLIOTECA DE CHALLENGES */
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-open-challenge]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+        event => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const actor =
+            game.actors.get(
+              button.dataset.openChallenge
+            );
+
+          actor?.sheet?.render?.(
+            true
+          );
+        }
+      );
+    }
+
+    for (
+      const card
+      of this.element.querySelectorAll(
+        "[data-challenge-card]"
+      )
+    ) {
+      card.draggable =
+        true;
+
+      for (
+        const image
+        of card.querySelectorAll("img")
+      ) {
+        image.draggable =
+          false;
+      }
+
+      card.addEventListener(
+        "dragstart",
+        event => {
+          const transfer =
+            event.dataTransfer;
+
+          const uuid =
+            card.dataset.challengeUuid;
+
+          if (!transfer || !uuid) {
+            event.preventDefault();
+            return;
+          }
+
+          transfer.effectAllowed =
+            "copy";
+
+          const payload =
+            JSON.stringify({
+              type:
+                "Actor",
+
+              uuid
+            });
+
+          transfer.setData(
+            "text/plain",
+            payload
+          );
+
+          transfer.setData(
+            "application/json",
+            payload
+          );
+
+          card.classList.add(
+            "dragging"
+          );
+        }
+      );
+
+      card.addEventListener(
+        "dragend",
+        () => {
+          card.classList.remove(
+            "dragging"
+          );
         }
       );
     }
@@ -3457,7 +3917,7 @@ class PokemonImporterApp
                 `<i class="fa-solid fa-spinner fa-spin"></i> ${done + 1}/${total}`;
 
               const selectedTrainerName =
-                isTrainerClassEntry(
+                isGenericPersonEntry(
                   entry
                 )
                   ? String(

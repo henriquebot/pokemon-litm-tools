@@ -5958,7 +5958,7 @@ async function applyGuidedChallengeConsequenceDirect(payload) {
           tokenId: token.id,
           targetName: token.name ?? actor.name,
           multiplier,
-          multiplierLabel: matchupLabel(multiplier),
+          multiplierLabel: compactPokemonMatchupLabel(multiplier),
           immune: true,
           applied: []
         });
@@ -5976,7 +5976,7 @@ async function applyGuidedChallengeConsequenceDirect(payload) {
         tokenId: token.id,
         targetName: token.name ?? actor.name,
         multiplier,
-        multiplierLabel: matchupLabel(multiplier),
+        multiplierLabel: compactPokemonMatchupLabel(multiplier),
         resisted: true,
         applied: []
       });
@@ -5996,7 +5996,7 @@ async function applyGuidedChallengeConsequenceDirect(payload) {
       tokenId: token.id,
       targetName: token.name ?? actor.name,
       multiplier,
-      multiplierLabel: move ? matchupLabel(multiplier) : "",
+      multiplierLabel: move ? compactPokemonMatchupLabel(multiplier) : "",
       finalLevel: finalEffect.level,
       applied
     });
@@ -7383,7 +7383,9 @@ function decorateConsequenceVfx(message, root) {
   for (const action of actions) {
     controls.append(iconActionButton(action.title, action.icon, () => replayConsequenceVfx(data, action.mode)));
   }
-  const host = root.querySelector(".pokemon-guided-mini-card.consequence > div")
+  const host = root.querySelector(
+    ".pokemon-guided-mini-card.consequence > div, .pokemon-guided-mini-card.threat > div"
+  )
     ?? root.querySelector(".message-content") ?? root;
   host.append(controls);
 }

@@ -69,6 +69,111 @@ import {
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
+function actorDirectoryRoot(html) {
+  if (html instanceof HTMLElement) return html;
+  if (html?.[0] instanceof HTMLElement) return html[0];
+  return null;
+}
+
+function decoratePokemonActorDirectoryKinds(_app, html) {
+  const root =
+    actorDirectoryRoot(html);
+
+  if (!root) return;
+
+  for (
+    const row
+    of root.querySelectorAll(
+      "li.directory-item.document[data-entry-id]"
+    )
+  ) {
+    if (
+      row.querySelector(
+        "[data-pokemon-actor-kind]"
+      )
+    ) {
+      continue;
+    }
+
+    const actor =
+      game.actors.get(
+        row.dataset.entryId
+      );
+
+    if (!actor) {
+      continue;
+    }
+
+    const kind =
+      actor.type === "litm-character"
+        ? {
+            key:
+              "character",
+            label:
+              "Personagem",
+            icon:
+              "fa-user"
+          }
+        : actor.type === "litm-npc"
+          ? {
+              key:
+                "challenge",
+              label:
+                "Challenge",
+              icon:
+                "fa-triangle-exclamation"
+            }
+          : null;
+
+    if (!kind) {
+      continue;
+    }
+
+    const marker =
+      document.createElement(
+        "span"
+      );
+
+    marker.className =
+      "pokemon-actor-kind-badge "
+      + "pokemon-actor-kind-"
+      + kind.key;
+
+    marker.dataset
+      .pokemonActorKind =
+        kind.key;
+
+    marker.title =
+      kind.label;
+
+    marker.setAttribute(
+      "data-tooltip",
+      kind.label
+    );
+
+    marker.innerHTML =
+      '<i class="fa-solid '
+      + kind.icon
+      + '"></i>';
+
+    const host =
+      row.querySelector(
+        ".entry-name, .document-name"
+      )
+      ?? row;
+
+    host.prepend(
+      marker
+    );
+  }
+}
+
+Hooks.on(
+  "renderActorDirectory",
+  decoratePokemonActorDirectoryKinds
+);
+
+
 Hooks.once("init", () => {
 
   registerPokemonContentSettings();
