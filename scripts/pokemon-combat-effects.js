@@ -7782,31 +7782,31 @@ function usePokemonPtBrLitmCards() {
 const LITM_CARD_PTBR_REPLACEMENTS = [
   [
     /The Narrator decides on a narrative development detrimental to the Hero,/gi,
-    "O Narrador decide um desenvolvimento narrativo prejudicial ao HerÃ³i,"
+    "O Narrador decide um desenvolvimento narrativo prejudicial ao Herói,"
   ],
   [
     /and can give or remove a tag or status in a way that hinders the Hero\./gi,
-    "e pode dar ou remover uma Tag ou Status de forma que atrapalhe o HerÃ³i."
+    "e pode dar ou remover uma Tag ou Status de forma que atrapalhe o Herói."
   ],
   [
     /Success \(as in 10\+\)\s*&\s*Consequences as in Simple action\./gi,
-    "Sucesso (como em 10+) e ConsequÃªncias como em uma aÃ§Ã£o Simples."
+    "Sucesso (como em 10+) e Consequências como em uma ação Simples."
   ],
   [
     /The action unfolds as expected, or better,/gi,
-    "A aÃ§Ã£o acontece como esperado, ou melhor,"
+    "A ação acontece como esperado, ou melhor,"
   ],
   [
     /achieving its intended goal or overcoming an obstacle\./gi,
-    "alcanÃ§ando seu objetivo ou superando um obstÃ¡culo."
+    "alcançando seu objetivo ou superando um obstáculo."
   ],
   [
     /The Narrator can also give you a useful tag or status\./gi,
-    "O Narrador tambÃ©m pode conceder uma Tag ou Status Ãºtil."
+    "O Narrador também pode conceder uma Tag ou Status útil."
   ],
   [
     /Get to Spend Power:/gi,
-    "VocÃª pode gastar Power:"
+    "Você pode gastar Power:"
   ],
   [
     /SPEND POWER ON EFFECTS:/gi,
