@@ -6,6 +6,11 @@ const STATE_KEY =
     "pokemonLitmSelectionOutline"
   );
 
+const STATUS_STATE_KEY =
+  Symbol(
+    "pokemonLitmStatusOutline"
+  );
+
 let hooksInstalled =
   false;
 
@@ -778,6 +783,194 @@ function removeOutline(token) {
     state.mesh,
     state.outline
   );
+}
+
+
+function statusOutlineStateFor(
+  token
+) {
+  const mesh =
+    getRenderable(
+      token
+    );
+
+  let state =
+    token?.[
+      STATUS_STATE_KEY
+    ];
+
+  if (!state) {
+    state = {
+      mesh:
+        null,
+
+      outline:
+        null
+    };
+
+    token[
+      STATUS_STATE_KEY
+    ] =
+      state;
+  }
+
+  if (
+    state.mesh
+    &&
+    state.mesh
+      !== mesh
+  ) {
+    detachFilter(
+      state.mesh,
+      state.outline
+    );
+  }
+
+  state.mesh =
+    mesh;
+
+  return state;
+}
+
+
+export function setPokemonStatusOutline(
+  token,
+  color,
+  alpha = 0.55
+) {
+  if (
+    !token
+    ||
+    token.destroyed
+  ) {
+    return null;
+  }
+
+  const state =
+    statusOutlineStateFor(
+      token
+    );
+
+  if (!state.mesh) {
+    return null;
+  }
+
+  const OutlineFilter =
+    outlineConstructor();
+
+  if (!OutlineFilter) {
+    warnMissingFilters();
+    return null;
+  }
+
+  if (
+    !state.outline
+    ||
+    !(
+      state.outline
+      instanceof
+      OutlineFilter
+    )
+  ) {
+    state.outline =
+      new OutlineFilter(
+        2,
+        color,
+        0.5
+      );
+  }
+
+  state.outline.thickness =
+    2;
+
+  state.outline.color =
+    color;
+
+  state.outline.quality =
+    0.5;
+
+  state.outline.alpha =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        Number(
+          alpha
+          ?? 0.55
+        )
+      )
+    );
+
+  state.outline.padding =
+    4;
+
+  attachFilter(
+    state.mesh,
+    state.outline
+  );
+
+  return state.outline;
+}
+
+
+export function setPokemonStatusOutlineAlpha(
+  token,
+  alpha
+) {
+  const state =
+    token?.[
+      STATUS_STATE_KEY
+    ];
+
+  if (
+    !state?.outline
+  ) {
+    return false;
+  }
+
+  state.outline.alpha =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        Number(
+          alpha
+          ?? 0.55
+        )
+      )
+    );
+
+  return true;
+}
+
+
+export function clearPokemonStatusOutline(
+  token
+) {
+  const state =
+    token?.[
+      STATUS_STATE_KEY
+    ];
+
+  if (!state) {
+    return;
+  }
+
+  detachFilter(
+    state.mesh,
+    state.outline
+  );
+
+  try {
+    state.outline
+      ?.destroy?.();
+  } catch {}
+
+  try {
+    delete token[
+      STATUS_STATE_KEY
+    ];
+  } catch {}
 }
 
 

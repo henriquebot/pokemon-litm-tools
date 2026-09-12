@@ -6513,6 +6513,11 @@ async function addChallengeBiographyActions(
         continue;
       }
 
+      applyPokemonMoveTypeAccent(
+        card,
+        move
+      );
+
       main.querySelector(
         "[data-pokemon-move-mechanics]"
       )?.remove();
@@ -7501,6 +7506,11 @@ async function addPokemonCharacterOtherActions(actor, root) {
     const card = document.createElement("article");
     card.className = "pokemon-character-action-card";
 
+    applyPokemonMoveTypeAccent(
+      card,
+      move
+    );
+
     const main = document.createElement("div");
     main.className = "pokemon-character-action-main";
 
@@ -7770,6 +7780,34 @@ function usePokemonPtBrLitmCards() {
 
 
 const LITM_CARD_PTBR_REPLACEMENTS = [
+  [
+    /The Narrator decides on a narrative development detrimental to the Hero,/gi,
+    "O Narrador decide um desenvolvimento narrativo prejudicial ao HerÃ³i,"
+  ],
+  [
+    /and can give or remove a tag or status in a way that hinders the Hero\./gi,
+    "e pode dar ou remover uma Tag ou Status de forma que atrapalhe o HerÃ³i."
+  ],
+  [
+    /Success \(as in 10\+\)\s*&\s*Consequences as in Simple action\./gi,
+    "Sucesso (como em 10+) e ConsequÃªncias como em uma aÃ§Ã£o Simples."
+  ],
+  [
+    /The action unfolds as expected, or better,/gi,
+    "A aÃ§Ã£o acontece como esperado, ou melhor,"
+  ],
+  [
+    /achieving its intended goal or overcoming an obstacle\./gi,
+    "alcanÃ§ando seu objetivo ou superando um obstÃ¡culo."
+  ],
+  [
+    /The Narrator can also give you a useful tag or status\./gi,
+    "O Narrador tambÃ©m pode conceder uma Tag ou Status Ãºtil."
+  ],
+  [
+    /Get to Spend Power:/gi,
+    "VocÃª pode gastar Power:"
+  ],
   [
     /SPEND POWER ON EFFECTS:/gi,
     "GASTAR POWER EM EFEITOS:"
@@ -8809,9 +8847,38 @@ async function promptCustomContextSpend({ message, actor, move, sourceToken, fro
       + (isTag ? '<p>Esta Tag custa 2 Power.</p>' : '<label>Power / tier<select name="level">' + levelOptions + '</select></label>')
       + '<label class="pokemon-context-checkbox"><input name="negative" type="checkbox" checked> Efeito negativo</label>'
       + '</div>',
+    buttons: [
+      {
+        action: "pokemon-back",
+        label: "Voltar",
+        icon: "fa-solid fa-arrow-left",
+        type: "button"
+      }
+    ],
     ok: { label: "Gastar e aplicar", icon: "fa-solid fa-check" },
     modal: false
   });
+
+  if (
+    choice === "pokemon-back"
+  ) {
+    const context = {
+      message,
+      actor,
+      move,
+      sourceToken,
+      frozenTargetIds
+    };
+
+    return isTag
+      ? openNativePokemonTagSpend(
+          context
+        )
+      : openNativePokemonStatusSpend(
+          context
+        );
+  }
+
   if (!choice) return;
   const name = String(choice.name ?? "").trim();
   if (!name) throw new Error("Digite o nome da Tag ou Status.");

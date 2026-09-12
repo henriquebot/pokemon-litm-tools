@@ -4825,3 +4825,22 @@ has(
       var(--color-border-light-primary)
     ) !important;
 }
+
+
+/* ========================================================= */
+/* POST SMOKE ROUND 3 V4 SAFE                                */
+/* Move cards: tipo somente na borda                         */
+/* ========================================================= */
+
+.pokemon-biography-effect[data-pokemon-effect-kind="move"][data-pokemon-move-type],
+.pokemon-character-action-card[data-pokemon-move-type] {
+  background: transparent !important;
+  border:
+    1px solid
+    var(
+      --pokemon-move-type-color,
+      var(--color-border-light-primary)
+    ) !important;
+  border-inline-start-width: 3px !important;
+  box-shadow: none !important;
+}

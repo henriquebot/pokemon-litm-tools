@@ -90,17 +90,13 @@ function jsFiles(
 
 
 ok(
-  "Pokemon token usa nearest-neighbor",
-  showcase.includes(
-    "function applyPokemonPixelSampling("
+  "Showcase nÃ£o altera sampling da imagem do token",
+  !showcase.includes(
+    "applyPokemonPixelSampling"
   )
   &&
-  showcase.includes(
-    'source.style.scaleMode =\n          "nearest"'
-  )
-  &&
-  showcase.includes(
-    "applyPokemonPixelSampling(\n    token"
+  !showcase.includes(
+    'scaleMode =\n          "nearest"'
   )
 );
 
@@ -116,15 +112,15 @@ ok(
   )
   &&
   showcase.includes(
+    "setPokemonStatusOutline("
+  )
+  &&
+  showcase.includes(
+    "setPokemonStatusOutlineAlpha("
+  )
+  &&
+  !showcase.includes(
     "statusOutlineSprites"
-  )
-  &&
-  showcase.includes(
-    "new PIXI.Sprite("
-  )
-  &&
-  showcase.includes(
-    "state.statusOutline.alpha"
   )
   &&
   !showcase.includes(

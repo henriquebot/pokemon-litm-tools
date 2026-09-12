@@ -1,3 +1,9 @@
+import {
+  setPokemonStatusOutline,
+  setPokemonStatusOutlineAlpha,
+  clearPokemonStatusOutline
+} from "./token-outline.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const SOCKET_NAME = `module.${MODULE_ID}`;
 
@@ -232,90 +238,26 @@ function waterPokemon(
 }
 
 
-function applyPokemonPixelSampling(
-  token
-) {
-  const candidates = [
-    token?.mesh,
-    token?.icon,
-    ...(Array.isArray(token?.mesh?.children) ? token.mesh.children : [])
-  ].filter(Boolean);
-
-  const visited = new Set();
-
-  for (
-    const display
-    of candidates
-  ) {
-    const texture =
-      display?.texture
-      ?? null;
-
-    if (
-      !texture
-      ||
-      visited.has(
-        texture
-      )
-    ) {
-      continue;
-    }
-
-    visited.add(
-      texture
-    );
-
-    try {
-      const source =
-        texture.source
-        ?? texture.baseTexture
-        ?? null;
-
-      if (
-        source?.style
-        &&
-        "scaleMode" in source.style
-      ) {
-        source.style.scaleMode =
-          "nearest";
-      }
-
-      if (
-        source
-        &&
-        "scaleMode" in source
-      ) {
-        source.scaleMode =
-          "nearest";
-      }
-
-      if (
-        texture.baseTexture
-        &&
-        globalThis.PIXI
-          ?.SCALE_MODES
-          ?.NEAREST
-          !== undefined
-      ) {
-        texture.baseTexture.scaleMode =
-          PIXI.SCALE_MODES.NEAREST;
-      }
-    } catch {}
-  }
-}
-
-
 function normalizedStatusRowText(
   row
 ) {
-  return [
-    row?.name,
-    row?.status,
-    row?.tag,
-    row?.text
-  ]
-    .filter(Boolean)
-    .join(" ")
+  const value =
+    typeof row === "string"
+      ? row
+      : [
+          row?.name,
+          row?.status,
+          row?.tag,
+          row?.value,
+          row?.text
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+  return String(
+    value
+    ?? ""
+  )
     .normalize("NFD")
     .replace(
       /[\u0300-\u036f]/g,
@@ -408,23 +350,16 @@ function statusProfile(
     const row
     of rows
   ) {
-    const isStatus =
-      row?.isStatus
-        === true
-      ||
-      Number(
-        row?.value
-        ?? 0
-      ) > 0;
-
     if (
-      !isStatus
-      ||
-      row?.expired
-        === true
-      ||
-      row?.planned
-        === true
+      typeof row !== "string"
+      &&
+      (
+        row?.expired
+          === true
+        ||
+        row?.planned
+          === true
+      )
     ) {
       continue;
     }
@@ -735,6 +670,10 @@ function safeDestroy(
 function clearTokenShowcase(
   token
 ) {
+  clearPokemonStatusOutline(
+    token
+  );
+
   const state =
     tokenStates.get(
       token
@@ -776,110 +715,6 @@ function clearTokenShowcase(
 }
 
 
-function syncStatusOutlineSprites(
-  token,
-  state
-) {
-  const mesh =
-    token?.mesh
-    ?? token?.icon
-    ?? null;
-
-  if (
-    !mesh
-    ||
-    !state?.statusOutlineSprites
-      ?.length
-  ) {
-    return;
-  }
-
-  for (
-    const entry
-    of state.statusOutlineSprites
-  ) {
-    const sprite =
-      entry.sprite;
-
-    if (
-      !sprite
-      ||
-      sprite.destroyed
-    ) {
-      continue;
-    }
-
-    try {
-      if (
-        mesh.texture
-        &&
-        sprite.texture
-          !== mesh.texture
-      ) {
-        sprite.texture =
-          mesh.texture;
-      }
-
-      sprite.anchor.set(
-        Number(
-          mesh.anchor?.x
-          ?? 0.5
-        ),
-        Number(
-          mesh.anchor?.y
-          ?? 0.5
-        )
-      );
-
-      sprite.pivot.set(
-        Number(
-          mesh.pivot?.x
-          ?? 0
-        ),
-        Number(
-          mesh.pivot?.y
-          ?? 0
-        )
-      );
-
-      sprite.position.set(
-        Number(
-          mesh.position?.x
-          ?? 0
-        )
-          + entry.dx,
-        Number(
-          mesh.position?.y
-          ?? 0
-        )
-          + entry.dy
-      );
-
-      sprite.scale.set(
-        Number(
-          mesh.scale?.x
-          ?? 1
-        ),
-        Number(
-          mesh.scale?.y
-          ?? 1
-        )
-      );
-
-      sprite.rotation =
-        Number(
-          mesh.rotation
-          ?? 0
-        );
-
-      sprite.visible =
-        mesh.visible
-          !== false;
-    } catch {}
-  }
-}
-
-
 function drawTokenShowcase(
   token
 ) {
@@ -896,10 +731,6 @@ function drawTokenShowcase(
   ) {
     return;
   }
-
-  applyPokemonPixelSampling(
-    token
-  );
 
   if (
     !tokenFxEnabled()
@@ -1030,86 +861,14 @@ function drawTokenShowcase(
     ?? token?.icon
     ?? null;
 
-  let statusOutline =
-    null;
-
-  const statusOutlineSprites =
-    [];
-
-  if (
+  const statusOutlineFilter =
     status
-    &&
-    mesh?.texture
-  ) {
-    statusOutline =
-      new PIXI.Container();
-
-    statusOutline.eventMode =
-      "none";
-
-    statusOutline.zIndex =
-      -12;
-
-    under.addChild(
-      statusOutline
-    );
-
-    const offsets = [
-      [-2, 0],
-      [2, 0],
-      [0, -2],
-      [0, 2],
-      [-1.5, -1.5],
-      [1.5, -1.5],
-      [-1.5, 1.5],
-      [1.5, 1.5]
-    ];
-
-    for (
-      const [
-        dx,
-        dy
-      ]
-      of offsets
-    ) {
-      const sprite =
-        new PIXI.Sprite(
-          mesh.texture
-        );
-
-      sprite.tint =
-        status.color;
-
-      sprite.alpha =
-        1;
-
-      sprite.roundPixels =
-        true;
-
-      sprite.eventMode =
-        "none";
-
-      statusOutline.addChild(
-        sprite
-      );
-
-      statusOutlineSprites.push({
-        sprite,
-        dx,
-        dy
-      });
-    }
-
-    syncStatusOutlineSprites(
-      token,
-      {
-        statusOutlineSprites
-      }
-    );
-
-    statusOutline.alpha =
-      0.52;
-  }
+      ? setPokemonStatusOutline(
+          token,
+          status.color,
+          0.55
+        )
+      : null;
 
   const basePivotY =
     Number(
@@ -1125,8 +884,7 @@ function drawTokenShowcase(
       shadow,
       waterOuter,
       waterInner,
-      statusOutline,
-      statusOutlineSprites,
+      statusOutlineFilter,
       statusId:
         status?.id
         ?? null,
@@ -1254,19 +1012,16 @@ function showcaseTick() {
     }
 
     if (
-      state.statusOutline
+      state.statusOutlineFilter
     ) {
-      syncStatusOutlineSprites(
+      setPokemonStatusOutlineAlpha(
         token,
-        state
-      );
-
-      state.statusOutline.alpha =
-        0.42
+        0.50
         + (
           wave + 1
         )
-        * 0.11;
+        * 0.08
+      );
     }
   }
 }
