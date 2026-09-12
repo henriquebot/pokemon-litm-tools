@@ -237,6 +237,16 @@ ok(
 );
 
 ok(
+  "runtime cleanup: Destino foi incorporado à etapa 1 e wizard tem 4 etapas",
+  builder.includes('"Configuração",\n      "Perfil",\n      "Golpes",\n      "Revisão"')
+  && builder.includes('challengeFolderMode: "existing"')
+  && builder.includes('this.config.challengeFolderMode ===\n          "scene"')
+  && builderTemplate.includes('data-builder-field="challengeFolderMode"')
+  && builderTemplate.includes("Scene atual — {{sceneFolderLabel}} (padrão)")
+  && builderTemplate.includes("Etapa {{step}} de 4")
+);
+
+ok(
   "runtime UX: Character Creator mostra seleção e personalização em duas colunas",
   creatorTemplate.includes("pokemon-character-type-card")
   && creatorTemplate.includes("pokemon-team-customization-tabs")
@@ -296,8 +306,9 @@ for (const [input, expected] of [
   ["Trainer Acetrainer F Pe 01mbms4g", "Trainer Acetrainer F"],
   ["Trainer Acetrainer M Pe 01xyz", "Trainer Acetrainer M"],
   ["Trainer Acetrainer F", "Trainer Acetrainer F"],
-  ["Trainer Farmer Pe 01xyz", "Trainer Farmer Pe 01xyz"],
-  ["Trainer FM Pe 01xyz", "Trainer FM Pe 01xyz"],
+  ["Trainer Backers Pe 01jmzofq", "Trainer Backers"],
+  ["Trainer Farmer Pe 01xyz", "Trainer Farmer"],
+  ["Trainer FM Pe 01xyz", "Trainer FM"],
   ["Professor Oak", "Professor Oak"],
   ["Trainer\tF\tPe 01xyz", "Trainer\tF"],
   ["", ""]
@@ -321,5 +332,10 @@ assert.equal(Boolean(isChallenge(null)), false);
 assert.equal(isChallenge({ ...flagged("litm-npc"), documentName: "Item" }), false);
 assert.equal(isChallenge({ ...flagged("litm-npc"), getFlag: () => false }), false);
 ok("controle do Criador de Challenge exige Actor litm-npc mesmo com flag antiga", true);
+
+ok(
+  "Pokemon Manager não recebe Pokédex no header",
+  links.includes('root.classList?.contains(\n      "pokemon-manager"')
+);
 
 console.log("Pokemon LITM Tools | v0.8.1 bundle tests passed");

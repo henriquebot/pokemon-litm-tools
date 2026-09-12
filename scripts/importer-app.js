@@ -19,10 +19,20 @@ export function formatPokemonAssetLabel(name) {
   const label = String(name ?? "");
   const gender = /(?:^|\s)[FM](?=\s|$)/i.exec(label);
 
-  return gender
+  if (gender) {
+    return label.slice(
+      0,
+      gender.index + gender[0].length
+    ).trimEnd();
+  }
+
+  const technicalSuffix =
+    /(?:^|\s)Pe(?=\s|$)/i.exec(label);
+
+  return technicalSuffix
     ? label.slice(
         0,
-        gender.index + gender[0].length
+        technicalSuffix.index
       ).trimEnd()
     : label;
 }

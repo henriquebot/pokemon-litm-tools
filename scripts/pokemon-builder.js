@@ -933,10 +933,18 @@ async function resolveImporterSceneChallengeFolder() {
 async function resolveChallengeFolder(
   config
 ) {
+  const folderMode =
+    String(
+      config.challengeFolderMode
+      ?? ""
+    ).trim();
+
   if (
     config.autoSceneFolder === true
     &&
     config.mode === "challenge"
+    &&
+    folderMode === "scene"
   ) {
     try {
       const automaticFolderId =
@@ -965,16 +973,24 @@ async function resolveChallengeFolder(
   }
 
   let folderId =
-    String(
-      config.folderId
-      ?? ""
-    ).trim();
+    folderMode === "new"
+      ? ""
+      : String(
+          config.folderId
+          ?? ""
+        ).trim();
 
   const newFolder =
-    String(
-      config.newFolder
-      ?? ""
-    ).trim();
+    (
+      folderMode === "existing"
+      ||
+      folderMode === "scene"
+    )
+      ? ""
+      : String(
+          config.newFolder
+          ?? ""
+        ).trim();
 
   if (newFolder) {
     const folder =
@@ -3031,7 +3047,8 @@ class PokemonChallengeWizardApp
     trainerId: "",
     destination: "team",
     folderId: "",
-    newFolder: ""
+    newFolder: "",
+    challengeFolderMode: "existing"
   };
 
   constructor(entry, prepareDefinition, options = {}) {
@@ -3059,6 +3076,10 @@ class PokemonChallengeWizardApp
       && !this.existingActor;
     this.config.autoSceneFolder =
       this.autoSceneFolder;
+    this.config.challengeFolderMode =
+      this.autoSceneFolder
+        ? "scene"
+        : "existing";
     this.config.mode = requestedKind === "theme" ? "player-theme" : "challenge";
 
     if (this.existingActor) {
@@ -3069,6 +3090,7 @@ class PokemonChallengeWizardApp
       this.config.trainerId = flags.trainerNpcId ?? "";
       this.config.folderId = this.existingActor.folder?.id ?? "";
       this.config.newFolder = "";
+      this.config.challengeFolderMode = "existing";
     }
   }
 
@@ -3192,7 +3214,7 @@ class PokemonChallengeWizardApp
     const context =
       await super._prepareContext(options);
 
-    if (this.step >= 3) {
+    if (this.step >= 2) {
       await this._ensureData();
     }
 
@@ -3202,7 +3224,6 @@ class PokemonChallengeWizardApp
 
     const progressNames = [
       "Configuração",
-      "Destino",
       "Perfil",
       "Golpes",
       "Revisão"
@@ -3433,7 +3454,7 @@ class PokemonChallengeWizardApp
             )
         );
 
-      if (this.step === 5) {
+      if (this.step === 4) {
         const built =
           this._buildReview();
 
@@ -3501,26 +3522,12 @@ class PokemonChallengeWizardApp
       this.selectedMoveIds.size;
 
     const canNext =
-      (
-        this.step === 1
-      )
+      this.step === 1
       ||
-      (
-        this.step === 2
-        &&
-        (
-          this.config.mode === "challenge"
-          ||
-          !!this.config.trainerId
-        )
-      )
+      this.step === 2
       ||
       (
         this.step === 3
-      )
-      ||
-      (
-        this.step === 4
         &&
         selectedCount >= 1
         &&
@@ -3547,16 +3554,16 @@ class PokemonChallengeWizardApp
         this.step === 1,
 
       stepIsDestination:
-        this.step === 2,
+        false,
 
       stepIsProfile:
-        this.step === 3,
+        this.step === 2,
 
       stepIsMoves:
-        this.step === 4,
+        this.step === 3,
 
       stepIsReview:
-        this.step === 5,
+        this.step === 4,
 
       isChallenge:
         this.config.mode ===
@@ -3582,6 +3589,18 @@ class PokemonChallengeWizardApp
               : ""
           )
         ),
+
+      challengeFolderModeScene:
+        this.config.challengeFolderMode ===
+          "scene",
+
+      challengeFolderModeExisting:
+        this.config.challengeFolderMode ===
+          "existing",
+
+      challengeFolderModeNew:
+        this.config.challengeFolderMode ===
+          "new",
 
       isTrainer:
         this.config.mode ===
@@ -3674,12 +3693,12 @@ class PokemonChallengeWizardApp
       canNext:
         canNext
         &&
-        this.step < 5
+        this.step < 4
         &&
         !this.busy,
 
       canCreate:
-        this.step === 5
+        this.step === 4
         &&
         !this.busy,
 
@@ -3703,9 +3722,13 @@ class PokemonChallengeWizardApp
     field("mode")
       ?.addEventListener(
         "change",
-        event => {
+        async event => {
           this.config.mode =
             event.currentTarget.value;
+
+          await this.render({
+            force: true
+          });
         }
       );
 
@@ -3743,6 +3766,19 @@ class PokemonChallengeWizardApp
         event => {
           this.config.newFolder =
             event.currentTarget.value;
+        }
+      );
+
+    field("challengeFolderMode")
+      ?.addEventListener(
+        "change",
+        async event => {
+          this.config.challengeFolderMode =
+            event.currentTarget.value;
+
+          await this.render({
+            force: true
+          });
         }
       );
 
@@ -3842,7 +3878,7 @@ class PokemonChallengeWizardApp
         }
 
         const next = this.element.querySelector("[data-action='builderNext']");
-        if (next && this.step === 2) next.disabled = false;
+        if (next && this.step === 1) next.disabled = false;
       });
     }
 
@@ -4009,7 +4045,7 @@ class PokemonChallengeWizardApp
           if (this.busy) return;
 
           if (
-            this.step === 2
+            this.step === 1
             &&
             this.config.mode !==
               "challenge"
@@ -4023,13 +4059,33 @@ class PokemonChallengeWizardApp
           }
 
           if (
-            this.step === 2
+            this.step === 1
+            &&
+            this.config.mode ===
+              "challenge"
+            &&
+            this.config.challengeFolderMode ===
+              "new"
+            &&
+            !String(
+              this.config.newFolder
+              ?? ""
+            ).trim()
+          ) {
+            ui.notifications.warn(
+              "Digite o nome da nova pasta."
+            );
+            return;
+          }
+
+          if (
+            this.step === 1
           ) {
             await this._ensureData();
           }
 
           if (
-            this.step === 4
+            this.step === 3
             &&
             (
               this.selectedMoveIds.size
@@ -4045,7 +4101,7 @@ class PokemonChallengeWizardApp
             return;
           }
 
-          if (this.step < 5) {
+          if (this.step < 4) {
             this.step++;
           }
 
