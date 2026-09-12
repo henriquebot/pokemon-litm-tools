@@ -39,6 +39,244 @@ let creatorApp = null;
 
 const archetypeCatalogPromises = new Map();
 
+let rangerThemeCatalogPromise = null;
+
+async function loadRangerThemes() {
+  if (!rangerThemeCatalogPromise) {
+    rangerThemeCatalogPromise =
+      fetch("modules/" + MODULE_ID + "/data/ranger-themes.json")
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Nao foi possivel carregar os Themes Ranger.");
+          }
+          return response.json();
+        })
+        .then(data =>
+          Array.isArray(data?.themes)
+            ? data.themes
+            : []
+        );
+  }
+
+  return rangerThemeCatalogPromise;
+}
+
+
+function makeRangerThemeDraft(theme) {
+  return {
+    presetIndex:
+      theme?.id ?? null,
+
+    presetSourceId:
+      "ranger",
+
+    rangerThemeId:
+      theme?.id ?? null,
+
+    rangerPresetName:
+      String(theme?.presetName ?? ""),
+
+    rangerQuestions:
+      foundry.utils.deepClone(
+        theme?.questions ?? {}
+      ),
+
+    name:
+      String(theme?.presetName ?? ""),
+
+    titleTag:
+      "",
+
+    powerTags: [
+      "",
+      ""
+    ],
+
+    weaknessTags: [
+      ""
+    ],
+
+    quest:
+      ""
+  };
+}
+
+
+function rangerDraftAnswer(draft, key) {
+  if (key === "title") return String(draft?.titleTag ?? "");
+  if (key === "power1") return String(draft?.powerTags?.[0] ?? "");
+  if (key === "power2") return String(draft?.powerTags?.[1] ?? "");
+  if (key === "weakness") return String(draft?.weaknessTags?.[0] ?? "");
+  if (key === "quest") return String(draft?.quest ?? "");
+  return "";
+}
+
+
+function setRangerDraftAnswer(draft, key, value) {
+  const clean = String(value ?? "");
+
+  if (key === "title") {
+    draft.titleTag = clean;
+  } else if (key === "power1") {
+    draft.powerTags[0] = clean;
+  } else if (key === "power2") {
+    draft.powerTags[1] = clean;
+  } else if (key === "weakness") {
+    draft.weaknessTags[0] = clean;
+  } else if (key === "quest") {
+    draft.quest = clean;
+  }
+}
+
+
+function rangerThemeFields(draft, slotIndex) {
+  const definitions = [
+    ["title", "Title Tag"],
+    ["power1", "Power Tag 1"],
+    ["power2", "Power Tag 2"],
+    ["weakness", "Weakness Tag"],
+    ["quest", "Quest"]
+  ];
+
+  return definitions.map(([key, label]) => {
+    const question =
+      draft?.rangerQuestions?.[key]
+      ?? {};
+
+    return {
+      key,
+      label,
+      prompt:
+        String(question?.prompt ?? ""),
+
+      value:
+        rangerDraftAnswer(
+          draft,
+          key
+        ),
+
+      suggestions:
+        (question?.suggestions ?? [])
+          .map(text => ({
+            text:
+              String(text),
+
+            key,
+            slotIndex
+          }))
+    };
+  });
+}
+
+
+async function ensureRangerStyler(actor) {
+  let backpack =
+    actor?.items?.find?.(
+      item => item.type === "backpack"
+    )
+    ?? null;
+
+  if (!backpack) {
+    const created =
+      await actor.createEmbeddedDocuments(
+        "Item",
+        [
+          {
+            name:
+              "Backpack",
+
+            type:
+              "backpack",
+
+            system: {
+              items:
+                []
+            }
+          }
+        ]
+      );
+
+    backpack =
+      created?.[0]
+      ?? null;
+  }
+
+  if (!backpack) {
+    throw new Error(
+      "Backpack do Ranger não encontrada."
+    );
+  }
+
+  const items =
+    foundry.utils.deepClone(
+      backpack.system?.items
+      ?? []
+    );
+
+  if (
+    !items.some(
+      row =>
+        String(row?.name ?? "")
+          .trim()
+          .toLocaleLowerCase()
+          === "styler básico"
+    )
+  ) {
+    items.push({
+      name:
+        "Styler básico",
+
+      burned:
+        false,
+
+      toBurn:
+        false,
+
+      planned:
+        false,
+
+      selected:
+        false
+    });
+
+    await backpack.update({
+      "system.items":
+        items
+    });
+  }
+
+  return backpack;
+}
+
+
+async function saveRangerDesiredPokemon(
+  actor,
+  entries
+) {
+  const clean =
+    (entries ?? [])
+      .filter(Boolean)
+      .slice(0, 6);
+
+  await actor.setFlag(
+    MODULE_ID,
+    "rangerDesiredPokemonIds",
+    clean.map(
+      entry => entry.id
+    )
+  );
+
+  await actor.setFlag(
+    MODULE_ID,
+    "rangerDesiredPokemonNames",
+    clean.map(
+      entry => entry.name
+    )
+  );
+
+  return clean;
+}
+
 export function formatCharacterSpriteLabel(name) {
   return formatPokemonAssetLabel(name);
 }
@@ -59,7 +297,19 @@ async function loadCharacterArchetypes(mode = "trainer") {
           }
           return response.json();
         })
-        .then(data => Array.isArray(data?.archetypes) ? data.archetypes : [])
+        .then(data => {
+          const rows =
+            Array.isArray(data?.archetypes)
+              ? data.archetypes
+              : [];
+
+          return key === "trainer"
+            ? rows.filter(
+                archetype =>
+                  archetype?.id !== "ranger"
+              )
+            : rows;
+        })
     );
   }
   return archetypeCatalogPromises.get(key);
@@ -71,6 +321,11 @@ function makeThemeDraft(
   presetIndex = null,
   presetSourceId = null
 ) {
+  const sourcePowerTags =
+    Array.isArray(theme?.powerTags)
+      ? theme.powerTags
+      : [];
+
   return {
     presetIndex,
     presetSourceId,
@@ -81,17 +336,25 @@ function makeThemeDraft(
         ?? ""
       ),
 
-    powerTags:
-      Array.from(
-        {
-          length: 3
-        },
-        (_, index) =>
-          String(
-            theme?.powerTags?.[index]
-            ?? ""
-          )
+    titleTag:
+      String(
+        theme?.titleTag
+        ?? sourcePowerTags[0]
+        ?? ""
       ),
+
+    powerTags:
+      [
+        String(
+          sourcePowerTags[1]
+          ?? ""
+        ),
+
+        String(
+          sourcePowerTags[2]
+          ?? ""
+        )
+      ],
 
     weaknessTags: [
       String(
@@ -908,6 +1171,8 @@ class PokemonCharacterCreatorApp
 
   dreamSelections = [];
 
+  rangerThemeSelections = [];
+
   archetypeId = null;
 
   archetypeVariantId = null;
@@ -918,7 +1183,9 @@ class PokemonCharacterCreatorApp
 
 
   get totalSteps() {
-    return this.mode === "pokemon" ? 6 : 7;
+    return this.mode === "pokemon"
+      ? 6
+      : 7;
   }
 
 
@@ -972,7 +1239,12 @@ class PokemonCharacterCreatorApp
             ?? ""
           ).trim()
           &&
-          powerTags.length === 3
+          !!String(
+            draft?.titleTag
+            ?? ""
+          ).trim()
+          &&
+          powerTags.length === 2
           &&
           powerTags.every(
             tag =>
@@ -1000,6 +1272,18 @@ class PokemonCharacterCreatorApp
 
 
   _teamReady() {
+    if (
+      this.mode === "ranger"
+    ) {
+      return (
+        this.teamSize === 1
+        &&
+        this.teamSelections.length === 1
+        &&
+        !!this.teamSelections[0]
+      );
+    }
+
     if (
       this.mode !== "trainer"
     ) {
@@ -1123,6 +1407,11 @@ class PokemonCharacterCreatorApp
       )
       ||
       (
+        this.mode === "ranger"
+        && [3, 6, 7].includes(this.step)
+      )
+      ||
+      (
         this.mode === "pokemon"
         && [5, 6].includes(this.step)
         && this.visualSource === "catalog"
@@ -1157,7 +1446,7 @@ class PokemonCharacterCreatorApp
           entry => ({
             ...entry,
 
-            displayName: this.mode === "trainer"
+            displayName: (this.mode === "trainer" || this.mode === "ranger")
               ? formatCharacterSpriteLabel(entry.name)
               : entry.name,
 
@@ -1202,7 +1491,7 @@ class PokemonCharacterCreatorApp
                   ),
 
             secondaryMeta:
-              this.mode === "trainer"
+              (this.mode === "trainer" || this.mode === "ranger")
                 ? (
                     entry.providerLabel
                     ||
@@ -1224,9 +1513,15 @@ class PokemonCharacterCreatorApp
     let teamSlots = [];
 
     if (
-      this.step === 5
-      &&
-      this.mode === "trainer"
+      (
+        this.mode === "trainer"
+        && this.step === 5
+      )
+      ||
+      (
+        this.mode === "ranger"
+        && this.step === 3
+      )
     ) {
       teamItems =
         catalog.pokemon.map(
@@ -1422,9 +1717,23 @@ class PokemonCharacterCreatorApp
     let dreamItems = [];
 
     if (
-      this.step === 7
-      &&
-      this.mode === "trainer"
+      (
+        this.mode === "ranger"
+        && this.step === 7
+        && this._teamReady()
+        && this.rangerThemeSelections.length === 4
+        && this._themesReady()
+      )
+      ||
+      (
+        this.mode === "trainer"
+        && this.step === 7
+      )
+      ||
+      (
+        this.mode === "ranger"
+        && this.step === 6
+      )
     ) {
       dreamItems =
         catalog.pokemon.map(
@@ -1659,7 +1968,11 @@ class PokemonCharacterCreatorApp
     let selectedArchetype = null;
 
     if (
-      this.mode
+      (
+        this.mode === "trainer"
+        ||
+        this.mode === "pokemon"
+      )
       &&
       this.step >= 3
     ) {
@@ -1723,6 +2036,80 @@ class PokemonCharacterCreatorApp
               )
             ?? null
         };
+      }
+    }
+
+
+    let rangerThemes = [];
+    let rangerThemeOptions = [];
+
+    if (
+      this.mode === "ranger"
+      &&
+      this.step >= 4
+    ) {
+      rangerThemes =
+        await loadRangerThemes();
+
+      const selected =
+        new Set(
+          this.rangerThemeSelections
+        );
+
+      rangerThemeOptions =
+        rangerThemes.map(
+          theme => ({
+            ...theme,
+
+            selected:
+              selected.has(
+                theme.id
+              )
+          })
+        );
+
+      if (
+        this.step >= 5
+        &&
+        this.rangerThemeSelections.length === 4
+      ) {
+        const draftIds =
+          (this.themeDrafts ?? [])
+            .map(
+              draft =>
+                draft?.rangerThemeId
+            );
+
+        const selectionChanged =
+          draftIds.length !== 4
+          ||
+          this.rangerThemeSelections.some(
+            (id, index) =>
+              id !== draftIds[index]
+          );
+
+        if (selectionChanged) {
+          const byId =
+            new Map(
+              rangerThemes.map(
+                theme => [
+                  theme.id,
+                  theme
+                ]
+              )
+            );
+
+          this.themeDrafts =
+            this.rangerThemeSelections
+              .map(
+                id =>
+                  byId.get(id)
+              )
+              .filter(Boolean)
+              .map(
+                makeRangerThemeDraft
+              );
+        }
       }
     }
 
@@ -1794,6 +2181,9 @@ class PokemonCharacterCreatorApp
             name:
               draft.name,
 
+            titleTag:
+              draft.titleTag,
+
             powerTags:
               draft.powerTags.map(
                 (name, tagIndex) => ({
@@ -1830,6 +2220,33 @@ class PokemonCharacterCreatorApp
                     === "custom"
               }
             ]
+          })
+        );
+    }
+
+
+    if (
+      this.mode === "ranger"
+      &&
+      this.step >= 5
+    ) {
+      themeEditorSlots =
+        this.themeDrafts.map(
+          (draft, slotIndex) => ({
+            index:
+              slotIndex,
+
+            number:
+              slotIndex + 1,
+
+            presetName:
+              draft.rangerPresetName,
+
+            fields:
+              rangerThemeFields(
+                draft,
+                slotIndex
+              )
           })
         );
     }
@@ -1908,6 +2325,29 @@ class PokemonCharacterCreatorApp
       )
       ||
       (
+        this.mode === "ranger"
+        && this.step === 3
+        && this._teamReady()
+      )
+      ||
+      (
+        this.mode === "ranger"
+        && this.step === 4
+        && this.rangerThemeSelections.length === 4
+      )
+      ||
+      (
+        this.mode === "ranger"
+        && this.step === 5
+        && this._themesReady()
+      )
+      ||
+      (
+        this.mode === "ranger"
+        && this.step === 6
+      )
+      ||
+      (
         this.mode === "pokemon"
         && this.step === 3
         && profileReady
@@ -1969,6 +2409,22 @@ class PokemonCharacterCreatorApp
         this.mode === "trainer"
         && this.step === 5,
 
+      stepIsRangerPartner:
+        this.mode === "ranger"
+        && this.step === 3,
+
+      stepIsRangerThemePick:
+        this.mode === "ranger"
+        && this.step === 4,
+
+      stepIsRangerDesired:
+        this.mode === "ranger"
+        && this.step === 6,
+
+      stepIsRangerReview:
+        this.mode === "ranger"
+        && this.step === 7,
+
       stepIsPokemonTeam:
         this.mode === "trainer"
         && this.step === 6,
@@ -1995,6 +2451,10 @@ class PokemonCharacterCreatorApp
         || (
           this.mode === "pokemon"
           && this.step === 4
+        )
+        || (
+          this.mode === "ranger"
+          && this.step === 5
         ),
 
       stepIsPokemonProfile:
@@ -2008,11 +2468,21 @@ class PokemonCharacterCreatorApp
       isTrainer:
         this.mode === "trainer",
 
+      isRanger:
+        this.mode === "ranger",
+
+      isHuman:
+        this.mode === "trainer"
+        || this.mode === "ranger",
+
       isPokemon:
         this.mode === "pokemon",
 
       showTrainerProgress:
         this.mode === "trainer",
+
+      showRangerProgress:
+        this.mode === "ranger",
 
       characterName:
         this.characterName,
@@ -2052,6 +2522,38 @@ class PokemonCharacterCreatorApp
 
       dreamCount:
         this.dreamSelections.length,
+
+      rangerThemeOptions,
+
+      rangerThemeCount:
+        this.rangerThemeSelections.length,
+
+      rangerPartner:
+        this.mode === "ranger"
+        && catalog
+          ? (
+              catalog.pokemon.find(
+                entry =>
+                  entry.id
+                  === this.teamSelections[0]
+              )
+              ?? null
+            )
+          : null,
+
+      rangerDesired:
+        this.mode === "ranger"
+        && catalog
+          ? this.dreamSelections
+              .map(
+                id =>
+                  catalog.pokemon.find(
+                    entry =>
+                      entry.id === id
+                  )
+              )
+              .filter(Boolean)
+          : [],
 
       archetypes,
 
@@ -2188,6 +2690,11 @@ class PokemonCharacterCreatorApp
         this.mode === "trainer"
         && [5, 7].includes(this.step)
       )
+      ||
+      (
+        this.mode === "ranger"
+        && [3, 6].includes(this.step)
+      )
     ) {
       refreshPokemonAssetPreviews(
         this.element,
@@ -2249,6 +2756,9 @@ class PokemonCharacterCreatorApp
             this.dreamSelections =
               [];
 
+            this.rangerThemeSelections =
+              [];
+
             this.archetypeId =
               null;
 
@@ -2257,6 +2767,20 @@ class PokemonCharacterCreatorApp
 
             this.themeDrafts =
               [];
+
+            if (
+              mode === "ranger"
+            ) {
+              this.teamSize =
+                1;
+
+              this.teamSelections = [
+                null
+              ];
+
+              this.teamSlot =
+                0;
+            }
           }
 
           for (
@@ -3125,6 +3649,62 @@ class PokemonCharacterCreatorApp
     }
 
 
+    /* THEMES RANGER */
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-ranger-theme-id]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+        async () => {
+          const id =
+            button.dataset
+              .rangerThemeId;
+
+          if (!id) return;
+
+          const index =
+            this.rangerThemeSelections
+              .indexOf(id);
+
+          if (index >= 0) {
+            this.rangerThemeSelections.splice(
+              index,
+              1
+            );
+
+            this.themeDrafts = [];
+          } else {
+            if (
+              this.rangerThemeSelections.length
+              >= 4
+            ) {
+              ui.notifications.warn(
+                "Escolha exatamente 4 Themes Ranger."
+              );
+
+              return;
+            }
+
+            this.rangerThemeSelections.push(
+              id
+            );
+
+            this.themeDrafts = [];
+          }
+
+          await this.render({
+            force:
+              true
+          });
+        }
+      );
+    }
+
+
     /* PERFIL */
 
     for (
@@ -3320,6 +3900,43 @@ class PokemonCharacterCreatorApp
     for (
       const input
       of this.element.querySelectorAll(
+        "[data-theme-title-tag]"
+      )
+    ) {
+      input.addEventListener(
+        "input",
+        () => {
+          const slot =
+            Number(
+              input.dataset
+                .themeTitleTag
+            );
+
+          if (
+            !this.themeDrafts[slot]
+          ) return;
+
+          this.themeDrafts[slot]
+            .titleTag =
+              input.value;
+
+          this.themeDrafts[slot]
+            .presetIndex =
+              "custom";
+
+          this.themeDrafts[slot]
+            .presetSourceId =
+              null;
+
+          refreshThemeFinish();
+        }
+      );
+    }
+
+
+    for (
+      const input
+      of this.element.querySelectorAll(
         "[data-theme-power]"
       )
     ) {
@@ -3432,6 +4049,115 @@ class PokemonCharacterCreatorApp
     }
 
 
+    /* RESPOSTAS DOS THEMES RANGER */
+
+    for (
+      const input
+      of this.element.querySelectorAll(
+        "[data-ranger-answer]"
+      )
+    ) {
+      input.addEventListener(
+        "input",
+        () => {
+          const slot =
+            Number(
+              input.dataset
+                .rangerSlot
+            );
+
+          const key =
+            input.dataset
+              .rangerField;
+
+          const draft =
+            this.themeDrafts[slot];
+
+          if (
+            !draft
+            || !key
+          ) {
+            return;
+          }
+
+          setRangerDraftAnswer(
+            draft,
+            key,
+            input.value
+          );
+
+          refreshThemeFinish();
+        }
+      );
+    }
+
+
+    for (
+      const button
+      of this.element.querySelectorAll(
+        "[data-ranger-suggestion]"
+      )
+    ) {
+      button.addEventListener(
+        "click",
+        () => {
+          const slot =
+            Number(
+              button.dataset
+                .rangerSlot
+            );
+
+          const key =
+            button.dataset
+              .rangerField;
+
+          const value =
+            String(
+              button.dataset
+                .rangerValue
+              ?? ""
+            );
+
+          const draft =
+            this.themeDrafts[slot];
+
+          if (
+            !draft
+            || !key
+          ) {
+            return;
+          }
+
+          setRangerDraftAnswer(
+            draft,
+            key,
+            value
+          );
+
+          const input =
+            this.element.querySelector(
+              '[data-ranger-answer]'
+              + '[data-ranger-slot="'
+              + slot
+              + '"]'
+              + '[data-ranger-field="'
+              + CSS.escape(key)
+              + '"]'
+            );
+
+          if (input) {
+            input.value =
+              value;
+
+            input.focus();
+          }
+
+          refreshThemeFinish();
+        }
+      );
+    }
+
+
     /* VOLTAR */
 
     this.element
@@ -3503,6 +4229,30 @@ class PokemonCharacterCreatorApp
             this.mode === "trainer"
             && this.step === 6
             && !this._pokemonReady()
+          ) {
+            return;
+          }
+
+          if (
+            this.mode === "ranger"
+            && this.step === 3
+            && !this._teamReady()
+          ) {
+            return;
+          }
+
+          if (
+            this.mode === "ranger"
+            && this.step === 4
+            && this.rangerThemeSelections.length !== 4
+          ) {
+            return;
+          }
+
+          if (
+            this.mode === "ranger"
+            && this.step === 5
+            && !this._themesReady()
           ) {
             return;
           }
@@ -3695,7 +4445,11 @@ class PokemonCharacterCreatorApp
 
 
             if (
-              this.mode === "trainer"
+              (
+                this.mode === "trainer"
+                ||
+                this.mode === "ranger"
+              )
               &&
               Number(
                 this.teamSize
@@ -3769,6 +4523,75 @@ class PokemonCharacterCreatorApp
                 actor,
                 dreamEntries
               );
+            }
+
+
+            if (
+              this.mode === "ranger"
+            ) {
+              const catalog =
+                await loadPokemonAssetCatalog();
+
+              const byId =
+                new Map(
+                  catalog.pokemon.map(
+                    entry => [
+                      entry.id,
+                      entry
+                    ]
+                  )
+                );
+
+              const desiredEntries =
+                this.dreamSelections
+                  .map(
+                    id =>
+                      byId.get(id)
+                  )
+                  .filter(Boolean);
+
+              await saveRangerDesiredPokemon(
+                actor,
+                desiredEntries
+              );
+
+              await ensureRangerStyler(
+                actor
+              );
+
+              await actor.setFlag(
+                MODULE_ID,
+                "characterRole",
+                "ranger"
+              );
+
+              await actor.setFlag(
+                MODULE_ID,
+                "rangerPartnerAssetId",
+                this.teamSelections[0]
+                ?? null
+              );
+
+              const partnerTheme =
+                actor.items.find(
+                  item =>
+                    item.type === "themebook"
+                    &&
+                    item.getFlag?.(
+                      MODULE_ID,
+                      "assetId"
+                    )
+                      === this.teamSelections[0]
+                )
+                ?? null;
+
+              if (partnerTheme) {
+                await partnerTheme.setFlag(
+                  MODULE_ID,
+                  "rangerPartner",
+                  true
+                );
+              }
             }
 
 
@@ -3895,7 +4718,9 @@ class PokemonCharacterCreatorApp
             await createCharacterThemes(
               actor,
               this.themeDrafts,
-              this.archetypeId,
+              this.mode === "ranger"
+                ? "ranger"
+                : this.archetypeId,
               {
                 pokemonMode:
                   this.mode === "pokemon",

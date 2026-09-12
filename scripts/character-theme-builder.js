@@ -57,7 +57,11 @@ function validProfileDraft(draft) {
       draft?.name
     )
     &&
-    powerTags.length === 3
+    !!cleanText(
+      draft?.titleTag
+    )
+    &&
+    powerTags.length === 2
     &&
     powerTags.every(
       tag =>
@@ -195,7 +199,7 @@ function profileThemeData(
   index,
   archetypeId
 ) {
-  const powerTags =
+  const additionalPowerTags =
     (
       Array.isArray(
         draft?.powerTags
@@ -204,8 +208,24 @@ function profileThemeData(
         : []
     )
       .map(cleanText)
-      .filter(Boolean)
-      .map(buildTag);
+      .filter(Boolean);
+
+  /*
+   * O Foundry/LitM atual não usa Item.name nas rolagens.
+   * O primeiro system.powertags é visualmente tratado como
+   * a Tag principal (classe "first") e entra normalmente
+   * no DiceRollApp. Por isso a Title Tag precisa ocupar
+   * powertags[0], enquanto draft.powerTags guarda apenas
+   * as duas Power Tags adicionais.
+   */
+  const powerTags = [
+    cleanText(
+      draft?.titleTag
+    ),
+    ...additionalPowerTags
+  ]
+    .filter(Boolean)
+    .map(buildTag);
 
   const weaknessTags =
     (
@@ -270,6 +290,11 @@ function profileThemeData(
 
         characterThemeSlot:
           index,
+
+        titleTagName:
+          cleanText(
+            draft?.titleTag
+          ),
 
         archetypeId,
 
@@ -634,8 +659,8 @@ export async function createCharacterThemes(
   if (!validDrafts) {
     throw new Error(
       pokemonMode
-        ? "Os 2 Temas de Perfil precisam ter nome, 3 Tags de Poder, 1 Tag de Fraqueza e Quest."
-        : "Os 4 Temas precisam ter nome, 3 Tags de Poder, 1 Tag de Fraqueza e Quest."
+        ? "Os 2 Temas de Perfil precisam ter nome, 2 Tags de Poder adicionais, 1 Tag de Fraqueza e Quest."
+        : "Os 4 Temas precisam ter nome, 2 Tags de Poder adicionais, 1 Tag de Fraqueza e Quest."
     );
   }
 

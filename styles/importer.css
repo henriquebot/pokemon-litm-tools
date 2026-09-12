@@ -4844,3 +4844,152 @@ has(
   border-inline-start-width: 3px !important;
   box-shadow: none !important;
 }
+
+/* ========================================================= */
+/* NEXT PULL RANGER + UX                                     */
+/* ========================================================= */
+
+.pokemon-character-type-grid {
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+}
+
+.pokemon-ranger-theme-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.pokemon-ranger-theme-option {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 16px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 8px;
+}
+
+.pokemon-ranger-theme-option.selected {
+  box-shadow:
+    inset 0 0 0 2px
+    var(--color-border-highlight);
+}
+
+.pokemon-ranger-theme-count {
+  margin-top: 10px;
+  font-size: 1.05rem;
+}
+
+.pokemon-ranger-question {
+  display: grid;
+  gap: 7px;
+  padding: 10px 0;
+  border-top: 1px solid rgb(255 255 255 / .08);
+}
+
+.pokemon-ranger-question > small {
+  opacity: .75;
+}
+
+.pokemon-ranger-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pokemon-ranger-suggestions button {
+  width: auto;
+  min-height: 30px;
+  padding: 4px 9px;
+  font-size: .82rem;
+}
+
+.pokemon-ranger-review-grid,
+.pokemon-ranger-review-themes {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pokemon-ranger-review-themes {
+  margin-top: 16px;
+}
+
+.pokemon-ranger-review-grid > article {
+  padding: 14px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 8px;
+}
+
+
+/* POKEMON MOVE CARDS - BORDER ONLY */
+
+.pokemon-biography-effect[data-pokemon-effect-kind="move"][data-pokemon-move-type],
+.pokemon-character-action-card[data-pokemon-move-type] {
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.pokemon-biography-effect[data-pokemon-effect-kind="move"][data-pokemon-move-type]::before,
+.pokemon-biography-effect[data-pokemon-effect-kind="move"][data-pokemon-move-type]::after,
+.pokemon-character-action-card[data-pokemon-move-type]::before,
+.pokemon-character-action-card[data-pokemon-move-type]::after {
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+
+/* COMPLETE GUIDED MOVE CARD */
+
+.pokemon-guided-rich-body {
+  margin-top: 7px;
+}
+
+.pokemon-guided-move-card {
+  display: grid;
+  gap: 7px;
+}
+
+.pokemon-guided-move-badges,
+.pokemon-guided-move-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.pokemon-guided-move-badges > span,
+.pokemon-guided-move-effects > span {
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: .78rem;
+}
+
+.pokemon-guided-move-description {
+  margin: 0;
+}
+
+.pokemon-guided-move-result {
+  padding-top: 6px;
+  border-top: 1px solid rgb(255 255 255 / .14);
+}
+
+@media (max-width: 900px) {
+  .pokemon-character-type-grid,
+  .pokemon-ranger-theme-grid,
+  .pokemon-ranger-review-grid,
+  .pokemon-ranger-review-themes {
+    grid-template-columns: 1fr;
+  }
+}

@@ -90,7 +90,7 @@ function jsFiles(
 
 
 ok(
-  "Showcase nÃ£o altera sampling da imagem do token",
+  "Showcase não altera sampling da imagem do token",
   !showcase.includes(
     "applyPokemonPixelSampling"
   )

@@ -4440,6 +4440,30 @@ function applyPokemonMoveTypeAccent(element, move) {
   if (!Object.hasOwn(TYPE_COLORS, type)) return;
   element.dataset.pokemonMoveType = type;
   element.style.setProperty("--pokemon-move-type-color", typeColor(type));
+
+  element.style.setProperty(
+    "background",
+    "transparent",
+    "important"
+  );
+
+  element.style.setProperty(
+    "background-color",
+    "transparent",
+    "important"
+  );
+
+  element.style.setProperty(
+    "background-image",
+    "none",
+    "important"
+  );
+
+  element.style.setProperty(
+    "box-shadow",
+    "none",
+    "important"
+  );
 }
 
 function createPokemonMoveTypeBadge(mechanics) {

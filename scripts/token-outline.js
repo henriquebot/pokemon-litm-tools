@@ -790,14 +790,10 @@ function statusOutlineStateFor(
   token
 ) {
   const mesh =
-    getRenderable(
-      token
-    );
+    getRenderable(token);
 
   let state =
-    token?.[
-      STATUS_STATE_KEY
-    ];
+    token?.[STATUS_STATE_KEY];
 
   if (!state) {
     state = {
@@ -805,24 +801,29 @@ function statusOutlineStateFor(
         null,
 
       outline:
+        null,
+
+      glow:
         null
     };
 
-    token[
-      STATUS_STATE_KEY
-    ] =
+    token[STATUS_STATE_KEY] =
       state;
   }
 
   if (
     state.mesh
     &&
-    state.mesh
-      !== mesh
+    state.mesh !== mesh
   ) {
     detachFilter(
       state.mesh,
       state.outline
+    );
+
+    detachFilter(
+      state.mesh,
+      state.glow
     );
   }
 
@@ -836,7 +837,7 @@ function statusOutlineStateFor(
 export function setPokemonStatusOutline(
   token,
   color,
-  alpha = 0.55
+  alpha = 0.40
 ) {
   if (
     !token
@@ -874,14 +875,14 @@ export function setPokemonStatusOutline(
   ) {
     state.outline =
       new OutlineFilter(
-        2,
+        5,
         color,
         0.5
       );
   }
 
   state.outline.thickness =
-    2;
+    5;
 
   state.outline.color =
     color;
@@ -896,18 +897,88 @@ export function setPokemonStatusOutline(
         1,
         Number(
           alpha
-          ?? 0.55
+          ?? 0.40
         )
       )
     );
 
   state.outline.padding =
-    4;
+    9;
 
   attachFilter(
     state.mesh,
     state.outline
   );
+
+  const GlowFilter =
+    glowConstructor();
+
+  if (GlowFilter) {
+    if (
+      !state.glow
+      ||
+      !(
+        state.glow
+        instanceof
+        GlowFilter
+      )
+    ) {
+      state.glow =
+        new GlowFilter({
+          distance:
+            7,
+
+          outerStrength:
+            1.1,
+
+          innerStrength:
+            0,
+
+          color,
+
+          quality:
+            0.12,
+
+          alpha:
+            0.18,
+
+          knockout:
+            false
+        });
+    }
+
+    state.glow.distance =
+      7;
+
+    state.glow.outerStrength =
+      1.1;
+
+    state.glow.innerStrength =
+      0;
+
+    state.glow.color =
+      color;
+
+    state.glow.quality =
+      0.12;
+
+    state.glow.alpha =
+      Math.min(
+        0.24,
+        Math.max(
+          0.10,
+          state.outline.alpha * 0.45
+        )
+      );
+
+    state.glow.padding =
+      10;
+
+    attachFilter(
+      state.mesh,
+      state.glow
+    );
+  }
 
   return state.outline;
 }
@@ -918,9 +989,7 @@ export function setPokemonStatusOutlineAlpha(
   alpha
 ) {
   const state =
-    token?.[
-      STATUS_STATE_KEY
-    ];
+    token?.[STATUS_STATE_KEY];
 
   if (
     !state?.outline
@@ -928,17 +997,31 @@ export function setPokemonStatusOutlineAlpha(
     return false;
   }
 
-  state.outline.alpha =
+  const normalized =
     Math.max(
       0,
       Math.min(
         1,
         Number(
           alpha
-          ?? 0.55
+          ?? 0.40
         )
       )
     );
+
+  state.outline.alpha =
+    normalized;
+
+  if (state.glow) {
+    state.glow.alpha =
+      Math.min(
+        0.24,
+        Math.max(
+          0.10,
+          normalized * 0.45
+        )
+      );
+  }
 
   return true;
 }
@@ -948,9 +1031,7 @@ export function clearPokemonStatusOutline(
   token
 ) {
   const state =
-    token?.[
-      STATUS_STATE_KEY
-    ];
+    token?.[STATUS_STATE_KEY];
 
   if (!state) {
     return;
@@ -961,8 +1042,18 @@ export function clearPokemonStatusOutline(
     state.outline
   );
 
+  detachFilter(
+    state.mesh,
+    state.glow
+  );
+
   try {
     state.outline
+      ?.destroy?.();
+  } catch {}
+
+  try {
+    state.glow
       ?.destroy?.();
   } catch {}
 

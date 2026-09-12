@@ -28,12 +28,12 @@ ok(
 );
 
 ok(
-  "showcase nÃ£o altera sampling do token",
+  "showcase não altera sampling do token",
   !showcase.includes("applyPokemonPixelSampling")
 );
 
 ok(
-  "status nÃ£o usa Ã­cone cÃ­rculo nem sprites duplicados",
+  "status não usa ícone círculo nem sprites duplicados",
   !showcase.includes("statusOutlineSprites")
   && !showcase.includes("syncStatusOutlineSprites")
   && !showcase.includes("let statusIcon =")
@@ -59,11 +59,11 @@ ok(
 );
 
 ok(
-  "prosa padrÃ£o LitM possui traduÃ§Ã£o PT-BR",
-  combat.includes("O Narrador decide um desenvolvimento narrativo prejudicial ao HerÃ³i")
-  && combat.includes("Sucesso (como em 10+) e ConsequÃªncias")
-  && combat.includes("A aÃ§Ã£o acontece como esperado, ou melhor")
-  && combat.includes("VocÃª pode gastar Power:")
+  "prosa padrão LitM possui tradução PT-BR",
+  combat.includes("O Narrador decide um desenvolvimento narrativo prejudicial ao Herói")
+  && combat.includes("Sucesso (como em 10+) e Consequências")
+  && combat.includes("A ação acontece como esperado, ou melhor")
+  && combat.includes("Você pode gastar Power:")
 );
 
 console.log("Pokemon LITM Tools | post-smoke round 3 v4 safe tests passed");

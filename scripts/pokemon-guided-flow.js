@@ -7,6 +7,10 @@ import {
   pokemonMoveTargetIsImmune
 } from "./pokemon-combat-effects.js";
 
+import {
+  moveLitmProfile
+} from "./pokemon-content.js";
+
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 const SOCKET_NAME = "module." + MODULE_ID;
@@ -230,6 +234,7 @@ async function postMiniCard({
   title,
   subtitle = "",
   body = "",
+  bodyHtml = "",
   css = "",
   consequenceVfx = null,
   speakerAlias = "Pokémon LITM Tools"
@@ -241,9 +246,11 @@ async function postMiniCard({
     subtitle
       ? '<small class="pokemon-guided-mini-subtitle">' + esc(subtitle) + '</small>'
       : "",
-    body
-      ? '<div>' + miniCardBodyHtml(body) + '</div>'
-      : "",
+    bodyHtml
+      ? '<div class="pokemon-guided-rich-body">' + bodyHtml + '</div>'
+      : body
+        ? '<div>' + miniCardBodyHtml(body) + '</div>'
+        : "",
     '</div></div>'
   ].join("");
 
@@ -1366,6 +1373,99 @@ function pokemonMoveEffects(move) {
   return [];
 }
 
+function pokemonMoveRichBodyHtml(
+  move,
+  resultSummary = ""
+) {
+  const mechanics =
+    moveLitmProfile(
+      move
+    );
+
+  const badges =
+    (
+      mechanics?.badges
+      ?? []
+    )
+      .filter(Boolean)
+      .map(
+        badge =>
+          '<span>'
+          + esc(badge)
+          + '</span>'
+      )
+      .join("");
+
+  const description =
+    String(
+      move?.description
+      ?? move?.shortDescription
+      ?? ""
+    ).trim();
+
+  const effects =
+    pokemonMoveEffects(
+      move
+    );
+
+  const effectHtml =
+    effects.length
+      ? (
+          '<div class="pokemon-guided-move-effects">'
+          + '<strong>Efeitos:</strong> '
+          + effects.map(
+              effect =>
+                '<span>'
+                + esc(
+                    String(
+                      effect?.name
+                      ?? "efeito"
+                    )
+                    + (
+                        effect?.kind === "tag"
+                          ? ""
+                          : "-"
+                            + Number(
+                                effect?.level
+                                ?? 1
+                              )
+                      )
+                  )
+                + '</span>'
+            ).join("")
+          + '</div>'
+        )
+      : "";
+
+  const resultHtml =
+    resultSummary
+      ? (
+          '<div class="pokemon-guided-move-result">'
+          + '<strong>Resultado:</strong> '
+          + esc(resultSummary)
+          + '</div>'
+        )
+      : "";
+
+  return (
+    '<div class="pokemon-guided-move-card">'
+    + (
+        badges
+          ? '<div class="pokemon-guided-move-badges">' + badges + '</div>'
+          : ""
+      )
+    + (
+        description
+          ? '<p class="pokemon-guided-move-description">' + esc(description) + '</p>'
+          : ""
+      )
+    + effectHtml
+    + resultHtml
+    + '</div>'
+  );
+}
+
+
 function consequenceEffectChoices(move, effects, targetActors) {
   return effects.map((effect, index) => ({ effect, index }))
     .filter(({ effect }) => !targetActors.length
@@ -1400,6 +1500,22 @@ async function chooseThreatOrConsequence(source, action) {
       + '<p><strong>' + esc(source.name) + '</strong> · ' + esc(action?.name ?? action?.id ?? action) + '</p>'
       + '<label>Resolver como<select name="mode"><option value="threat">Ameaça · anunciar na ficção</option><option value="consequence">Consequência · aplicar efeito</option></select></label>'
       + '</div>',
+    buttons: [
+      {
+        action:
+          "pokemon-back",
+
+        label:
+          "Voltar",
+
+        icon:
+          "fa-solid fa-arrow-left",
+
+        type:
+          "button"
+      }
+    ],
+
     ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
     modal: false
   });
@@ -1555,10 +1671,38 @@ async function chooseConsequenceEffect(source, action, sceneId) {
 }
 
 async function resolveGuidedConsequence(message, source) {
-  const action = await chooseSourceAction(source);
-  if (!action) return;
-  const mode = await chooseThreatOrConsequence(source, action);
-  if (!mode) return;
+  let action =
+    null;
+
+  let mode =
+    null;
+
+  while (true) {
+    action =
+      await chooseSourceAction(
+        source
+      );
+
+    if (!action) {
+      return;
+    }
+
+    mode =
+      await chooseThreatOrConsequence(
+        source,
+        action
+      );
+
+    if (!mode) {
+      return;
+    }
+
+    if (mode === "pokemon-back") {
+      continue;
+    }
+
+    break;
+  }
 
   const actionName = String(action?.name ?? action?.id ?? action);
   if (mode.mode === "threat") {
@@ -1567,6 +1711,13 @@ async function resolveGuidedConsequence(message, source) {
       title: source.kind === "pokemon"
         ? source.name + " usou " + actionName + "!"
         : source.name + " · " + actionName,
+      bodyHtml:
+        source.kind === "pokemon"
+          ? pokemonMoveRichBodyHtml(
+              action
+            )
+          : "",
+
       css: "threat",
       speakerAlias: source.name,
       consequenceVfx: source.kind === "pokemon"
@@ -1612,7 +1763,19 @@ async function resolveGuidedConsequence(message, source) {
     title: source.kind === "pokemon"
       ? source.name + " usou " + actionName + "!"
       : source.name + " · " + actionName,
-    body: summary,
+    body:
+      source.kind === "pokemon"
+        ? ""
+        : summary,
+
+    bodyHtml:
+      source.kind === "pokemon"
+        ? pokemonMoveRichBodyHtml(
+            action,
+            summary
+          )
+        : "",
+
     css: "consequence",
     speakerAlias: source.name,
     consequenceVfx: {
@@ -1738,9 +1901,18 @@ async function announceChallengeThreatFromSheet(
       + actionName,
 
     body:
-      challengeActionSummary(
-        action
-      ),
+      pokemonMove
+        ? ""
+        : challengeActionSummary(
+            action
+          ),
+
+    bodyHtml:
+      pokemonMove
+        ? pokemonMoveRichBodyHtml(
+            pokemonMove
+          )
+        : "",
 
     css:
       "threat",
@@ -2035,7 +2207,17 @@ async function applyChallengeConsequenceFromSheet(
         ),
 
     body:
-      summary,
+      pokemonMove
+        ? ""
+        : summary,
+
+    bodyHtml:
+      pokemonMove
+        ? pokemonMoveRichBodyHtml(
+            pokemonMove,
+            summary
+          )
+        : "",
 
     css:
       "consequence",

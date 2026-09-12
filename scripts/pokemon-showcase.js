@@ -866,7 +866,7 @@ function drawTokenShowcase(
       ? setPokemonStatusOutline(
           token,
           status.color,
-          0.55
+          0.40
         )
       : null;
 
@@ -1014,13 +1014,19 @@ function showcaseTick() {
     if (
       state.statusOutlineFilter
     ) {
+      const statusWave =
+        Math.sin(
+          now * 1.15
+          + state.phase
+        );
+
       setPokemonStatusOutlineAlpha(
         token,
-        0.50
+        0.30
         + (
-          wave + 1
+          statusWave + 1
         )
-        * 0.08
+        * 0.10
       );
     }
   }

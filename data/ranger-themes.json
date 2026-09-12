@@ -1,0 +1,390 @@
+{
+  "version": 1,
+  "themes": [
+    {
+      "id": "nature-protector",
+      "presetName": "Protetor da Natureza",
+      "description": "Relação do Ranger com habitats, ecossistemas, Pokémon selvagens e preservação.",
+      "questions": {
+        "title": {
+          "prompt": "O que melhor descreve seu compromisso com a natureza?",
+          "suggestions": [
+            "Guardião dos habitats",
+            "Voz dos Pokémon selvagens",
+            "Protetor das terras naturais"
+          ]
+        },
+        "power1": {
+          "prompt": "O que você percebe no ambiente que a maioria das pessoas ignora?",
+          "suggestions": [
+            "Ler rastros",
+            "Reconhecer habitats",
+            "Perceber desequilíbrios naturais"
+          ]
+        },
+        "power2": {
+          "prompt": "Qual habilidade ajuda você a trabalhar longe das cidades?",
+          "suggestions": [
+            "Sobrevivência",
+            "Orientação pela natureza",
+            "Encontrar água e abrigo"
+          ]
+        },
+        "weakness": {
+          "prompt": "Como seu compromisso com a natureza pode colocar você em problemas?",
+          "suggestions": [
+            "Não tolero abuso contra Pokémon",
+            "Recuso deixar um habitat em perigo",
+            "Confio demais na natureza"
+          ]
+        },
+        "quest": {
+          "prompt": "Que questão sobre proteger a natureza move seu Ranger?",
+          "suggestions": [
+            "O que estou disposto a proteger?",
+            "Humanos e Pokémon conseguem viver em equilíbrio?",
+            "Até onde devo ir para defender um habitat?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "capture-rescue",
+      "presetName": "Captura e Resgate",
+      "description": "Atuação imediata quando pessoas ou Pokémon estão em perigo.",
+      "questions": {
+        "title": {
+          "prompt": "Quem você se torna quando alguém precisa ser salvo?",
+          "suggestions": [
+            "Resgatista incansável",
+            "Primeiro a entrar no perigo",
+            "Especialista em acalmar Pokémon"
+          ]
+        },
+        "power1": {
+          "prompt": "Como você se aproxima de alguém em pânico?",
+          "suggestions": [
+            "Aproximação segura",
+            "Voz tranquilizadora",
+            "Ler sinais de medo"
+          ]
+        },
+        "power2": {
+          "prompt": "O que você faz especialmente bem em uma emergência?",
+          "suggestions": [
+            "Agir sob pressão",
+            "Improvisar um resgate",
+            "Encontrar uma rota segura"
+          ]
+        },
+        "weakness": {
+          "prompt": "O que faz você correr riscos demais?",
+          "suggestions": [
+            "Não consigo deixar ninguém para trás",
+            "Assumo riscos demais",
+            "Ajo antes de pensar"
+          ]
+        },
+        "quest": {
+          "prompt": "Que pergunta guia você quando alguém está em perigo?",
+          "suggestions": [
+            "Quem precisa de mim agora?",
+            "Consigo salvar todos?",
+            "Até onde devo me arriscar por alguém?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "ranger-duty",
+      "presetName": "Dever Ranger",
+      "description": "Responsabilidade, função, juramento, autoridade e compromisso com a missão.",
+      "questions": {
+        "title": {
+          "prompt": "Que ideia resume seu compromisso como Ranger?",
+          "suggestions": [
+            "Ranger de confiança",
+            "Cumpro a missão",
+            "A paz vem primeiro"
+          ]
+        },
+        "power1": {
+          "prompt": "O que seu treinamento Ranger permite que você faça melhor?",
+          "suggestions": [
+            "Conhecer procedimentos",
+            "Manter a cabeça fria",
+            "Coordenar uma emergência"
+          ]
+        },
+        "power2": {
+          "prompt": "Que recurso da organização Ranger costuma ajudar você?",
+          "suggestions": [
+            "Contatos entre Rangers",
+            "Credencial oficial",
+            "Conheço a cadeia de comando"
+          ]
+        },
+        "weakness": {
+          "prompt": "Como seu senso de dever pode prejudicar você?",
+          "suggestions": [
+            "Levo falhas para o lado pessoal",
+            "Tenho dificuldade em desobedecer ordens",
+            "Coloco a missão antes de mim"
+          ]
+        },
+        "quest": {
+          "prompt": "O que ser um verdadeiro Ranger significa para você?",
+          "suggestions": [
+            "Sou digno deste distintivo?",
+            "Quando uma ordem deve ser desobedecida?",
+            "Que tipo de Ranger quero ser?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "pokemon-harmony",
+      "presetName": "Harmonia com Pokémon",
+      "description": "Empatia, comunicação e capacidade de trabalhar ao lado de Pokémon.",
+      "questions": {
+        "title": {
+          "prompt": "O que torna sua relação com Pokémon especial?",
+          "suggestions": [
+            "Pokémon confiam em mim",
+            "Entendo sem palavras",
+            "Coração aberto aos Pokémon"
+          ]
+        },
+        "power1": {
+          "prompt": "Como você conquista a confiança de um Pokémon desconfiado?",
+          "suggestions": [
+            "Falar com calma",
+            "Respeitar seu espaço",
+            "Demonstrar boas intenções"
+          ]
+        },
+        "power2": {
+          "prompt": "O que você percebe sobre Pokémon que outras pessoas ignoram?",
+          "suggestions": [
+            "Ler emoções",
+            "Entender comportamento",
+            "Perceber quando algo está errado"
+          ]
+        },
+        "weakness": {
+          "prompt": "Como sua empatia com Pokémon pode complicar suas decisões?",
+          "suggestions": [
+            "Sofro ao vê-los machucados",
+            "Hesito em enfrentar um Pokémon",
+            "Confio neles rápido demais"
+          ]
+        },
+        "quest": {
+          "prompt": "O que você ainda quer compreender sobre Pokémon?",
+          "suggestions": [
+            "O que eles tentam nos dizer?",
+            "Até onde pode chegar nossa confiança?",
+            "Podemos realmente nos entender?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "academy-days",
+      "presetName": "Tempos de Academia",
+      "description": "Quem o personagem era antes de se formar e o que trouxe da Ranger School.",
+      "questions": {
+        "title": {
+          "prompt": "Como você era conhecido pelos outros alunos?",
+          "suggestions": [
+            "Nerd de Pokémon",
+            "Atleta da turma",
+            "Popular entre os alunos",
+            "Aluno exemplar",
+            "Encrenqueiro carismático",
+            "Quieto, mas brilhante",
+            "Líder da turma"
+          ]
+        },
+        "power1": {
+          "prompt": "Em qual área você mais se destacava na Academia?",
+          "suggestions": [
+            "Conhecimento Pokémon",
+            "Resgate em campo",
+            "Tecnologia Ranger",
+            "Sobrevivência",
+            "Investigação",
+            "Técnicas de vínculo",
+            "Ecologia",
+            "Comunicação e operações"
+          ]
+        },
+        "power2": {
+          "prompt": "O que da época da Academia ainda ajuda você hoje?",
+          "suggestions": [
+            "Rede de antigos colegas",
+            "Treinamento disciplinado",
+            "Memória excelente das aulas"
+          ]
+        },
+        "weakness": {
+          "prompt": "Que problema da época da Academia você ainda carrega?",
+          "suggestions": [
+            "Competitivo demais",
+            "Uma antiga rivalidade",
+            "Medo de decepcionar meus professores"
+          ]
+        },
+        "quest": {
+          "prompt": "O que sua época de estudante deixou inacabado?",
+          "suggestions": [
+            "Que Ranger quero me tornar?",
+            "Preciso provar que merecia estar lá?",
+            "Conseguirei superar quem eu era na Academia?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "field-investigator",
+      "presetName": "Investigador de Campo",
+      "description": "Mistérios, pistas, comportamento suspeito e investigação Ranger.",
+      "questions": {
+        "title": {
+          "prompt": "Como você aborda um mistério?",
+          "suggestions": [
+            "Olho clínico",
+            "Detetive Ranger",
+            "Caçador de pistas"
+          ]
+        },
+        "power1": {
+          "prompt": "O que dificilmente passa despercebido por você?",
+          "suggestions": [
+            "Pequenos detalhes",
+            "Rastros estranhos",
+            "Contradições em histórias"
+          ]
+        },
+        "power2": {
+          "prompt": "Qual método você usa para descobrir o que aconteceu?",
+          "suggestions": [
+            "Reconstruir a cena",
+            "Conversar com testemunhas",
+            "Conectar pistas distantes"
+          ]
+        },
+        "weakness": {
+          "prompt": "Como sua curiosidade coloca você em problemas?",
+          "suggestions": [
+            "Não consigo largar um mistério",
+            "Desconfio de todo mundo",
+            "Me apego à primeira teoria"
+          ]
+        },
+        "quest": {
+          "prompt": "Qual pergunta sempre faz você continuar investigando?",
+          "suggestions": [
+            "O que realmente aconteceu aqui?",
+            "Quem está por trás disso?",
+            "O que estou deixando passar?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "field-explorer",
+      "presetName": "Explorador de Campo",
+      "description": "Rotas selvagens, cavernas, montanhas, ruínas e lugares desconhecidos.",
+      "questions": {
+        "title": {
+          "prompt": "Que tipo de explorador você é?",
+          "suggestions": [
+            "Desbravador de rotas",
+            "Ranger dos ermos",
+            "Nunca me perco"
+          ]
+        },
+        "power1": {
+          "prompt": "Qual habilidade ajuda você a atravessar terrenos difíceis?",
+          "suggestions": [
+            "Escalador experiente",
+            "Orientação impecável",
+            "Ler o terreno"
+          ]
+        },
+        "power2": {
+          "prompt": "Como você mantém uma expedição funcionando?",
+          "suggestions": [
+            "Planejar a rota",
+            "Encontrar abrigo",
+            "Preparado para imprevistos"
+          ]
+        },
+        "weakness": {
+          "prompt": "O que seu espírito aventureiro faz você subestimar?",
+          "suggestions": [
+            "Minha curiosidade me coloca em perigo",
+            "Odeio ficar parado",
+            "Sempre quero ir um pouco mais longe"
+          ]
+        },
+        "quest": {
+          "prompt": "O que faz você continuar explorando?",
+          "suggestions": [
+            "O que existe além do próximo caminho?",
+            "Que lugar ninguém conhece ainda?",
+            "Posso abrir um caminho seguro para outros?"
+          ]
+        }
+      }
+    },
+    {
+      "id": "community-bonds",
+      "presetName": "Laços com a Comunidade",
+      "description": "Relação do Ranger com moradores, famílias, viajantes e comunidades.",
+      "questions": {
+        "title": {
+          "prompt": "Como as pessoas costumam enxergar você?",
+          "suggestions": [
+            "Amigo da comunidade",
+            "Ranger em quem todos confiam",
+            "Conheço todo mundo por aqui"
+          ]
+        },
+        "power1": {
+          "prompt": "Que tipo de ajuda você consegue graças às pessoas que conhece?",
+          "suggestions": [
+            "Sempre conheço alguém",
+            "Portas se abrem para mim",
+            "Sei a quem pedir ajuda"
+          ]
+        },
+        "power2": {
+          "prompt": "Que habilidade ajuda você a lidar com pessoas durante uma crise?",
+          "suggestions": [
+            "Conquistar confiança",
+            "Acalmar uma multidão",
+            "Encontrar um acordo"
+          ]
+        },
+        "weakness": {
+          "prompt": "Como sua ligação com outras pessoas complica sua vida?",
+          "suggestions": [
+            "Não sei dizer não",
+            "Me envolvo nos problemas de todos",
+            "Minha reputação me precede"
+          ]
+        },
+        "quest": {
+          "prompt": "Que responsabilidade você sente em relação às pessoas ao seu redor?",
+          "suggestions": [
+            "Quem depende de mim?",
+            "Consigo conquistar a confiança deles?",
+            "O que esta comunidade realmente precisa?"
+          ]
+        }
+      }
+    }
+  ]
+}

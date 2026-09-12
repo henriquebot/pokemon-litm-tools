@@ -35,13 +35,43 @@ function forcedDeletion() {
   return new foundry.data.operators.ForcedDeletion();
 }
 
+function canManageActor(
+  actor,
+  user = game.user
+) {
+  if (
+    !actor
+    || !user
+  ) {
+    return false;
+  }
+
+  if (user.isGM) {
+    return true;
+  }
+
+  const ownerLevel =
+    CONST
+      .DOCUMENT_OWNERSHIP_LEVELS
+      .OWNER;
+
+  return (
+    actor.testUserPermission?.(
+      user,
+      ownerLevel
+    )
+    === true
+  );
+}
+
+
 function getManagedActors() {
   return game.actors
     .filter(actor =>
       actor.type === "litm-character"
       && actor.getFlag(MODULE_ID, "combatProjection") !== true
       && actor.getFlag(MODULE_ID, "kind") !== "pokemon-combat"
-      && (game.user.isGM || actor.isOwner)
+      && canManageActor(actor)
     )
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
@@ -55,7 +85,7 @@ function trainerOwnerIds(trainer) {
 
 function pokemonBelongsToTrainer(pokemon, trainer) {
   if (!pokemon || !trainer) return false;
-  if (!game.user.isGM) return pokemon.isOwner;
+  if (!game.user.isGM) return canManageActor(pokemon);
   if (pokemon.getFlag(MODULE_ID, "ownerTrainerId") === trainer.id) return true;
   const ids = trainerOwnerIds(trainer);
   const level = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
@@ -874,7 +904,16 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   busy = false;
 
   constructor(options = {}) { super(options); this.actorId = options.actorId ?? null; }
-  get actor() { return this.actorId ? game.actors.get(this.actorId) : null; }
+  get actor() {
+    const actor =
+      this.actorId
+        ? game.actors.get(this.actorId)
+        : null;
+
+    return canManageActor(actor)
+      ? actor
+      : null;
+  }
 
   _ensureActor() {
     const actors = getManagedActors();
@@ -1168,8 +1207,22 @@ export function openPokemonManager(actor = null) {
     ui.notifications.warn("O Pokémon Manager requer Legend in the Mist.");
     return null;
   }
-  const preferred = actor?.documentName === "Actor" ? actor
-    : canvas.tokens.controlled?.find(token => token.actor?.type === "litm-character" && (game.user.isGM || token.actor.isOwner))?.actor ?? null;
+  const explicit =
+    actor?.documentName === "Actor"
+    && canManageActor(actor)
+      ? actor
+      : null;
+
+  const preferred =
+    explicit
+    ?? canvas.tokens.controlled
+      ?.find(
+        token =>
+          token.actor?.type === "litm-character"
+          && canManageActor(token.actor)
+      )
+      ?.actor
+    ?? null;
 
   if (managerApp && managerApp.rendered) {
     if (preferred) managerApp.actorId = preferred.id;

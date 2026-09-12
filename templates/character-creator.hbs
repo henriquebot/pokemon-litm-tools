@@ -27,6 +27,19 @@
       <div class="pokemon-wizard-step {{#if stepIsDream}}active{{/if}}"><span>7</span>Time dos Sonhos</div>
     {{/if}}
 
+    {{#if showRangerProgress}}
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsRangerPartner}}active{{/if}}"><span>3</span>Pokémon Parceiro</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsRangerThemePick}}active{{/if}}"><span>4</span>Escolher Themes</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>5</span>Construir Themes</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsRangerDesired}}active{{/if}}"><span>6</span>Pokémon desejados</div>
+      <div class="pokemon-wizard-line"></div>
+      <div class="pokemon-wizard-step {{#if stepIsRangerReview}}active{{/if}}"><span>7</span>Revisão</div>
+    {{/if}}
+
     {{#if isPokemon}}
       <div class="pokemon-wizard-line"></div>
       <div class="pokemon-wizard-step {{#if stepIsArchetype}}active{{/if}}"><span>3</span>Perfil</div>
@@ -69,6 +82,23 @@
 
           <span>
             Voc&ecirc; &eacute; humano e viaja com uma equipe de Pok&eacute;mon.
+          </span>
+        </button>
+
+
+        <button
+          type="button"
+          class="pokemon-character-type-card {{#if isRanger}}selected{{/if}}"
+          data-character-type="ranger"
+        >
+          <i class="fa-solid fa-shield-heart"></i>
+
+          <strong>
+            Ranger
+          </strong>
+
+          <span>
+            Voc&ecirc; protege pessoas, Pok&eacute;mon e a natureza ao lado de um Pok&eacute;mon Parceiro.
           </span>
         </button>
 
@@ -232,7 +262,7 @@
           >
 
 
-          {{#if isTrainer}}
+          {{#if isHuman}}
 
             <select data-role="person-type">
 
@@ -480,6 +510,228 @@
         {{/if}}
 
       {{/if}}
+
+    </section>
+
+  {{/if}}
+
+
+
+  {{#if stepIsRangerPartner}}
+
+    <section class="pokemon-wizard-page pokemon-team-page pokemon-ranger-partner-page">
+
+      <h2>Escolha seu Pokémon Parceiro</h2>
+
+      <p>
+        Todo Ranger começa ao lado de exatamente <strong>1 Pokémon Parceiro</strong>.
+        Ele usa as mesmas estruturas de Party, Theme, follower e Pokémon Manager.
+      </p>
+
+      <div class="pokemon-theme-guidance">
+        Escolha o parceiro com quem seu Ranger inicia a campanha.
+      </div>
+
+      <div class="pokemon-importer-toolbar pokemon-team-toolbar">
+        <input
+          type="search"
+          data-role="asset-search"
+          placeholder="Buscar Pokémon..."
+          autocomplete="off"
+        >
+
+        <button
+          type="button"
+          data-action="togglePreviewZoom"
+          class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+        >
+          <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+          Zoom
+        </button>
+      </div>
+
+      <div class="pokemon-importer-list pokemon-team-list">
+        {{#each teamItems}}
+          <article
+            class="pokemon-asset-card pokemon-character-card{{#if selected}} selected{{/if}}"
+            data-team-asset
+            data-search-card
+            data-search="{{search}}"
+            data-asset-id="{{id}}"
+          >
+            <div class="pokemon-asset-preview">
+              <img src="{{preview}}" alt="{{name}}" loading="lazy">
+            </div>
+
+            <div class="pokemon-asset-info">
+              <strong>{{name}}</strong>
+              <small>{{meta}}</small>
+
+              <button
+                type="button"
+                class="pokemon-pokedex-link"
+                data-pokedex-url="{{pokedexUrl}}"
+              >
+                <i class="fa-solid fa-mobile-screen-button"></i>
+                Pokédex
+              </button>
+            </div>
+          </article>
+        {{/each}}
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsRangerThemePick}}
+
+    <section class="pokemon-wizard-page pokemon-ranger-theme-picker">
+
+      <h2>Escolha 4 Themes Ranger</h2>
+
+      <p>
+        Nenhum Theme é obrigatório. Tempos de Academia é uma boa opção para Rangers recém-formados.
+      </p>
+
+      <div class="pokemon-ranger-theme-count">
+        Selecionados: <strong>{{rangerThemeCount}} / 4</strong>
+      </div>
+
+      <div class="pokemon-ranger-theme-grid">
+        {{#each rangerThemeOptions}}
+          <button
+            type="button"
+            class="pokemon-ranger-theme-option{{#if selected}} selected{{/if}}"
+            data-ranger-theme-id="{{id}}"
+          >
+            <strong>{{presetName}}</strong>
+            <span>{{description}}</span>
+          </button>
+        {{/each}}
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsRangerDesired}}
+
+    <section class="pokemon-wizard-page pokemon-dream-page">
+
+      <h2>Pokémon com quem gostaria de trabalhar um dia</h2>
+
+      <p>
+        Escolha até 6 Pokémon que seu Ranger admira, gostaria de conhecer ou sonha em ter como parceiro de missão no futuro.
+      </p>
+
+      <div class="pokemon-theme-guidance">
+        Esta lista é narrativa: não cria Actors, Themes, Party ou Box.
+      </div>
+
+      <div class="pokemon-dream-counter">
+        <i class="fa-solid fa-star"></i>
+        Selecionados:
+        <strong>{{dreamCount}} / 6</strong>
+      </div>
+
+      <div class="pokemon-importer-toolbar pokemon-team-toolbar">
+        <input
+          type="search"
+          data-role="asset-search"
+          placeholder="Buscar Pokémon..."
+          autocomplete="off"
+        >
+
+        <button
+          type="button"
+          data-action="togglePreviewZoom"
+          class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+        >
+          <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+          Zoom
+        </button>
+      </div>
+
+      <div class="pokemon-importer-list pokemon-team-list pokemon-dream-list">
+        {{#each dreamItems}}
+          <article
+            class="pokemon-asset-card pokemon-character-card pokemon-dream-pokemon{{#if inDream}} selected in-dream{{/if}}"
+            data-dream-asset
+            data-search-card
+            data-search="{{search}}"
+            data-asset-id="{{id}}"
+          >
+            <div class="pokemon-asset-preview">
+              <img src="{{preview}}" alt="{{name}}" loading="lazy">
+            </div>
+
+            <div class="pokemon-asset-info">
+              <strong>{{name}}</strong>
+              <small>{{meta}}</small>
+
+              <button
+                type="button"
+                class="pokemon-pokedex-link"
+                data-pokedex-url="{{pokedexUrl}}"
+              >
+                <i class="fa-solid fa-mobile-screen-button"></i>
+                Pokédex
+              </button>
+            </div>
+          </article>
+        {{/each}}
+      </div>
+
+    </section>
+
+  {{/if}}
+
+
+  {{#if stepIsRangerReview}}
+
+    <section class="pokemon-wizard-page pokemon-ranger-review-page">
+
+      <h2>Revise seu Ranger</h2>
+
+      <div class="pokemon-ranger-review-grid">
+
+        <article>
+          <small>Ranger</small>
+          <h3>{{characterName}}</h3>
+          <p><strong>Pokémon Parceiro:</strong> {{rangerPartner.name}}</p>
+          <p><strong>Backpack:</strong> Styler básico</p>
+        </article>
+
+        <article>
+          <small>Pokémon com quem gostaria de trabalhar</small>
+          {{#if rangerDesired.length}}
+            <ul>
+              {{#each rangerDesired}}
+                <li>{{name}}</li>
+              {{/each}}
+            </ul>
+          {{else}}
+            <p>Nenhum escolhido.</p>
+          {{/if}}
+        </article>
+
+      </div>
+
+      <div class="pokemon-ranger-review-themes">
+        {{#each themeEditorSlots}}
+          <article class="pokemon-theme-editor-card">
+            <small>{{presetName}}</small>
+            <h3>{{fields.0.value}}</h3>
+            <p><strong>+ </strong>{{fields.1.value}}</p>
+            <p><strong>+ </strong>{{fields.2.value}}</p>
+            <p><strong>- </strong>{{fields.3.value}}</p>
+            <p><strong>Quest:</strong> {{fields.4.value}}</p>
+          </article>
+        {{/each}}
+      </div>
 
     </section>
 
@@ -1185,16 +1437,21 @@
     <section class="pokemon-wizard-page pokemon-themes-page">
 
       <h2>
-        {{#if isPokemon}}Construa seus Temas de Perfil{{else}}Construa seus Temas{{/if}}
+        {{#if isRanger}}
+          Construa seus Themes Ranger
+        {{else}}
+          {{#if isPokemon}}Construa seus Temas de Perfil{{else}}Construa seus Temas{{/if}}
+        {{/if}}
       </h2>
 
 
 
       <div class="pokemon-theme-guidance">
-        <strong>Como pensar seus Temas:</strong>
-        Tags de Poder representam capacidades, recursos e qualidades que ajudam seu personagem.
-        Tags de Fraqueza representam limita&ccedil;&otilde;es que podem complicar suas a&ccedil;&otilde;es.
-        A Quest &eacute; a pergunta que move aquele Tema.
+        <strong>Suas respostas se tornarão as Tags do personagem.</strong>
+        A <strong>Title Tag</strong> é a ideia central do Theme.
+        Uma <strong>Power Tag</strong> é uma capacidade, recurso, conhecimento, relação ou qualidade que ajuda em cena.
+        Uma <strong>Weakness Tag</strong> é uma limitação real que pode complicar suas ações.
+        A <strong>Quest</strong> é uma pergunta, objetivo, desejo ou compromisso que você quer explorar.
       </div>
 
       {{#if isPokemon}}
@@ -1203,6 +1460,58 @@
           Escolha aqui apenas os 2 Temas narrativos. Natureza &amp; Habilidade e Golpes formar&atilde;o os outros 2 Themes automaticamente.
         </div>
       {{/if}}
+
+
+      {{#if isRanger}}
+
+        <div class="pokemon-theme-editor-heading">
+          <strong>Responda às perguntas dos quatro Themes.</strong>
+          <span>Clique em uma sugestão para preencher o campo e edite como quiser, ou escreva sua própria resposta.</span>
+        </div>
+
+        <div class="pokemon-theme-editor-list pokemon-ranger-question-list">
+          {{#each themeEditorSlots}}
+            <article class="pokemon-theme-editor-card">
+              <header class="pokemon-theme-editor-card-header">
+                <span class="pokemon-theme-number">Theme {{number}}</span>
+                <strong>{{presetName}}</strong>
+              </header>
+
+              {{#each fields}}
+                <div class="pokemon-ranger-question">
+                  <strong>{{label}}</strong>
+                  <small>{{prompt}}</small>
+
+                  <div class="pokemon-ranger-suggestions">
+                    {{#each suggestions}}
+                      <button
+                        type="button"
+                        data-ranger-suggestion
+                        data-ranger-slot="{{slotIndex}}"
+                        data-ranger-field="{{key}}"
+                        data-ranger-value="{{text}}"
+                      >
+                        {{text}}
+                      </button>
+                    {{/each}}
+                  </div>
+
+                  <input
+                    type="text"
+                    data-ranger-answer
+                    data-ranger-slot="{{../index}}"
+                    data-ranger-field="{{key}}"
+                    value="{{value}}"
+                    placeholder="Escrever minha resposta"
+                  >
+                </div>
+              {{/each}}
+            </article>
+          {{/each}}
+        </div>
+
+      {{/if}}
+
 
       {{#if selectedArchetype}}
 
@@ -1258,7 +1567,26 @@
               <div class="pokemon-theme-editor-section">
 
                 <strong>
-                  Tags de Poder
+                  Title Tag
+                </strong>
+
+                <small>
+                  A ideia central deste Theme. No LitM ela é a primeira Tag de Poder e aparece em destaque.
+                </small>
+
+                <input
+                  type="text"
+                  data-theme-title-tag="{{index}}"
+                  value="{{titleTag}}"
+                  placeholder="Ex.: Veterano das rotas"
+                >
+
+              </div>
+
+              <div class="pokemon-theme-editor-section">
+
+                <strong>
+                  Power Tags adicionais
                 </strong>
 
                 <small>
@@ -1359,7 +1687,7 @@
         {{#unless canFinish}}disabled{{/unless}}
       >
         <i class="fa-solid fa-check"></i>
-        Finalizar
+        {{#if isRanger}}CRIAR RANGER{{else}}Finalizar{{/if}}
       </button>
 
     {{else}}
