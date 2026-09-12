@@ -813,9 +813,157 @@ function actorFolderOptions() {
 }
 
 
+function pokemonBuilderFolderParentId(folder) {
+  const parent =
+    folder?.folder
+    ?? folder?.parent
+    ?? null;
+
+  return typeof parent === "string"
+    ? parent
+    : parent?.id ?? null;
+}
+
+function findPokemonBuilderActorFolder(
+  name,
+  parentId = null
+) {
+  const normalizedName =
+    String(name ?? "")
+      .trim()
+      .toLocaleLowerCase();
+
+  return (
+    game.folders.find(
+      folder =>
+        folder?.type === "Actor"
+        &&
+        String(folder?.name ?? "")
+          .trim()
+          .toLocaleLowerCase()
+          === normalizedName
+        &&
+        (
+          pokemonBuilderFolderParentId(folder)
+          ?? null
+        )
+          ===
+        (parentId ?? null)
+    )
+    ?? null
+  );
+}
+
+async function ensurePokemonBuilderActorFolder(
+  name,
+  parentId = null
+) {
+  const existing =
+    findPokemonBuilderActorFolder(
+      name,
+      parentId
+    );
+
+  if (existing) {
+    return existing;
+  }
+
+  return Folder.create({
+    name,
+    type: "Actor",
+    ...(parentId
+      ? { folder: parentId }
+      : {})
+  });
+}
+
+async function resolveImporterSceneChallengeFolder() {
+  const root =
+    await ensurePokemonBuilderActorFolder(
+      "Challenge"
+    );
+
+  if (!root?.id) {
+    return null;
+  }
+
+  const sceneName =
+    String(
+      globalThis.canvas?.scene?.name
+      ?? ""
+    ).trim();
+
+  if (!sceneName) {
+    return root.id;
+  }
+
+  const existingSceneFolder =
+    findPokemonBuilderActorFolder(
+      sceneName,
+      root.id
+    );
+
+  if (existingSceneFolder?.id) {
+    return existingSceneFolder.id;
+  }
+
+  try {
+    const sceneFolder =
+      await ensurePokemonBuilderActorFolder(
+        sceneName,
+        root.id
+      );
+
+    return (
+      sceneFolder?.id
+      ?? root.id
+    );
+  }
+  catch (error) {
+    console.warn(
+      `Pokemon LITM Tools | Não foi possível criar Challenge/${sceneName}; usando a pasta Challenge.`,
+      error
+    );
+
+    return root.id;
+  }
+}
+
+
 async function resolveChallengeFolder(
   config
 ) {
+  if (
+    config.autoSceneFolder === true
+    &&
+    config.mode === "challenge"
+  ) {
+    try {
+      const automaticFolderId =
+        await resolveImporterSceneChallengeFolder();
+
+      if (automaticFolderId) {
+        await game.settings.set(
+          MODULE_ID,
+          "lastActorFolder",
+          automaticFolderId
+        );
+
+        return automaticFolderId;
+      }
+    }
+    catch (error) {
+      console.warn(
+        "Pokemon LITM Tools | Pasta automática do Challenge indisponível; usando fallback.",
+        error
+      );
+
+      ui.notifications.warn(
+        "Não foi possível organizar o Challenge pela Scene. Usando destino seguro."
+      );
+    }
+  }
+
   let folderId =
     String(
       config.folderId
@@ -2875,6 +3023,7 @@ class PokemonChallengeWizardApp
   existingActor = null;
   hydratedFromActor = false;
   launchKind = "challenge";
+  autoSceneFolder = false;
 
   config = {
     mode: "challenge",
@@ -2887,9 +3036,12 @@ class PokemonChallengeWizardApp
 
   constructor(entry, prepareDefinition, options = {}) {
     const requestedKind = options.launchKind === "theme" ? "theme" : "challenge";
+    const requestedSceneFolder =
+      options.autoSceneFolder === true;
     const appOptions = { ...options };
     delete appOptions.launchKind;
     delete appOptions.existingActor;
+    delete appOptions.autoSceneFolder;
     appOptions.window = {
       ...(appOptions.window ?? {}),
       title: requestedKind === "theme"
@@ -2902,6 +3054,11 @@ class PokemonChallengeWizardApp
     this.prepareDefinition = prepareDefinition;
     this.existingActor = options.existingActor ?? null;
     this.launchKind = requestedKind;
+    this.autoSceneFolder =
+      requestedSceneFolder
+      && !this.existingActor;
+    this.config.autoSceneFolder =
+      this.autoSceneFolder;
     this.config.mode = requestedKind === "theme" ? "player-theme" : "challenge";
 
     if (this.existingActor) {
@@ -3404,6 +3561,27 @@ class PokemonChallengeWizardApp
       isChallenge:
         this.config.mode ===
         "challenge",
+
+      autoSceneFolder:
+        this.autoSceneFolder
+        &&
+        this.config.mode ===
+          "challenge",
+
+      sceneFolderLabel:
+        (
+          "Challenge"
+          +
+          (
+            globalThis.canvas?.scene?.name
+              ? (
+                  " / "
+                  +
+                  globalThis.canvas.scene.name
+                )
+              : ""
+          )
+        ),
 
       isTrainer:
         this.config.mode ===

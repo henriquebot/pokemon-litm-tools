@@ -65,24 +65,31 @@
         <h2>Destino</h2>
 
         {{#if isChallenge}}
-          <p>Escolha onde o Challenge será armazenado.</p>
+          {{#if autoSceneFolder}}
+            <p>
+              Este Challenge será organizado automaticamente em
+              <strong>{{sceneFolderLabel}}</strong>.
+            </p>
+          {{else}}
+            <p>Escolha onde o Challenge será armazenado.</p>
 
-          <div class="pokemon-builder-config-grid">
-            <label>
-              <span>Pasta de Actors</span>
-              <select data-builder-field="folderId">
-                <option value="" {{#if rootFolderSelected}}selected{{/if}}>Raiz de Actors</option>
-                {{#each folders}}
-                  <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
-                {{/each}}
-              </select>
-            </label>
+            <div class="pokemon-builder-config-grid">
+              <label>
+                <span>Pasta de Actors</span>
+                <select data-builder-field="folderId">
+                  <option value="" {{#if rootFolderSelected}}selected{{/if}}>Raiz de Actors</option>
+                  {{#each folders}}
+                    <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+                  {{/each}}
+                </select>
+              </label>
 
-            <label>
-              <span>Ou criar nova pasta</span>
-              <input data-builder-field="newFolder" type="text" value="{{newFolder}}" placeholder="Ex.: Pokémon Selvagens">
-            </label>
-          </div>
+              <label>
+                <span>Ou criar nova pasta</span>
+                <input data-builder-field="newFolder" type="text" value="{{newFolder}}" placeholder="Ex.: Pokémon Selvagens">
+              </label>
+            </div>
+          {{/if}}
         {{else}}
           {{#if isPlayerTheme}}
             <p>Escolha o treinador-jogador que receberá este Themebook.</p>

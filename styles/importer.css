@@ -4212,8 +4212,8 @@ has(
   flex: 1 1 auto;
   display: grid;
   grid-template-columns:
-    minmax(0, 11fr)
-    minmax(0, 9fr);
+    minmax(0, 2fr)
+    minmax(0, 3fr);
   gap: 18px;
   min-height: 0;
   margin-top: 8px;

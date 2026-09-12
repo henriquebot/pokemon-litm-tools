@@ -2,7 +2,8 @@ import {
   loadPokemonAssetCatalog,
   getPokemonAssetPreviewData,
   refreshPokemonAssetPreviews,
-  preparePokemonActorDefinition
+  preparePokemonActorDefinition,
+  formatPokemonAssetLabel
 } from "./importer-app.js";
 
 import {
@@ -39,11 +40,7 @@ let creatorApp = null;
 const archetypeCatalogPromises = new Map();
 
 export function formatCharacterSpriteLabel(name) {
-  const label = String(name ?? "");
-  const gender = /(?:^|\s)[FM](?=\s|$)/i.exec(label);
-  return gender
-    ? label.slice(0, gender.index + gender[0].length).trimEnd()
-    : label;
+  return formatPokemonAssetLabel(name);
 }
 
 async function loadCharacterArchetypes(mode = "trainer") {

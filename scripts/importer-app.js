@@ -15,6 +15,18 @@ const LITM_SYSTEM_ID = "mist-engine-fvtt";
 export const POKEMON_IMPORTER_DRAG_TYPE =
   "PokemonLITMAsset";
 
+export function formatPokemonAssetLabel(name) {
+  const label = String(name ?? "");
+  const gender = /(?:^|\s)[FM](?=\s|$)/i.exec(label);
+
+  return gender
+    ? label.slice(
+        0,
+        gender.index + gender[0].length
+      ).trimEnd()
+    : label;
+}
+
 const {
   ApplicationV2,
   HandlebarsApplicationMixin
@@ -2632,18 +2644,25 @@ export function challengeLibraryData() {
   const candidates =
     folders.filter(
       folder =>
-        String(folder?.name ?? "")
-          .trim()
-          .toLocaleLowerCase()
-        === "challenges"
+        ["challenge", "challenges"].includes(
+          String(folder?.name ?? "")
+            .trim()
+            .toLocaleLowerCase()
+        )
     );
 
-  const root =
-    candidates.find(folder => !folderParentId(folder))
-    ?? candidates[0]
-    ?? null;
+  const topLevelRoots =
+    candidates.filter(
+      folder =>
+        !folderParentId(folder)
+    );
 
-  if (!root) {
+  const activeRoots =
+    topLevelRoots.length
+      ? topLevelRoots
+      : candidates;
+
+  if (!activeRoots.length) {
     return {
       rootMissing: true,
       items: [],
@@ -2651,8 +2670,18 @@ export function challengeLibraryData() {
     };
   }
 
+  const root =
+    activeRoots[0];
+
+  const rootIds =
+    new Set(
+      activeRoots.map(
+        folder => folder.id
+      )
+    );
+
   const allowed =
-    new Set([root.id]);
+    new Set(rootIds);
 
   /*
    * Resolve subpastas sem depender de profundidade fixa.
@@ -2689,7 +2718,7 @@ export function challengeLibraryData() {
     while (current && !seen.has(current.id)) {
       seen.add(current.id);
       names.unshift(String(current.name ?? ""));
-      if (current.id === root.id) break;
+      if (rootIds.has(current.id)) break;
       current = byId.get(folderParentId(current)) ?? null;
     }
 
@@ -2901,6 +2930,11 @@ class PokemonImporterApp
         (catalog[this.activeTab] ?? [])
           .map(entry => ({
             ...entry,
+
+            displayName:
+              this.activeTab === "people"
+                ? formatPokemonAssetLabel(entry.name)
+                : entry.name,
 
             pokedexUrl:
               this.activeTab === "pokemon"
@@ -3396,7 +3430,8 @@ class PokemonImporterApp
 
             await openPokemonBuilder(
               entry,
-              prepareActorDefinition
+              prepareActorDefinition,
+              { autoSceneFolder: true }
             );
 
           } catch (error) {

@@ -15,6 +15,8 @@ const styles = read("styles/importer.css");
 const creatorTemplate = read("templates/character-creator.hbs");
 const creator = read("scripts/character-creator-app.js");
 const links = read("scripts/pokemon-links.js");
+const builder = read("scripts/pokemon-builder.js");
+const builderTemplate = read("templates/pokemon-builder-wizard.hbs");
 
 function ok(name, value) {
   assert.equal(Boolean(value), true, name);
@@ -226,6 +228,15 @@ ok(
 );
 
 ok(
+  "runtime cleanup: Challenge do Importer usa pasta automática por Scene",
+  importer.includes("autoSceneFolder: true")
+  && builder.includes("resolveImporterSceneChallengeFolder")
+  && builder.includes('["challenge", "challenges"]') === false
+  && builderTemplate.includes("sceneFolderLabel")
+  && importer.includes('["challenge", "challenges"]')
+);
+
+ok(
   "runtime UX: Character Creator mostra seleção e personalização em duas colunas",
   creatorTemplate.includes("pokemon-character-type-card")
   && creatorTemplate.includes("pokemon-team-customization-tabs")
@@ -233,7 +244,7 @@ ok(
   && creatorTemplate.includes("pokemon-team-customization-workspace")
   && creatorTemplate.includes("pokemon-team-customization-picker")
   && creatorTemplate.includes('data-role="pokemon-customization-search"')
-  && styles.includes("grid-template-columns:\n    minmax(0, 11fr)\n    minmax(0, 9fr)")
+  && styles.includes("grid-template-columns:\n    minmax(0, 2fr)\n    minmax(0, 3fr)")
 );
 
 ok(
@@ -280,7 +291,7 @@ function pureHelper(source, name, bindings = {}) {
   return Function(...Object.keys(bindings), declaration.replace(/^export /, "") + "\nreturn " + name)(...Object.values(bindings));
 }
 
-const spriteLabel = pureHelper(creator, "formatCharacterSpriteLabel");
+const spriteLabel = pureHelper(importer, "formatPokemonAssetLabel");
 for (const [input, expected] of [
   ["Trainer Acetrainer F Pe 01mbms4g", "Trainer Acetrainer F"],
   ["Trainer Acetrainer M Pe 01xyz", "Trainer Acetrainer M"],
@@ -292,6 +303,11 @@ for (const [input, expected] of [
   ["", ""]
 ]) assert.equal(spriteLabel(input), expected, "human sprite label: " + input);
 ok("labels de sprites cortam após F/M isolado e preservam nomes sem gênero", true);
+ok("label de sprite é compartilhado entre Importer e Character Creator",
+  creator.includes("formatPokemonAssetLabel")
+  && template.includes('title="{{displayName}}"')
+  && template.includes("{{displayName}}")
+);
 ok("label humano não substitui identificadores do asset", creatorTemplate.includes('data-asset-id="{{id}}"')
   && creatorTemplate.includes('data-asset-name="{{name}}"') && creatorTemplate.includes('{{displayName}}'));
 
