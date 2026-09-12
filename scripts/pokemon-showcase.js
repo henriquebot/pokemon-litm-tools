@@ -49,6 +49,14 @@ function reactionsEnabled() {
 }
 
 
+function ambientFxEnabled() {
+  return readSetting(
+    "visualShowcaseAmbientFx",
+    false
+  ) === true;
+}
+
+
 function moduleFlags(
   source
 ) {
@@ -555,17 +563,37 @@ function makeText(
   text,
   style
 ) {
-  try {
+  const value =
+    String(
+      text
+      ?? ""
+    );
+
+  const major =
+    Number.parseInt(
+      String(
+        PIXI.VERSION
+        ?? "0"
+      ).split(".")[0],
+      10
+    );
+
+  if (
+    Number.isFinite(major)
+    &&
+    major >= 8
+  ) {
     return new PIXI.Text({
-      text,
+      text:
+        value,
       style
     });
-  } catch {
-    return new PIXI.Text(
-      text,
-      style
-    );
   }
+
+  return new PIXI.Text(
+    value,
+    style
+  );
 }
 
 
@@ -663,12 +691,19 @@ function drawTokenShowcase(
       token
     );
 
+  const ambientFx =
+    ambientFxEnabled();
+
   const flying =
+    ambientFx
+    &&
     flyingPokemon(
       token
     );
 
   const water =
+    ambientFx
+    &&
     waterPokemon(
       token
     );
@@ -711,39 +746,13 @@ function drawTokenShowcase(
     return;
   }
 
+  /*
+   * A elipse falsa de sombra foi removida.
+   * Uma futura sombra opcional deve usar
+   * Drop Shadow real no sprite/placeable.
+   */
   const shadow =
-    new PIXI.Graphics();
-
-  graphicsEllipse(
-    shadow,
-    width / 2,
-    height * (
-      flying
-        ? 0.86
-        : 0.82
-    ),
-    width * (
-      flying
-        ? 0.24
-        : 0.29
-    ),
-    height * (
-      flying
-        ? 0.07
-        : 0.085
-    ),
-    0x05060a,
-    flying
-      ? 0.22
-      : 0.38
-  );
-
-  shadow.zIndex =
-    -30;
-
-  under.addChild(
-    shadow
-  );
+    null;
 
   let waterOuter =
     null;
@@ -953,20 +962,6 @@ function showcaseTick() {
     if (
       state.flying
     ) {
-      state.shadow.alpha =
-        0.17
-        + (
-          wave + 1
-        )
-        * 0.035;
-
-      state.shadow.scale.x =
-        0.94
-        + (
-          wave + 1
-        )
-        * 0.03;
-
       const mesh =
         token?.mesh
         ?? token?.icon
@@ -1642,6 +1637,31 @@ function hudRoot(
 }
 
 
+function hudToken(
+  app
+) {
+  const object =
+    app?.object;
+
+  if (
+    object?.documentName
+      === "Token"
+  ) {
+    return object;
+  }
+
+  if (
+    object?.document
+      ?.documentName
+      === "Token"
+  ) {
+    return object.document;
+  }
+
+  return null;
+}
+
+
 function enhanceTokenHud(
   app,
   html
@@ -1652,23 +1672,22 @@ function enhanceTokenHud(
     return;
   }
 
-  const token =
-    app?.object
-    ?? tokenObject(
-      app?.document
+  const tokenDocument =
+    hudToken(
+      app
     );
 
   if (
-    !token
+    !tokenDocument
     ||
     !isPokemonToken(
-      token
+      tokenDocument
     )
     ||
     (
       !game.user?.isGM
       &&
-      !token.actor?.isOwner
+      !tokenDocument.isOwner
     )
   ) {
     return;
@@ -1684,23 +1703,42 @@ function enhanceTokenHud(
     !root
     ||
     root.querySelector(
-      "[data-pokemon-reaction-hud]"
+      "[data-pokemon-reaction-toggle]"
     )
   ) {
     return;
   }
 
-  const strip =
+  const column =
+    root.querySelector(
+      ".col.right"
+    )
+    ??
+    root.querySelector(
+      ".right"
+    )
+    ??
+    root;
+
+  const toggle =
     document.createElement(
       "div"
     );
 
-  strip.className =
-    "pokemon-reaction-hud";
+  toggle.className =
+    "control-icon pokemon-reaction-toggle";
 
-  strip.dataset
-    .pokemonReactionHud =
+  toggle.dataset
+    .pokemonReactionToggle =
       "true";
+
+  toggle.title =
+    "Reações Pokémon";
+
+  toggle.innerHTML =
+    '<i class="fa-solid fa-face-smile"></i>';
+
+  const choices = [];
 
   for (
     const [
@@ -1711,44 +1749,87 @@ function enhanceTokenHud(
       REACTIONS
     )
   ) {
-    const button =
+    const control =
       document.createElement(
-        "button"
+        "div"
       );
 
-    button.type =
-      "button";
+    control.className =
+      "control-icon pokemon-reaction-choice";
 
-    button.dataset
+    control.dataset
       .pokemonReaction =
         key;
 
-    button.title =
+    control.title =
       profile.title;
 
-    button.textContent =
+    control.textContent =
       profile.label;
 
-    button.addEventListener(
+    control.hidden =
+      true;
+
+    control.addEventListener(
       "click",
       event => {
         event.preventDefault();
         event.stopPropagation();
 
         showPokemonReaction(
-          token,
+          tokenDocument,
           key
+        );
+
+        for (
+          const choice
+          of choices
+        ) {
+          choice.hidden =
+            true;
+        }
+
+        toggle.classList.remove(
+          "active"
         );
       }
     );
 
-    strip.append(
-      button
+    choices.push(
+      control
     );
   }
 
-  root.append(
-    strip
+  toggle.addEventListener(
+    "click",
+    event => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const open =
+        choices.some(
+          choice =>
+            !choice.hidden
+        );
+
+      for (
+        const choice
+        of choices
+      ) {
+        choice.hidden =
+          open;
+      }
+
+      toggle.classList.toggle(
+        "active",
+        !open
+      );
+    }
+  );
+
+  column.append(
+    toggle,
+    ...choices
   );
 }
 
@@ -1836,7 +1917,7 @@ export function registerPokemonShowcaseSettings() {
       name:
         "Pokémon · Token FX",
       hint:
-        "Adiciona sombra, hover de Pokémon voadores, ripple de água, indicadores visuais de status e efeitos de entrada/saída. Não altera a posição do TokenDocument.",
+        "Adiciona indicadores visuais de status e efeitos de entrada/saída. Efeitos ambientais ficam em uma opção separada. Não altera a posição do TokenDocument.",
       scope:
         "client",
       config:
@@ -1845,6 +1926,27 @@ export function registerPokemonShowcaseSettings() {
         Boolean,
       default:
         true,
+      onChange:
+        refreshShowcaseCanvas
+    }
+  );
+
+  game.settings.register(
+    MODULE_ID,
+    "visualShowcaseAmbientFx",
+    {
+      name:
+        "Pokémon · Efeitos ambientais automáticos",
+      hint:
+        "Ativa flutuação de Pokémon voadores/levitadores e ripple de Pokémon de Água. Desligado por padrão.",
+      scope:
+        "client",
+      config:
+        true,
+      type:
+        Boolean,
+      default:
+        false,
       onChange:
         refreshShowcaseCanvas
     }

@@ -1421,15 +1421,20 @@ async function chooseConsequenceEffect(source, action, sceneId) {
 
   const result = await foundry.applications.api.DialogV2.input({
     window: { title: "Aplicar consequência" },
-    position: { width: 520 },
+    position: { width: 780 },
     content:
-      '<div class="pokemon-guided-dialog">'
+      '<div class="pokemon-guided-dialog pokemon-guided-consequence-dialog">'
+      + '<div class="pokemon-guided-consequence-fields">'
       + (source.kind === "pokemon" ? '<label>Efeito sugerido<select name="effect">' + consequenceEffectOptions(choices) + '</select></label><small data-consequence-immunity aria-live="polite" hidden></small>' : "")
       + '<label>Status / Tag<input name="name" type="text" value="' + esc(defaultEffect.name ?? "consequência") + '"></label>'
       + '<label>Tier<select name="level">' + [1,2,3,4,5,6].map(level => '<option value="' + level + '"' + (level === Number(defaultEffect.level ?? 1) ? ' selected' : '') + '>' + level + '</option>').join("") + '</select></label>'
-      + '<fieldset><legend>Actors afetados</legend>'
-      + targets.map((target, index) => '<label class="pokemon-guided-check"><input type="checkbox" name="target_' + index + '"' + (target.checked ? ' checked' : '') + '> ' + esc(target.name)
+      + '</div>'
+      + '<fieldset class="pokemon-guided-consequence-targets"><legend>Actors afetados</legend>'
+      + '<input class="pokemon-guided-target-search" type="search" name="targetSearch" placeholder="Buscar Actor...">'
+      + '<div class="pokemon-guided-consequence-target-list">'
+      + targets.map((target, index) => '<label class="pokemon-guided-check" data-consequence-target-row data-target-name="' + esc(target.name) + '"><input type="checkbox" name="target_' + index + '"' + (target.checked ? ' checked' : '') + '> ' + esc(target.name)
         + (source.kind === "pokemon" && pokemonMoveTargetIsImmune(action, actorForTarget(target)) ? ' · imune ao dano' : '') + '</label>').join("")
+      + '</div>'
       + '</fieldset>'
       + '</div>',
     ok: { label: "Aplicar", icon: "fa-solid fa-burst" },
@@ -1459,6 +1464,60 @@ async function chooseConsequenceEffect(source, action, sceneId) {
       };
       select.addEventListener("change", () => refresh(true));
       for (const checkbox of root.querySelectorAll('[name^="target_"]')) checkbox.addEventListener("change", () => refresh());
+
+      const targetSearch =
+        root.querySelector(
+          '[name="targetSearch"]'
+        );
+
+      const filterTargets = () => {
+        const term =
+          String(
+            targetSearch?.value
+            ?? ""
+          )
+            .normalize("NFD")
+            .replace(
+              /[\u0300-\u036f]/g,
+              ""
+            )
+            .toLocaleLowerCase()
+            .trim();
+
+        for (
+          const row
+          of root.querySelectorAll(
+            "[data-consequence-target-row]"
+          )
+        ) {
+          const name =
+            String(
+              row.dataset.targetName
+              ?? ""
+            )
+              .normalize("NFD")
+              .replace(
+                /[\u0300-\u036f]/g,
+                ""
+              )
+              .toLocaleLowerCase();
+
+          row.hidden =
+            !!term
+            &&
+            !name.includes(
+              term
+            );
+        }
+      };
+
+      targetSearch
+        ?.addEventListener(
+          "input",
+          filterTargets
+        );
+
+      filterTargets();
       refresh();
     },
     modal: true

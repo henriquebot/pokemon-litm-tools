@@ -4739,3 +4739,89 @@ has(
   transform:
     translateY(-1px);
 }
+
+/* ========================================================= */
+/* VISUAL SHOWCASE V1 - SMOKE FIXES                          */
+/* ========================================================= */
+
+.pokemon-reaction-choice.control-icon[hidden] {
+  display: none !important;
+}
+
+.pokemon-reaction-toggle.control-icon.active {
+  box-shadow:
+    inset 0 0 0 2px
+    var(--color-border-highlight, #ff6400);
+}
+
+.pokemon-reaction-choice.control-icon {
+  display: grid;
+  place-items: center;
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.pokemon-guided-consequence-dialog {
+  display: grid !important;
+  grid-template-columns:
+    minmax(280px, .9fr)
+    minmax(340px, 1.1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.pokemon-guided-consequence-fields {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pokemon-guided-consequence-targets {
+  min-width: 0;
+  max-height: 430px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pokemon-guided-target-search {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.pokemon-guided-consequence-target-list {
+  min-height: 0;
+  max-height: 350px;
+  overflow-y: auto;
+  padding-right: 5px;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+
+.pokemon-guided-consequence-target-list
+.pokemon-guided-check[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 700px) {
+  .pokemon-guided-consequence-dialog {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pokemon-guided-mini-card {
+  background: transparent !important;
+}
+
+.pokemon-chat-move-actions[data-pokemon-move-type],
+.pokemon-litm-roll-package[data-pokemon-move-type] {
+  background: transparent !important;
+  border-color:
+    color-mix(
+      in srgb,
+      var(--pokemon-move-type-color) 70%,
+      var(--color-border-light-primary)
+    ) !important;
+}

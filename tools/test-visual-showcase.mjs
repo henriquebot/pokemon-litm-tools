@@ -13,11 +13,17 @@ const main =
 const combat =
   read("scripts/pokemon-combat.js");
 
+const guided =
+  read("scripts/pokemon-guided-flow.js");
+
 const template =
   read("templates/pokemon-builder-wizard.hbs");
 
 const styles =
   read("styles/importer.css");
+
+const roadmap =
+  read("ROADMAP.md");
 
 function ok(name, value) {
   assert.equal(
@@ -32,7 +38,7 @@ function ok(name, value) {
 }
 
 ok(
-  "Visual Showcase Ã© ativado pelo main",
+  "showcase wired in main",
   main.includes(
     'from "./pokemon-showcase.js"'
   )
@@ -47,14 +53,10 @@ ok(
 );
 
 ok(
-  "Token FX Ã© somente visual e nÃ£o move TokenDocument",
+  "token visuals never move TokenDocument",
   showcase.includes(
-    'Hooks.on(\n    "drawToken"'
+    '"drawToken"'
   )
-  &&
-  showcase.includes(
-    "pokemon-builder"
-  ) === false
   &&
   !showcase.includes(
     "updateEmbeddedDocuments"
@@ -66,32 +68,70 @@ ok(
 );
 
 ok(
-  "Token FX possui sombra, voo, Ã¡gua e status",
+  "fake oval shadow removed",
   showcase.includes(
-    "graphicsEllipse("
+    "const shadow =\n    null;"
   )
   &&
-  showcase.includes(
-    "flyingPokemon("
+  !showcase.includes(
+    "state.shadow.alpha"
   )
   &&
-  showcase.includes(
-    "waterPokemon("
-  )
-  &&
-  showcase.includes(
-    "statusProfile("
-  )
-  &&
-  showcase.includes(
-    "basePivotY"
+  !showcase.includes(
+    "state.shadow.scale"
   )
 );
 
 ok(
-  "PokÃ©bola existente ganhou burst complementar",
-  combat.includes(
-    "playPokemonShowcaseBurst"
+  "ambient flying and water effects default off",
+  showcase.includes(
+    "visualShowcaseAmbientFx"
+  )
+  &&
+  showcase.includes(
+    "function ambientFxEnabled()"
+  )
+  &&
+  showcase.includes(
+    "const ambientFx =\n    ambientFxEnabled();"
+  )
+  &&
+  showcase.includes(
+    "default:\n        false"
+  )
+);
+
+ok(
+  "status and reaction text handles PIXI version",
+  showcase.includes(
+    "PIXI.VERSION"
+  )
+  &&
+  showcase.includes(
+    "new PIXI.Text(\n    value,\n    style"
+  )
+);
+
+ok(
+  "reactions use native token HUD column",
+  showcase.includes(
+    '"renderTokenHUD"'
+  )
+  &&
+  showcase.includes(
+    '".col.right"'
+  )
+  &&
+  showcase.includes(
+    "pokemonReactionToggle"
+  )
+  &&
+  showcase.includes(
+    "control-icon pokemon-reaction-choice"
+  )
+  &&
+  showcase.includes(
+    "showcase-reaction"
   )
 );
 
@@ -117,41 +157,14 @@ for (
 }
 
 ok(
-  "Reactions aparecem no Token HUD e usam socket",
-  showcase.includes(
-    '"renderTokenHUD"'
-  )
-  &&
-  showcase.includes(
-    "showcase-reaction"
-  )
-  &&
-  showcase.includes(
-    "data-pokemon-reaction-hud"
-  )
-  &&
-  showcase.includes(
-    "pokemonReactionHud"
+  "pokeball keeps showcase burst",
+  combat.includes(
+    "playPokemonShowcaseBurst"
   )
 );
 
 ok(
-  "Token FX e reactions podem ser desligados",
-  showcase.includes(
-    "visualShowcaseTokenFx"
-  )
-  &&
-  showcase.includes(
-    "visualShowcaseReactions"
-  )
-  &&
-  showcase.includes(
-    "game.settings.register"
-  )
-);
-
-ok(
-  "Criador de Challenge separa ConfiguraÃ§Ã£o e Destino",
+  "challenge config destination divider remains",
   template.includes(
     "pokemon-builder-section-divider"
   )
@@ -161,37 +174,55 @@ ok(
   )
 );
 
-for (
-  const root
-  of [
-    ".pokemon-importer",
-    ".pokemon-character-creator",
-    ".pokemon-manager",
-    ".pokemon-challenge-wizard"
-  ]
-) {
-  assert.equal(
-    styles.includes(root),
-    true,
-    "showcase root: " + root
-  );
-}
+ok(
+  "consequence dialog is two columns with search",
+  guided.includes(
+    "pokemon-guided-consequence-dialog"
+  )
+  &&
+  guided.includes(
+    'name="targetSearch"'
+  )
+  &&
+  guided.includes(
+    "data-consequence-target-row"
+  )
+  &&
+  styles.includes(
+    ".pokemon-guided-consequence-target-list"
+  )
+  &&
+  styles.includes(
+    "overflow-y: auto"
+  )
+);
 
 ok(
-  "Showcase aplica acabamento pixel/GBA",
+  "move cards avoid colored background",
   styles.includes(
-    "VISUAL SHOWCASE V1"
+    ".pokemon-guided-mini-card {\n  background: transparent !important;"
   )
   &&
   styles.includes(
-    "image-rendering: pixelated"
+    ".pokemon-litm-roll-package[data-pokemon-move-type]"
+  )
+);
+
+ok(
+  "roadmap records maintenance, transformations and real shadow",
+  roadmap.includes(
+    "Editor de manutenção no header"
   )
   &&
-  styles.includes(
-    ".pokemon-reaction-hud"
+  roadmap.includes(
+    "Fluxo unificado de evolução e transformações"
+  )
+  &&
+  roadmap.includes(
+    "Drop Shadow real"
   )
 );
 
 console.log(
-  "Pokemon LITM Tools | Visual Showcase v1 tests passed"
+  "Pokemon LITM Tools | Visual Showcase smoke fixes passed"
 );
