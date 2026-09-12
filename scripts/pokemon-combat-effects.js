@@ -72,17 +72,17 @@ const TYPE_COLORS = {
 
 const JB2A_PATHS = {
   fire: ["jb2a.fire_bolt"],
-  water: ["jb2a.water_bolt"],
+  water: ["jb2a.water_splash", "jb2a.energy_beam", "jb2a.bullet.01"],
   electric: ["jb2a.lightning_bolt", "jb2a.chain_lightning"],
   grass: ["jb2a.energy_beam", "jb2a.entangle"],
-  ice: ["jb2a.ray_of_frost", "jb2a.ice_shard"],
+  ice: ["jb2a.ray_of_frost", "jb2a.energy_beam"],
   fighting: ["jb2a.unarmed_strike"],
-  poison: ["jb2a.poison_spray", "jb2a.energy_beam"],
-  ground: ["jb2a.boulder_toss", "jb2a.bullet.01"],
+  poison: ["jb2a.energy_beam", "jb2a.bullet.01"],
+  ground: ["jb2a.bullet.01"],
   flying: ["jb2a.gust_of_wind", "jb2a.bullet.01"],
   psychic: ["jb2a.energy_beam"],
   bug: ["jb2a.energy_beam", "jb2a.bullet.01"],
-  rock: ["jb2a.boulder_toss", "jb2a.bullet.01"],
+  rock: ["jb2a.bullet.01"],
   ghost: ["jb2a.eldritch_blast", "jb2a.energy_beam"],
   dragon: ["jb2a.energy_beam"],
   dark: ["jb2a.eldritch_blast", "jb2a.energy_beam"],
@@ -114,12 +114,9 @@ const JB2A_TYPE_COLOR_KEYS = {
 
 const JB2A_INHERENT_TYPE_PATHS = new Set([
   "jb2a.fire_bolt",
-  "jb2a.water_bolt",
+  "jb2a.water_splash",
   "jb2a.ray_of_frost",
-  "jb2a.ice_shard",
-  "jb2a.poison_spray",
-  "jb2a.gust_of_wind",
-  "jb2a.boulder_toss"
+  "jb2a.gust_of_wind"
 ]);
 
 function authorityGM() {
@@ -410,21 +407,30 @@ function sourceTokenForActor(actor) {
   return token?.document ?? token ?? null;
 }
 
-function replayVfxTargetIds(frozenTargetIds) {
-  const scene = canvas?.scene;
-
-  const frozen = [...new Set(
-    [...(frozenTargetIds ?? [])]
-      .filter(id => !!scene?.tokens?.get(id))
+function replayVfxTargetIds(frozenTargetIds, scene = canvas?.scene, currentTargets = game.user?.targets ?? []) {
+  const current = [...new Set(
+    [...currentTargets]
+      .map(target => target?.document ?? target)
+      .filter(token => {
+        const sceneId = token?.parent?.id ?? token?.scene?.id;
+        return (!sceneId || sceneId === scene?.id) && !!scene?.tokens?.get(token?.id);
+      })
+      .map(token => token.id)
   )];
+  if (current.length) return current;
 
-  if (frozen.length) return frozen;
+  return [...new Set(frozenTargetIds ?? [])]
+    .filter(id => !!scene?.tokens?.get(id));
+}
 
-  return [...new Set(
-    [...(game.user?.targets ?? [])]
-      .map(target => target?.document?.id ?? target?.id)
-      .filter(id => !!scene?.tokens?.get(id))
-  )];
+function isSelfVfxTarget(target) {
+  return ["self", "user", "users-field"].includes(String(target ?? "").toLowerCase());
+}
+
+function moveReplayVfxTargetIds(move, source, frozenTargetIds, scene = canvas?.scene, currentTargets = game.user?.targets ?? []) {
+  return isSelfVfxTarget(move?.target)
+    ? (scene?.tokens?.get(source?.id) ? [source.id] : [])
+    : replayVfxTargetIds(frozenTargetIds, scene, currentTargets);
 }
 
 function tokenObject(tokenDoc) {
@@ -623,8 +629,8 @@ function databasePath(candidates, type = "normal") {
   for (const root of candidates ?? []) {
     let discovered = [];
     try {
-      if (typeof getPathsUnder === "function") {
-        const found = getPathsUnder.call(database, root, true);
+      if (typeof getPathsUnder === "function" && exists(root)) {
+        const found = getPathsUnder.call(database, root, { fullyQualified: true });
         if (Array.isArray(found)) discovered = found;
         else if (found && typeof found[Symbol.iterator] === "function") discovered = [...found];
       }
@@ -3864,7 +3870,7 @@ function selectedMoveBindingsForActor(
 }
 
 
-function selectedMoveFromActorState(
+function selectedMoveContextFromActorState(
   actor
 ) {
   const rows =
@@ -3873,8 +3879,19 @@ function selectedMoveFromActorState(
     );
 
   return rows.length === 1
-    ? rows[0].move
+    ? rows[0]
     : null;
+}
+
+function selectedMoveFromActorState(
+  actor
+) {
+  return (
+    selectedMoveContextFromActorState(
+      actor
+    )?.move
+    ?? null
+  );
 }
 
 
@@ -5676,7 +5693,7 @@ async function resolveMove(sourceActor, move, explicitTokenIds = null) {
       }
     ],
     rejectClose: false,
-    modal: true
+    modal: false
   });
 
   if (!choice) return;
@@ -5723,7 +5740,7 @@ async function openMoveAction(sourceActor, move) {
       }
     ],
     rejectClose: false,
-    modal: true
+    modal: false
   });
 
   if (choice === "use") await resolveMove(sourceActor, move);
@@ -5950,7 +5967,7 @@ async function applyGuidedChallengeConsequenceDirect(payload) {
           tokenId: token.id,
           targetName: token.name ?? actor.name,
           multiplier,
-          multiplierLabel: matchupLabel(multiplier),
+          multiplierLabel: compactPokemonMatchupLabel(multiplier),
           immune: true,
           applied: []
         });
@@ -5968,7 +5985,7 @@ async function applyGuidedChallengeConsequenceDirect(payload) {
         tokenId: token.id,
         targetName: token.name ?? actor.name,
         multiplier,
-        multiplierLabel: matchupLabel(multiplier),
+        multiplierLabel: compactPokemonMatchupLabel(multiplier),
         resisted: true,
         applied: []
       });
@@ -5988,7 +6005,7 @@ async function applyGuidedChallengeConsequenceDirect(payload) {
       tokenId: token.id,
       targetName: token.name ?? actor.name,
       multiplier,
-      multiplierLabel: move ? matchupLabel(multiplier) : "",
+      multiplierLabel: move ? compactPokemonMatchupLabel(multiplier) : "",
       finalLevel: finalEffect.level,
       applied
     });
@@ -6496,6 +6513,11 @@ async function addChallengeBiographyActions(
         continue;
       }
 
+      applyPokemonMoveTypeAccent(
+        card,
+        move
+      );
+
       main.querySelector(
         "[data-pokemon-move-mechanics]"
       )?.remove();
@@ -6970,7 +6992,24 @@ function renamePokemonCharacterOtherTab(
 function isPokemonPlayerActor(actor) {
   if (actor?.type !== "litm-character") return false;
 
-  if (actor.getFlag?.(MODULE_ID, "kind") === "pokemon") return true;
+  if (
+    actor.getFlag?.(
+      MODULE_ID,
+      "kind"
+    ) === "pokemon"
+    ||
+    actor.getFlag?.(
+      MODULE_ID,
+      "kind"
+    ) === "pokemon-combat"
+    ||
+    actor.getFlag?.(
+      MODULE_ID,
+      "combatProjection"
+    ) === true
+  ) {
+    return true;
+  }
 
   return Array.from(actor.items ?? []).some(item =>
     item.getFlag?.(MODULE_ID, "themeRole") === "pokemon-moves"
@@ -7326,9 +7365,11 @@ function iconActionButton(title, icon, handler) {
   return button;
 }
 
-function consequenceVfxActions(data, scene) {
+function consequenceVfxActions(data, scene, currentTargets = []) {
   if (!data || !scene || scene.id !== data.sceneId) return [];
-  const targetTokenIds = [...new Set(data.targetTokenIds ?? [])]
+  const targetTokenIds = moveReplayVfxTargetIds(
+    { target: data.moveTarget }, { id: data.sourceTokenId }, data.targetTokenIds, scene, currentTargets
+  )
     .filter(id => !!scene.tokens?.get(id)?.actor);
   if (!targetTokenIds.length) return [];
 
@@ -7353,7 +7394,7 @@ function consequenceVfxActions(data, scene) {
 
 async function replayConsequenceVfx(data, mode) {
   // Resolve os documentos novamente: tokens podem ter saído da cena desde o card.
-  const action = consequenceVfxActions(data, canvas?.scene).find(row => row.mode === mode);
+  const action = consequenceVfxActions(data, canvas?.scene, game.user?.targets ?? []).find(row => row.mode === mode);
   if (!action) throw new Error("Abra a cena da consequência e verifique os tokens envolvidos.");
   const type = Object.hasOwn(TYPE_COLORS, data.type) ? data.type : "normal";
   if (mode === "target") {
@@ -7368,14 +7409,21 @@ async function replayConsequenceVfx(data, mode) {
 function decorateConsequenceVfx(message, root) {
   if (!game.user.isGM || root.querySelector(".pokemon-consequence-vfx")) return;
   const data = message.getFlag?.(MODULE_ID, "consequenceVfx");
-  const actions = consequenceVfxActions(data, canvas?.scene);
-  if (!actions.length) return;
+  const scene = canvas?.scene;
+  if (!data || !scene || scene.id !== data.sceneId) return;
+  // Os botões continuam disponíveis para selecionar outro alvo depois de renderizar o card.
+  const actions = [{ mode: "target", title: "VFX no alvo", icon: "fa-wand-magic-sparkles" }];
+  if (scene.tokens?.get(data.sourceTokenId)?.actor && !isSelfVfxTarget(data.moveTarget)) {
+    actions.push({ mode: "source-target", title: "VFX atacante → alvo", icon: "fa-arrow-right-long" });
+  }
   const controls = document.createElement("span");
   controls.className = "pokemon-consequence-vfx";
   for (const action of actions) {
     controls.append(iconActionButton(action.title, action.icon, () => replayConsequenceVfx(data, action.mode)));
   }
-  const host = root.querySelector(".pokemon-guided-mini-card.consequence > div")
+  const host = root.querySelector(
+    ".pokemon-guided-mini-card.consequence > div, .pokemon-guided-mini-card.threat > div"
+  )
     ?? root.querySelector(".message-content") ?? root;
   host.append(controls);
 }
@@ -7457,6 +7505,11 @@ async function addPokemonCharacterOtherActions(actor, root) {
   for (const move of moves) {
     const card = document.createElement("article");
     card.className = "pokemon-character-action-card";
+
+    applyPokemonMoveTypeAccent(
+      card,
+      move
+    );
 
     const main = document.createElement("div");
     main.className = "pokemon-character-action-main";
@@ -7685,6 +7738,216 @@ async function pokemonMovesForMessageActor(
 }
 
 
+function usePokemonPtBrLitmCards() {
+  let mode =
+    "auto";
+
+  try {
+    mode =
+      game.settings.get(
+        MODULE_ID,
+        "litmCardLanguage"
+      )
+      ?? "auto";
+  } catch {}
+
+  if (
+    mode === "pt-BR"
+  ) {
+    return true;
+  }
+
+  if (
+    mode === "native"
+  ) {
+    return false;
+  }
+
+  const foundryLanguage =
+    String(
+      game.i18n?.lang
+      ?? ""
+    ).toLocaleLowerCase();
+
+  return (
+    foundryLanguage === "pt"
+    ||
+    foundryLanguage.startsWith(
+      "pt-"
+    )
+  );
+}
+
+
+const LITM_CARD_PTBR_REPLACEMENTS = [
+  [
+    /The Narrator decides on a narrative development detrimental to the Hero,/gi,
+    "O Narrador decide um desenvolvimento narrativo prejudicial ao Herói,"
+  ],
+  [
+    /and can give or remove a tag or status in a way that hinders the Hero\./gi,
+    "e pode dar ou remover uma Tag ou Status de forma que atrapalhe o Herói."
+  ],
+  [
+    /Success \(as in 10\+\)\s*&\s*Consequences as in Simple action\./gi,
+    "Sucesso (como em 10+) e Consequências como em uma ação Simples."
+  ],
+  [
+    /The action unfolds as expected, or better,/gi,
+    "A ação acontece como esperado, ou melhor,"
+  ],
+  [
+    /achieving its intended goal or overcoming an obstacle\./gi,
+    "alcançando seu objetivo ou superando um obstáculo."
+  ],
+  [
+    /The Narrator can also give you a useful tag or status\./gi,
+    "O Narrador também pode conceder uma Tag ou Status útil."
+  ],
+  [
+    /Get to Spend Power:/gi,
+    "Você pode gastar Power:"
+  ],
+  [
+    /SPEND POWER ON EFFECTS:/gi,
+    "GASTAR POWER EM EFEITOS:"
+  ],
+  [
+    /Spend your power:/gi,
+    "Gaste seu Power:"
+  ],
+  [
+    /No Consequences\./gi,
+    "Sem consequências."
+  ],
+  [
+    /Add or scratch a tag \(2 Power\)/gi,
+    "Adicionar ou riscar uma Tag (2 Power)"
+  ],
+  [
+    /Add or reduce a status \(1 Power per tier\)/gi,
+    "Adicionar ou reduzir um Status (1 Power por tier)"
+  ],
+  [
+    /Discover a valuable detail \(1 Power\)/gi,
+    "Descobrir um detalhe valioso (1 Power)"
+  ],
+  [
+    /See advanced options on page 154\./gi,
+    "Veja opções avançadas na página 154."
+  ],
+  [
+    /Detailed Roll/gi,
+    "Rolagem Detalhada"
+  ],
+  [
+    /\bPositive:/gi,
+    "Positivo:"
+  ],
+  [
+    /\bNegative:/gi,
+    "Negativo:"
+  ],
+  [
+    /Single-use tag \(last Power\)/gi,
+    "Tag de uso único (último Power)"
+  ],
+  [
+    /Extra feat/gi,
+    "Feito extra"
+  ],
+  [
+    /Discover a valuable detail/gi,
+    "Descobrir um detalhe valioso"
+  ]
+];
+
+
+function translateLitmCardTextNodes(
+  root
+) {
+  if (
+    !root
+    ||
+    !usePokemonPtBrLitmCards()
+  ) {
+    return;
+  }
+
+  const walker =
+    document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT
+    );
+
+  const nodes = [];
+
+  while (
+    walker.nextNode()
+  ) {
+    nodes.push(
+      walker.currentNode
+    );
+  }
+
+  for (
+    const node
+    of nodes
+  ) {
+    let value =
+      String(
+        node.nodeValue
+        ?? ""
+      );
+
+    for (
+      const [
+        pattern,
+        replacement
+      ]
+      of LITM_CARD_PTBR_REPLACEMENTS
+    ) {
+      value =
+        value.replace(
+          pattern,
+          replacement
+        );
+    }
+
+    if (
+      value !== node.nodeValue
+    ) {
+      node.nodeValue =
+        value;
+    }
+  }
+
+  const statusButton =
+    root.querySelector(
+      '[data-spend-option="status"]'
+    );
+
+  if (
+    statusButton
+  ) {
+    statusButton.textContent =
+      "Status: efeito do golpe / criar / reduzir · 1 Power por tier";
+  }
+
+  const tagButton =
+    root.querySelector(
+      '[data-spend-option="tag"]'
+    );
+
+  if (
+    tagButton
+  ) {
+    tagButton.textContent =
+      "Tag: efeito do golpe / criar / riscar / recuperar · 2 Power";
+  }
+}
+
+
 function normalizeMoveSearch(
   value
 ) {
@@ -7700,10 +7963,156 @@ function normalizeMoveSearch(
 }
 
 
+function associatedPokemonSourceToken(
+  actor,
+  move,
+  sourceThemeId = null,
+  sourceInstanceId = null
+) {
+  const scene =
+    canvas?.scene;
+
+  if (!scene) {
+    return null;
+  }
+
+  return (
+    scene.tokens?.find(
+      token => {
+        const combatActor =
+          token.actor;
+
+        const trainerId =
+          token.getFlag?.(
+            MODULE_ID,
+            "sourceTrainerActorId"
+          )
+          ??
+          token.getFlag?.(
+            MODULE_ID,
+            "trainerActorId"
+          )
+          ??
+          combatActor?.getFlag?.(
+            MODULE_ID,
+            "sourceTrainerActorId"
+          )
+          ??
+          null;
+
+        if (trainerId !== actor?.id) {
+          return false;
+        }
+
+        const tokenThemeId =
+          token.getFlag?.(
+            MODULE_ID,
+            "sourceThemeId"
+          )
+          ??
+          token.getFlag?.(
+            MODULE_ID,
+            "pokemonThemeId"
+          )
+          ??
+          combatActor?.getFlag?.(
+            MODULE_ID,
+            "sourceThemeId"
+          )
+          ??
+          null;
+
+        const tokenInstanceId =
+          token.getFlag?.(
+            MODULE_ID,
+            "pokemonInstanceId"
+          )
+          ??
+          combatActor?.getFlag?.(
+            MODULE_ID,
+            "pokemonInstanceId"
+          )
+          ??
+          null;
+
+        if (
+          sourceInstanceId
+          &&
+          tokenInstanceId === sourceInstanceId
+        ) {
+          return true;
+        }
+
+        if (
+          sourceThemeId
+          &&
+          tokenThemeId === sourceThemeId
+        ) {
+          return true;
+        }
+
+        if (
+          sourceThemeId
+          ||
+          sourceInstanceId
+        ) {
+          return false;
+        }
+
+        if (
+          moveForActor(
+            combatActor,
+            move?.id
+          )
+        ) {
+          return true;
+        }
+
+        const sourceTheme =
+          tokenThemeId
+            ? actor?.items?.get?.(
+                tokenThemeId
+              )
+            : null;
+
+        return !!sourceTheme
+          &&
+          movesFromPokemonItem(
+            sourceTheme
+          ).some(
+            row =>
+              row?.id === move?.id
+          );
+      }
+    )
+    ?? null
+  );
+}
+
 function sourceTokenForMessageActor(
   actor,
-  move
+  move,
+  message = null
 ) {
+  const frozenTokenId =
+    message?.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceTokenId"
+    )
+    ?? null;
+
+  if (frozenTokenId) {
+    const frozen =
+      canvas?.scene?.tokens?.get?.(
+        frozenTokenId
+      )
+      ?? null;
+
+    if (frozen?.actor) {
+      return frozen;
+    }
+  }
+
   const ownMoves =
     actor?.getFlag?.(
       MODULE_ID,
@@ -7731,43 +8140,26 @@ function sourceTokenForMessageActor(
     );
   }
 
-  const combatPokemon =
-    canvas?.scene?.tokens?.find(
-      token => {
-        const combatActor =
-          token.actor;
-
-        const sameTrainer =
-          combatActor?.getFlag?.(
-            MODULE_ID,
-            "sourceTrainerActorId"
-          ) === actor?.id;
-
-        if (!sameTrainer) return false;
-
-        if (moveForActor(combatActor, move?.id)) {
-          return true;
-        }
-
-        const sourceThemeId =
-          combatActor?.getFlag?.(
-            MODULE_ID,
-            "sourceThemeId"
-          );
-
-        const sourceTheme =
-          sourceThemeId
-            ? actor?.items?.get?.(sourceThemeId)
-            : null;
-
-        return !!sourceTheme
-          && movesFromPokemonItem(sourceTheme)
-            .some(row => row?.id === move?.id);
-      }
+  const sourceThemeId =
+    message?.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceThemeId"
     )
     ?? null;
 
-  return combatPokemon;
+  const sourceInstanceId =
+    message?.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceInstanceId"
+    )
+    ?? null;
+
+  return associatedPokemonSourceToken(
+    actor,
+    move,
+    sourceThemeId,
+    sourceInstanceId
+  );
 }
 
 
@@ -7851,10 +8243,14 @@ function onPreCreateChatMessage(
     );
 
   } else if (actor) {
-    const move =
-      selectedMoveFromActorState(
+    const selected =
+      selectedMoveContextFromActorState(
         actor
       );
+
+    const move =
+      selected?.move
+      ?? null;
 
     if (move?.id) {
       update[
@@ -7863,6 +8259,94 @@ function onPreCreateChatMessage(
         + ".pokemonMoveId"
       ] =
         move.id;
+
+      let sourceThemeId =
+        null;
+
+      let sourceInstanceId =
+        null;
+
+      if (
+        selected?.item?.getFlag?.(
+          MODULE_ID,
+          "pokemonTheme"
+        ) === true
+      ) {
+        sourceThemeId =
+          selected.item.id;
+
+        sourceInstanceId =
+          selected.item.getFlag?.(
+            MODULE_ID,
+            "pokemonInstanceId"
+          )
+          ?? null;
+      }
+
+      if (
+        actor.getFlag?.(
+          MODULE_ID,
+          "combatProjection"
+        ) === true
+      ) {
+        sourceThemeId =
+          actor.getFlag?.(
+            MODULE_ID,
+            "sourceThemeId"
+          )
+          ?? sourceThemeId;
+
+        sourceInstanceId =
+          actor.getFlag?.(
+            MODULE_ID,
+            "pokemonInstanceId"
+          )
+          ?? sourceInstanceId;
+      }
+
+      if (sourceThemeId) {
+        update[
+          "flags."
+          + MODULE_ID
+          + ".pokemonSourceThemeId"
+        ] =
+          sourceThemeId;
+      }
+
+      if (sourceInstanceId) {
+        update[
+          "flags."
+          + MODULE_ID
+          + ".pokemonSourceInstanceId"
+        ] =
+          sourceInstanceId;
+      }
+
+      const sourceToken =
+        associatedPokemonSourceToken(
+          actor,
+          move,
+          sourceThemeId,
+          sourceInstanceId
+        )
+        ??
+        (
+          actor.getFlag?.(
+            MODULE_ID,
+            "combatProjection"
+          ) === true
+            ? sourceTokenForActor(actor)
+            : null
+        );
+
+      if (sourceToken?.id) {
+        update[
+          "flags."
+          + MODULE_ID
+          + ".pokemonSourceTokenId"
+        ] =
+          sourceToken.id;
+      }
     }
   }
 
@@ -7886,6 +8370,42 @@ async function moveFromChatMessage(
       )
       ?? ""
     ).trim();
+
+  const sourceThemeId =
+    message.getFlag?.(
+      MODULE_ID,
+      "pokemonSourceThemeId"
+    )
+    ?? null;
+
+  if (
+    flaggedId
+    &&
+    sourceThemeId
+  ) {
+    const sourceTheme =
+      actor?.items?.get?.(
+        sourceThemeId
+      )
+      ?? null;
+
+    const themeMove =
+      sourceTheme
+        ? movesFromPokemonItem(
+            sourceTheme
+          ).find(
+            row =>
+              row?.id === flaggedId
+          )
+        : null;
+
+    if (themeMove) {
+      return enrichMoveForActor(
+        actor,
+        themeMove
+      );
+    }
+  }
 
   if (flaggedId) {
     const move =
@@ -8254,9 +8774,38 @@ async function chooseContextEffectSpend({ message, actor, move, sourceToken, fro
       + '<label>Destino<select name="destination">' + contextSpendDestinationHtml(destinations, destinations[0].value) + '</select></label>'
       + (isTag ? '<p>Esta Tag custa 2 Power.</p>' : '<label>Power / tier<select name="level">' + levelOptions + '</select></label>')
       + '</div>',
+    buttons: [
+      {
+        action: "pokemon-back",
+        label: "Voltar",
+        icon: "fa-solid fa-arrow-left",
+        type: "button"
+      }
+    ],
     ok: { label: "Gastar e aplicar", icon: "fa-solid fa-check" },
-    modal: true
+    modal: false
   });
+
+  if (
+    choice === "pokemon-back"
+  ) {
+    const context = {
+      message,
+      actor,
+      move,
+      sourceToken,
+      frozenTargetIds
+    };
+
+    return isTag
+      ? openNativePokemonTagSpend(
+          context
+        )
+      : openNativePokemonStatusSpend(
+          context
+        );
+  }
+
   if (!choice) return;
   const cost = isTag ? 2 : Math.max(1, Math.min(maxLevel, Number(choice.level ?? maxLevel) || maxLevel));
   const appliedEffect = foundry.utils.deepClone(effect);
@@ -8298,9 +8847,38 @@ async function promptCustomContextSpend({ message, actor, move, sourceToken, fro
       + (isTag ? '<p>Esta Tag custa 2 Power.</p>' : '<label>Power / tier<select name="level">' + levelOptions + '</select></label>')
       + '<label class="pokemon-context-checkbox"><input name="negative" type="checkbox" checked> Efeito negativo</label>'
       + '</div>',
+    buttons: [
+      {
+        action: "pokemon-back",
+        label: "Voltar",
+        icon: "fa-solid fa-arrow-left",
+        type: "button"
+      }
+    ],
     ok: { label: "Gastar e aplicar", icon: "fa-solid fa-check" },
-    modal: true
+    modal: false
   });
+
+  if (
+    choice === "pokemon-back"
+  ) {
+    const context = {
+      message,
+      actor,
+      move,
+      sourceToken,
+      frozenTargetIds
+    };
+
+    return isTag
+      ? openNativePokemonTagSpend(
+          context
+        )
+      : openNativePokemonStatusSpend(
+          context
+        );
+  }
+
   if (!choice) return;
   const name = String(choice.name ?? "").trim();
   if (!name) throw new Error("Digite o nome da Tag ou Status.");
@@ -8394,7 +8972,7 @@ async function promptReduceExistingStatus({ message, actor, move, sourceToken, f
     content: '<div class="pokemon-context-spend-dialog"><label>Status<select name="index">'
       + rows.map((row, index) => '<option value="' + index + '">' + esc(row.label) + '</option>').join("")
       + '</select></label></div>',
-    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: true
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: false
   });
   if (!first) return;
   const row = rows[Number(first.index)];
@@ -8405,7 +8983,7 @@ async function promptReduceExistingStatus({ message, actor, move, sourceToken, f
     content: '<div class="pokemon-context-spend-dialog"><label>Power<select name="amount">'
       + Array.from({ length: max }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + ' Power</option>').join("")
       + '</select></label></div>',
-    ok: { label: "Gastar e reduzir", icon: "fa-solid fa-check" }, modal: true
+    ok: { label: "Gastar e reduzir", icon: "fa-solid fa-check" }, modal: false
   });
   if (!second) return;
   const amount = Math.max(1, Math.min(max, Number(second.amount ?? 1) || 1));
@@ -8449,7 +9027,7 @@ async function promptRemoveExistingTag({ message, actor, move, sourceToken, froz
         ).join("")
       + '</select></label></div>',
     ok: { label: "Gastar 2 Power", icon: "fa-solid fa-check" },
-    modal: true
+    modal: false
   });
   if (!choice) return;
 
@@ -8503,7 +9081,7 @@ async function openNativePokemonStatusSpend(context) {
   const choice = await foundry.applications.api.DialogV2.input({
     window: { title: "Give / reduce a status" },
     content: '<div class="pokemon-context-spend-dialog"><label>Consequência<select name="choice">' + options.join("") + '</select></label></div>',
-    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: true
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: false
   });
   if (!choice) return;
   if (choice.choice === "custom") return promptCustomContextSpend({ ...context, kind: "status" });
@@ -8522,7 +9100,7 @@ async function openNativePokemonTagSpend(context) {
   const choice = await foundry.applications.api.DialogV2.input({
     window: { title: "Add / scratch / recover a tag" },
     content: '<div class="pokemon-context-spend-dialog"><label>Consequência<select name="choice">' + options.join("") + '</select></label></div>',
-    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: true
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: false
   });
   if (!choice) return;
   if (choice.choice === "custom") return promptCustomContextSpend({ ...context, kind: "tag" });
@@ -9169,7 +9747,7 @@ async function choosePokemonEffectPurchase(
       },
 
       modal:
-        true
+        false
     });
 
   if (!choice) {
@@ -9913,6 +10491,10 @@ async function onRenderPokemonChatMessage(
       : null;
   if (!root) return;
 
+  translateLitmCardTextNodes(
+    root
+  );
+
   decorateConsequenceVfx(message, root);
   const actor = game.actors.get(message?.speaker?.actor);
   if (!actor) return;
@@ -9945,7 +10527,7 @@ async function onRenderPokemonChatMessage(
 
   const sourceToken = () => {
     if (sceneId && sceneId !== canvas?.scene?.id) throw new Error("Abra a cena onde a rolagem foi feita.");
-    const token = sourceTokenForMessageActor(actor, move);
+    const token = sourceTokenForMessageActor(actor, move, message);
     if (!token) throw new Error("Token do Pokémon não encontrado.");
     return token.document ?? token;
   };
@@ -9953,10 +10535,7 @@ async function onRenderPokemonChatMessage(
   buttons.append(
     iconActionButton("VFX no Token", "fa-wand-magic-sparkles", async () => {
       const source = sourceToken();
-      const selfTarget = ["self", "user", "users-field"].includes(String(move?.target ?? "").toLowerCase());
-      const ids = selfTarget
-        ? [source.id]
-        : replayVfxTargetIds(frozenTargetIds);
+      const ids = moveReplayVfxTargetIds(move, source, frozenTargetIds);
 
       if (!ids.length) {
         throw new Error(
@@ -10242,9 +10821,23 @@ export async function pokemonLitmCombatSelfTest() {
       "Não foi possível reverter com segurança:"
     );
 
-  checks.vfxCurrentTargetFallback =
-    typeof replayVfxTargetIds === "function"
-    && replayVfxTargetIds.toString().includes("game.user?.targets");
+  const vfxScene = { id: "scene", tokens: new Map([
+    ["current", { id: "current", actor: {} }],
+    ["frozen", { id: "frozen", actor: {} }],
+    ["source", { id: "source", actor: {} }]
+  ]) };
+  const currentVfxTargets = [{ document: { id: "current", parent: vfxScene } }];
+  checks.vfxCurrentTargetPriority =
+    replayVfxTargetIds(["frozen"], vfxScene, currentVfxTargets).join() === "current"
+    && replayVfxTargetIds(["frozen", "missing", "frozen"], vfxScene, []).join() === "frozen"
+    && replayVfxTargetIds(["frozen"], vfxScene, [{ id: "current", parent: { id: "other" } }]).join() === "frozen"
+    && replayVfxTargetIds(["missing"], vfxScene, [{ id: "missing" }]).length === 0;
+  checks.vfxSelfTargetPreserved = ["self", "user", "users-field"].every(target =>
+    moveReplayVfxTargetIds({ target }, { id: "source" }, ["frozen"], vfxScene, currentVfxTargets).join() === "source"
+  );
+  checks.consequenceVfxCurrentTargetPriority = consequenceVfxActions({
+    sceneId: "scene", sourceTokenId: "source", targetTokenIds: ["frozen"]
+  }, vfxScene, currentVfxTargets).every(action => action.targetTokenIds.join() === "current");
 
   checks.consequenceVfxControlsInstalled = consequenceVfxControlsSelfTest();
 

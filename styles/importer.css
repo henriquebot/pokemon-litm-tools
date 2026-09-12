@@ -4110,3 +4110,737 @@ has(
 .pokemon-boss-phase-control {
   min-width: 30px;
 }
+
+
+/* v0.8.1 · Trainer names + quick Challenge actions */
+
+.pokemon-importer .pokemon-trainer-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.pokemon-importer .pokemon-trainer-name-row input {
+  min-width: 0;
+  flex: 1;
+  height: 26px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.pokemon-importer .pokemon-trainer-name-row button {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+}
+
+.pokemon-challenge-quick-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.pokemon-challenge-quick-actions button {
+  width: 27px;
+  min-width: 27px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  line-height: 1;
+  font-size: 13px;
+}
+
+/* v0.8.1 runtime UX patch v2 */
+
+/* Seleção clara no primeiro passo do Character Creator */
+.pokemon-character-type-card {
+  position: relative;
+  transition:
+    transform .12s ease,
+    background-color .12s ease,
+    border-color .12s ease,
+    box-shadow .12s ease;
+}
+
+.pokemon-character-type-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-border-highlight);
+  background: rgb(255 255 255 / .05);
+}
+
+.pokemon-character-type-card:focus-visible {
+  outline: 2px solid var(--color-border-highlight);
+  outline-offset: 3px;
+}
+
+.pokemon-character-type-card.selected {
+  border-color: var(--color-border-highlight);
+  background: rgb(255 255 255 / .10);
+  box-shadow:
+    inset 0 0 0 3px var(--color-border-highlight),
+    0 0 18px rgb(255 255 255 / .08);
+}
+
+.pokemon-character-type-card.selected::after {
+  content: "✓";
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-weight: 800;
+}
+
+/* Personalização do time: Pokémon à esquerda, detalhes e golpes à direita */
+.pokemon-team-customization-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pokemon-team-customization-workspace {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns:
+    minmax(0, 2fr)
+    minmax(0, 3fr);
+  gap: 18px;
+  min-height: 0;
+  margin-top: 8px;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.pokemon-team-customization-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 8px;
+  background: rgb(255 255 255 / .025);
+}
+
+.pokemon-team-customization-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.pokemon-team-customization-search input {
+  width: 100%;
+  min-width: 0;
+  font-weight: normal;
+}
+
+.pokemon-team-customization-page
+.pokemon-team-customization-tabs {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding-right: 5px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  align-content: start;
+  overflow-y: auto;
+}
+
+.pokemon-team-customization-page
+.pokemon-team-customization-tabs button {
+  min-height: 90px;
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 7px;
+  background: rgb(0 0 0 / .08);
+}
+
+.pokemon-team-customization-page
+.pokemon-team-customization-tabs button.active {
+  border-color: var(--color-border-highlight);
+  background: rgb(255 255 255 / .08);
+}
+
+.pokemon-team-customization-page
+.pokemon-team-customization-tabs button[hidden] {
+  display: none;
+}
+
+.pokemon-team-customization-empty {
+  margin: 0;
+  opacity: .7;
+}
+
+.pokemon-team-customization-page
+.pokemon-team-customization-list {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.pokemon-team-customization-workspace .pokemon-team-customization-card {
+  background: rgb(255 255 255 / .025);
+}
+
+.pokemon-team-customization-workspace .pokemon-team-customization-grid label,
+.pokemon-team-customization-workspace .pokemon-team-customization-grid select {
+  min-width: 0;
+}
+
+.pokemon-team-customization-workspace .pokemon-team-customization-grid select {
+  width: 100%;
+}
+
+.pokemon-team-customization-workspace .pokemon-team-moves {
+  border-top: 1px solid var(--color-border-light-primary);
+  padding-top: 14px;
+}
+
+.pokemon-team-customization-workspace .pokemon-team-move-options {
+  grid-template-columns: 1fr;
+  max-height: none;
+  overflow: visible;
+}
+
+/* Biblioteca de Challenges no Importer */
+.pokemon-challenge-library-card {
+  grid-template-columns:
+    96px
+    minmax(0, 1fr);
+}
+
+.pokemon-importer-shell.preview-zoomed
+.pokemon-challenge-library-card {
+  grid-template-columns:
+    144px
+    minmax(0, 1fr);
+}
+
+.pokemon-challenge-library-card
+.pokemon-asset-info button {
+  width: fit-content;
+  margin-top: 4px;
+}
+
+.pokemon-challenge-library-roles,
+.pokemon-challenge-library-limits {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.pokemon-challenge-library-limits {
+  font-weight: 600;
+}
+
+.pokemon-challenge-library-empty {
+  grid-column: 1 / -1;
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  opacity: .7;
+}
+
+.pokemon-challenge-library-empty > i {
+  font-size: 2.5rem;
+}
+
+/* Tipo de Actor na sidebar */
+.pokemon-actor-kind-badge {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: .65rem;
+  opacity: .82;
+}
+
+.pokemon-actor-kind-character {
+  border-radius: 50%;
+}
+
+.pokemon-actor-kind-challenge {
+  border-radius: 4px;
+}
+
+/* Assunto da Descoberta */
+.pokemon-guided-mini-subtitle {
+  display: block;
+  margin: 2px 0 3px;
+  opacity: .7;
+  font-size: .78em;
+}
+
+@media (max-width: 760px) {
+  .pokemon-team-customization-page {
+    overflow: auto;
+  }
+
+  .pokemon-team-customization-workspace {
+    flex: 0 0 auto;
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .pokemon-team-customization-page
+  .pokemon-team-customization-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 240px;
+  }
+
+  .pokemon-team-customization-page
+  .pokemon-team-customization-list {
+    overflow: visible;
+  }
+}
+
+/* ========================================================= */
+/* VISUAL SHOWCASE V1                                       */
+/* ========================================================= */
+
+:is(
+  .pokemon-importer,
+  .pokemon-character-creator,
+  .pokemon-manager,
+  .pokemon-challenge-wizard
+) {
+  --pokemon-showcase-ink:
+    rgb(244 237 222);
+  --pokemon-showcase-muted:
+    rgb(201 190 171);
+  --pokemon-showcase-panel:
+    rgb(22 20 29 / .94);
+  --pokemon-showcase-panel-2:
+    rgb(42 35 48 / .92);
+  --pokemon-showcase-line:
+    rgb(207 155 91 / .72);
+  --pokemon-showcase-accent:
+    rgb(230 171 96);
+  --pokemon-showcase-red:
+    rgb(181 66 60);
+  --pokemon-showcase-shadow:
+    0 8px 24px rgb(0 0 0 / .28);
+}
+
+:is(
+  .pokemon-importer,
+  .pokemon-character-creator,
+  .pokemon-manager,
+  .pokemon-challenge-wizard
+) .window-content {
+  color:
+    var(--pokemon-showcase-ink);
+  background:
+    radial-gradient(
+      circle at 78% 10%,
+      rgb(142 76 50 / .12),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      rgb(15 15 23 / .97),
+      rgb(20 18 28 / .97)
+    );
+}
+
+:is(
+  .pokemon-importer,
+  .pokemon-character-creator,
+  .pokemon-manager,
+  .pokemon-challenge-wizard
+) img {
+  image-rendering:
+    pixelated;
+}
+
+:is(
+  .pokemon-importer,
+  .pokemon-character-creator,
+  .pokemon-manager,
+  .pokemon-challenge-wizard
+) button,
+:is(
+  .pokemon-importer,
+  .pokemon-character-creator,
+  .pokemon-manager,
+  .pokemon-challenge-wizard
+) select,
+:is(
+  .pokemon-importer,
+  .pokemon-character-creator,
+  .pokemon-manager,
+  .pokemon-challenge-wizard
+) input {
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+
+:is(
+  .pokemon-importer,
+  .pokemon-character-creator,
+  .pokemon-manager,
+  .pokemon-challenge-wizard
+) button:hover:not(:disabled) {
+  border-color:
+    var(--pokemon-showcase-accent);
+  box-shadow:
+    0 0 0 1px
+    rgb(230 171 96 / .28);
+}
+
+.pokemon-importer-tabs,
+.pokemon-manager-tabs,
+.pokemon-builder-progress,
+.pokemon-wizard-progress {
+  background:
+    linear-gradient(
+      180deg,
+      rgb(35 29 42 / .96),
+      rgb(22 20 29 / .96)
+    );
+  border-bottom:
+    1px solid
+    var(--pokemon-showcase-line);
+  box-shadow:
+    0 4px 16px
+    rgb(0 0 0 / .16);
+}
+
+.pokemon-importer-tabs button.active,
+.pokemon-manager-tabs button.active,
+.pokemon-builder-progress-step.active,
+.pokemon-wizard-step.active {
+  color:
+    rgb(255 244 219);
+  border-color:
+    var(--pokemon-showcase-accent);
+  background:
+    linear-gradient(
+      180deg,
+      rgb(111 55 46 / .88),
+      rgb(68 39 43 / .9)
+    );
+  box-shadow:
+    inset 0 0 0 1px
+      rgb(255 215 151 / .2),
+    0 0 14px
+      rgb(197 94 63 / .13);
+}
+
+.pokemon-asset-card,
+.pokemon-manager-card,
+.pokemon-character-type-card,
+.pokemon-team-customization-card,
+.pokemon-builder-move-card,
+.pokemon-builder-trainer-card {
+  border:
+    1px solid
+    rgb(178 149 116 / .38);
+  background:
+    linear-gradient(
+      145deg,
+      rgb(48 40 51 / .78),
+      rgb(27 24 34 / .88)
+    );
+  box-shadow:
+    inset 0 1px 0
+      rgb(255 255 255 / .035),
+    0 6px 16px
+      rgb(0 0 0 / .16);
+}
+
+.pokemon-asset-card:hover,
+.pokemon-manager-card:hover,
+.pokemon-character-type-card:hover,
+.pokemon-builder-trainer-card:hover {
+  transform:
+    translateY(-1px);
+  border-color:
+    var(--pokemon-showcase-accent);
+}
+
+.pokemon-asset-card.selected,
+.pokemon-character-type-card.selected,
+.pokemon-builder-trainer-card.selected,
+.pokemon-team-customization-tabs button.active {
+  border-color:
+    rgb(240 187 108 / .92);
+  box-shadow:
+    inset 0 0 0 1px
+      rgb(240 187 108 / .22),
+    0 0 18px
+      rgb(190 83 51 / .15);
+}
+
+.pokemon-manager-header,
+.pokemon-builder-pokemon-header,
+.pokemon-importer-toolbar,
+.pokemon-team-toolbar {
+  background:
+    linear-gradient(
+      90deg,
+      rgb(58 43 54 / .72),
+      rgb(30 27 37 / .5)
+    );
+  border:
+    1px solid
+    rgb(177 145 111 / .3);
+  box-shadow:
+    inset 0 1px 0
+      rgb(255 255 255 / .035);
+}
+
+.pokemon-builder-wizard-footer,
+.pokemon-wizard-footer {
+  border-top:
+    1px solid
+    var(--pokemon-showcase-line);
+  background:
+    linear-gradient(
+      180deg,
+      rgb(21 19 27 / .9),
+      rgb(30 24 32 / .97)
+    );
+}
+
+.pokemon-builder-section-divider {
+  height:
+    1px;
+  margin:
+    18px 0 14px;
+  border:
+    0;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgb(218 159 91 / .78) 15%,
+      rgb(218 159 91 / .78) 85%,
+      transparent
+    );
+  box-shadow:
+    0 0 8px
+    rgb(181 79 47 / .12);
+}
+
+.pokemon-guided-mini-card,
+.pokemon-biography-effect {
+  border:
+    1px solid
+    rgb(187 150 106 / .42);
+  border-radius:
+    7px;
+  background:
+    linear-gradient(
+      145deg,
+      rgb(49 41 49 / .92),
+      rgb(28 25 34 / .96)
+    );
+  box-shadow:
+    var(--pokemon-showcase-shadow);
+}
+
+.pokemon-reaction-hud {
+  position:
+    absolute;
+  left:
+    50%;
+  top:
+    -54px;
+  z-index:
+    120;
+  display:
+    flex;
+  align-items:
+    center;
+  gap:
+    3px;
+  padding:
+    4px;
+  transform:
+    translateX(-50%);
+  border:
+    2px solid
+    rgb(38 29 43 / .96);
+  border-radius:
+    8px;
+  background:
+    rgb(255 248 231 / .98);
+  box-shadow:
+    0 4px 12px
+    rgb(0 0 0 / .34);
+}
+
+.pokemon-reaction-hud button {
+  display:
+    grid;
+  place-items:
+    center;
+  min-width:
+    28px;
+  width:
+    auto;
+  height:
+    28px;
+  margin:
+    0;
+  padding:
+    0 5px;
+  border:
+    1px solid
+    rgb(76 57 79 / .42);
+  border-radius:
+    4px;
+  color:
+    rgb(39 29 46);
+  background:
+    rgb(255 251 240);
+  font-family:
+    monospace;
+  font-size:
+    15px;
+  font-weight:
+    900;
+  line-height:
+    1;
+}
+
+.pokemon-reaction-hud button:hover {
+  color:
+    rgb(255 248 231);
+  background:
+    rgb(151 67 56);
+  transform:
+    translateY(-1px);
+}
+
+/* ========================================================= */
+/* VISUAL SHOWCASE V1 - SMOKE FIXES                          */
+/* ========================================================= */
+
+.pokemon-reaction-choice.control-icon[hidden] {
+  display: none !important;
+}
+
+.pokemon-reaction-toggle.control-icon.active {
+  box-shadow:
+    inset 0 0 0 2px
+    var(--color-border-highlight, #ff6400);
+}
+
+.pokemon-reaction-choice.control-icon {
+  display: grid;
+  place-items: center;
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.pokemon-guided-consequence-dialog {
+  display: grid !important;
+  grid-template-columns:
+    minmax(280px, .9fr)
+    minmax(340px, 1.1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.pokemon-guided-consequence-fields {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pokemon-guided-consequence-targets {
+  min-width: 0;
+  max-height: 430px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pokemon-guided-target-search {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.pokemon-guided-consequence-target-list {
+  min-height: 0;
+  max-height: 350px;
+  overflow-y: auto;
+  padding-right: 5px;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+
+.pokemon-guided-consequence-target-list
+.pokemon-guided-check[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 700px) {
+  .pokemon-guided-consequence-dialog {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pokemon-guided-mini-card {
+  background: transparent !important;
+}
+
+.pokemon-chat-move-actions[data-pokemon-move-type],
+.pokemon-litm-roll-package[data-pokemon-move-type] {
+  background: transparent !important;
+  border-color:
+    color-mix(
+      in srgb,
+      var(--pokemon-move-type-color) 70%,
+      var(--color-border-light-primary)
+    ) !important;
+}
+
+
+/* ========================================================= */
+/* POST SMOKE ROUND 3 V4 SAFE                                */
+/* Move cards: tipo somente na borda                         */
+/* ========================================================= */
+
+.pokemon-biography-effect[data-pokemon-effect-kind="move"][data-pokemon-move-type],
+.pokemon-character-action-card[data-pokemon-move-type] {
+  background: transparent !important;
+  border:
+    1px solid
+    var(
+      --pokemon-move-type-color,
+      var(--color-border-light-primary)
+    ) !important;
+  border-inline-start-width: 3px !important;
+  box-shadow: none !important;
+}

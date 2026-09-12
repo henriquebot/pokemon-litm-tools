@@ -2,7 +2,8 @@ import {
   loadPokemonAssetCatalog,
   getPokemonAssetPreviewData,
   refreshPokemonAssetPreviews,
-  preparePokemonActorDefinition
+  preparePokemonActorDefinition,
+  formatPokemonAssetLabel
 } from "./importer-app.js";
 
 import {
@@ -37,6 +38,10 @@ const DEFAULT_BACKGROUND =
 let creatorApp = null;
 
 const archetypeCatalogPromises = new Map();
+
+export function formatCharacterSpriteLabel(name) {
+  return formatPokemonAssetLabel(name);
+}
 
 async function loadCharacterArchetypes(mode = "trainer") {
   const key = mode === "pokemon" ? "pokemon" : "trainer";
@@ -853,7 +858,10 @@ class PokemonCharacterCreatorApp
         "/templates/character-creator.hbs",
 
       scrollable: [
-        ".pokemon-importer-list"
+        ".pokemon-importer-list",
+        ".pokemon-team-customization-tabs",
+        ".pokemon-team-customization-list",
+        ".pokemon-team-move-options"
       ]
     }
   };
@@ -891,6 +899,8 @@ class PokemonCharacterCreatorApp
   pokemonCustomizations = [];
 
   pokemonCustomizationSlot = 0;
+
+  pokemonCustomizationSearch = "";
 
   pokemonPlayerMoveIds = [];
 
@@ -1146,6 +1156,10 @@ class PokemonCharacterCreatorApp
         source.map(
           entry => ({
             ...entry,
+
+            displayName: this.mode === "trainer"
+              ? formatCharacterSpriteLabel(entry.name)
+              : entry.name,
 
             preview:
               entry.preview
@@ -2016,6 +2030,8 @@ class PokemonCharacterCreatorApp
 
       pokemonProfiles,
 
+      pokemonCustomizationSearch: this.pokemonCustomizationSearch,
+
       pokemonReady:
         this._pokemonReady(),
 
@@ -2841,6 +2857,24 @@ class PokemonCharacterCreatorApp
 
 
     /* PERSONALIZAR POKEMON */
+
+    const pokemonSearch = this.element.querySelector("[data-role='pokemon-customization-search']");
+    const filterPokemonProfiles = () => {
+      this.pokemonCustomizationSearch = pokemonSearch?.value ?? "";
+      const query = this.pokemonCustomizationSearch.trim().toLocaleLowerCase();
+      let visibleCount = 0;
+      for (const button of this.element.querySelectorAll("[data-pokemon-customization-slot]")) {
+        button.hidden = !String(button.dataset.pokemonCustomizationSearch ?? "")
+          .toLocaleLowerCase().includes(query);
+        if (!button.hidden) visibleCount += 1;
+      }
+      const empty = this.element.querySelector("[data-pokemon-customization-empty]");
+      if (empty) empty.hidden = visibleCount > 0;
+    };
+    if (pokemonSearch) {
+      pokemonSearch.addEventListener("input", filterPokemonProfiles);
+      filterPokemonProfiles();
+    }
 
     for (const button of this.element.querySelectorAll("[data-pokemon-customization-slot]")) {
       button.addEventListener("click", async () => {

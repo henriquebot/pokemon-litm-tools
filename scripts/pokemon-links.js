@@ -86,9 +86,11 @@ function appRoot(app, html) {
   );
 }
 
-function isPokemonChallenge(doc) {
+export function isPokemonChallenge(doc) {
   return (
     doc?.documentName === "Actor"
+    &&
+    doc.type === "litm-npc"
     &&
     doc?.getFlag?.(
       MODULE_ID,
@@ -173,13 +175,22 @@ function pokemonDbUrlForDocument(
 }
 
 function addPokemonDbButton(app, html) {
+  const root = appRoot(app, html);
+
+  if (
+    !root
+    ||
+    root.classList?.contains(
+      "pokemon-manager"
+    )
+  ) {
+    return;
+  }
+
   const doc = appDocument(app);
   const url = pokemonDbUrlForDocument(doc);
 
   if (!url) return;
-
-  const root = appRoot(app, html);
-  if (!root) return;
 
   const header =
     root.querySelector(

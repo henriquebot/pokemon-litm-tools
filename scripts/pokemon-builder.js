@@ -813,20 +813,184 @@ function actorFolderOptions() {
 }
 
 
-async function resolveChallengeFolder(
-  config
+function pokemonBuilderFolderParentId(folder) {
+  const parent =
+    folder?.folder
+    ?? folder?.parent
+    ?? null;
+
+  return typeof parent === "string"
+    ? parent
+    : parent?.id ?? null;
+}
+
+function findPokemonBuilderActorFolder(
+  name,
+  parentId = null
 ) {
-  let folderId =
+  const normalizedName =
+    String(name ?? "")
+      .trim()
+      .toLocaleLowerCase();
+
+  return (
+    game.folders.find(
+      folder =>
+        folder?.type === "Actor"
+        &&
+        String(folder?.name ?? "")
+          .trim()
+          .toLocaleLowerCase()
+          === normalizedName
+        &&
+        (
+          pokemonBuilderFolderParentId(folder)
+          ?? null
+        )
+          ===
+        (parentId ?? null)
+    )
+    ?? null
+  );
+}
+
+async function ensurePokemonBuilderActorFolder(
+  name,
+  parentId = null
+) {
+  const existing =
+    findPokemonBuilderActorFolder(
+      name,
+      parentId
+    );
+
+  if (existing) {
+    return existing;
+  }
+
+  return Folder.create({
+    name,
+    type: "Actor",
+    ...(parentId
+      ? { folder: parentId }
+      : {})
+  });
+}
+
+async function resolveImporterSceneChallengeFolder() {
+  const root =
+    await ensurePokemonBuilderActorFolder(
+      "Challenge"
+    );
+
+  if (!root?.id) {
+    return null;
+  }
+
+  const sceneName =
     String(
-      config.folderId
+      globalThis.canvas?.scene?.name
       ?? ""
     ).trim();
 
-  const newFolder =
+  if (!sceneName) {
+    return root.id;
+  }
+
+  const existingSceneFolder =
+    findPokemonBuilderActorFolder(
+      sceneName,
+      root.id
+    );
+
+  if (existingSceneFolder?.id) {
+    return existingSceneFolder.id;
+  }
+
+  try {
+    const sceneFolder =
+      await ensurePokemonBuilderActorFolder(
+        sceneName,
+        root.id
+      );
+
+    return (
+      sceneFolder?.id
+      ?? root.id
+    );
+  }
+  catch (error) {
+    console.warn(
+      `Pokemon LITM Tools | Não foi possível criar Challenge/${sceneName}; usando a pasta Challenge.`,
+      error
+    );
+
+    return root.id;
+  }
+}
+
+
+async function resolveChallengeFolder(
+  config
+) {
+  const folderMode =
     String(
-      config.newFolder
+      config.challengeFolderMode
       ?? ""
     ).trim();
+
+  if (
+    config.autoSceneFolder === true
+    &&
+    config.mode === "challenge"
+    &&
+    folderMode === "scene"
+  ) {
+    try {
+      const automaticFolderId =
+        await resolveImporterSceneChallengeFolder();
+
+      if (automaticFolderId) {
+        await game.settings.set(
+          MODULE_ID,
+          "lastActorFolder",
+          automaticFolderId
+        );
+
+        return automaticFolderId;
+      }
+    }
+    catch (error) {
+      console.warn(
+        "Pokemon LITM Tools | Pasta automática do Challenge indisponível; usando fallback.",
+        error
+      );
+
+      ui.notifications.warn(
+        "Não foi possível organizar o Challenge pela Scene. Usando destino seguro."
+      );
+    }
+  }
+
+  let folderId =
+    folderMode === "new"
+      ? ""
+      : String(
+          config.folderId
+          ?? ""
+        ).trim();
+
+  const newFolder =
+    (
+      folderMode === "existing"
+      ||
+      folderMode === "scene"
+    )
+      ? ""
+      : String(
+          config.newFolder
+          ?? ""
+        ).trim();
 
   if (newFolder) {
     const folder =
@@ -901,7 +1065,7 @@ async function askBuildConfig(entry) {
       </div>
     `,
     ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
-    modal: true
+    modal: false
   });
 
   if (!modeResult) return null;
@@ -935,7 +1099,7 @@ async function askBuildConfig(entry) {
         </div>
       `,
       ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
-      modal: true
+      modal: false
     });
 
     if (!result) return null;
@@ -976,7 +1140,7 @@ async function askBuildConfig(entry) {
       </div>
     `,
     ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
-    modal: true
+    modal: false
   });
 
   if (!result) return null;
@@ -1046,7 +1210,7 @@ async function reviewBuild(entry, config, data) {
       </div>
     `,
     ok: { label: "Escolher golpes", icon: "fa-solid fa-arrow-right" },
-    modal: true
+    modal: false
   });
 
   if (!profile) return null;
@@ -1098,7 +1262,7 @@ async function reviewBuild(entry, config, data) {
         </div>
       `,
       ok: { label: "Revisar", icon: "fa-solid fa-arrow-right" },
-      modal: true
+      modal: false
     });
 
     if (!result) return null;
@@ -1147,7 +1311,7 @@ async function reviewBuild(entry, config, data) {
       </div>
     `,
     ok: { label: "Criar Pokémon", icon: "fa-solid fa-check" },
-    modal: true
+    modal: false
   });
 
   return confirm ? review : null;
@@ -2280,7 +2444,7 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
         <select name="choice">${options}</select>
       </div>`,
       ok: { label: "Confirmar", icon: "fa-solid fa-check" },
-      modal: true
+      modal: false
     });
 
     if (!choice) return null;
@@ -2875,6 +3039,7 @@ class PokemonChallengeWizardApp
   existingActor = null;
   hydratedFromActor = false;
   launchKind = "challenge";
+  autoSceneFolder = false;
 
   config = {
     mode: "challenge",
@@ -2882,14 +3047,18 @@ class PokemonChallengeWizardApp
     trainerId: "",
     destination: "team",
     folderId: "",
-    newFolder: ""
+    newFolder: "",
+    challengeFolderMode: "existing"
   };
 
   constructor(entry, prepareDefinition, options = {}) {
     const requestedKind = options.launchKind === "theme" ? "theme" : "challenge";
+    const requestedSceneFolder =
+      options.autoSceneFolder === true;
     const appOptions = { ...options };
     delete appOptions.launchKind;
     delete appOptions.existingActor;
+    delete appOptions.autoSceneFolder;
     appOptions.window = {
       ...(appOptions.window ?? {}),
       title: requestedKind === "theme"
@@ -2902,6 +3071,15 @@ class PokemonChallengeWizardApp
     this.prepareDefinition = prepareDefinition;
     this.existingActor = options.existingActor ?? null;
     this.launchKind = requestedKind;
+    this.autoSceneFolder =
+      requestedSceneFolder
+      && !this.existingActor;
+    this.config.autoSceneFolder =
+      this.autoSceneFolder;
+    this.config.challengeFolderMode =
+      this.autoSceneFolder
+        ? "scene"
+        : "existing";
     this.config.mode = requestedKind === "theme" ? "player-theme" : "challenge";
 
     if (this.existingActor) {
@@ -2912,6 +3090,7 @@ class PokemonChallengeWizardApp
       this.config.trainerId = flags.trainerNpcId ?? "";
       this.config.folderId = this.existingActor.folder?.id ?? "";
       this.config.newFolder = "";
+      this.config.challengeFolderMode = "existing";
     }
   }
 
@@ -3035,7 +3214,7 @@ class PokemonChallengeWizardApp
     const context =
       await super._prepareContext(options);
 
-    if (this.step >= 3) {
+    if (this.step >= 2) {
       await this._ensureData();
     }
 
@@ -3045,7 +3224,6 @@ class PokemonChallengeWizardApp
 
     const progressNames = [
       "Configuração",
-      "Destino",
       "Perfil",
       "Golpes",
       "Revisão"
@@ -3276,7 +3454,7 @@ class PokemonChallengeWizardApp
             )
         );
 
-      if (this.step === 5) {
+      if (this.step === 4) {
         const built =
           this._buildReview();
 
@@ -3344,26 +3522,12 @@ class PokemonChallengeWizardApp
       this.selectedMoveIds.size;
 
     const canNext =
-      (
-        this.step === 1
-      )
+      this.step === 1
       ||
-      (
-        this.step === 2
-        &&
-        (
-          this.config.mode === "challenge"
-          ||
-          !!this.config.trainerId
-        )
-      )
+      this.step === 2
       ||
       (
         this.step === 3
-      )
-      ||
-      (
-        this.step === 4
         &&
         selectedCount >= 1
         &&
@@ -3390,20 +3554,53 @@ class PokemonChallengeWizardApp
         this.step === 1,
 
       stepIsDestination:
-        this.step === 2,
+        false,
 
       stepIsProfile:
-        this.step === 3,
+        this.step === 2,
 
       stepIsMoves:
-        this.step === 4,
+        this.step === 3,
 
       stepIsReview:
-        this.step === 5,
+        this.step === 4,
 
       isChallenge:
         this.config.mode ===
         "challenge",
+
+      autoSceneFolder:
+        this.autoSceneFolder
+        &&
+        this.config.mode ===
+          "challenge",
+
+      sceneFolderLabel:
+        (
+          "Challenge"
+          +
+          (
+            globalThis.canvas?.scene?.name
+              ? (
+                  " / "
+                  +
+                  globalThis.canvas.scene.name
+                )
+              : ""
+          )
+        ),
+
+      challengeFolderModeScene:
+        this.config.challengeFolderMode ===
+          "scene",
+
+      challengeFolderModeExisting:
+        this.config.challengeFolderMode ===
+          "existing",
+
+      challengeFolderModeNew:
+        this.config.challengeFolderMode ===
+          "new",
 
       isTrainer:
         this.config.mode ===
@@ -3496,12 +3693,12 @@ class PokemonChallengeWizardApp
       canNext:
         canNext
         &&
-        this.step < 5
+        this.step < 4
         &&
         !this.busy,
 
       canCreate:
-        this.step === 5
+        this.step === 4
         &&
         !this.busy,
 
@@ -3525,9 +3722,13 @@ class PokemonChallengeWizardApp
     field("mode")
       ?.addEventListener(
         "change",
-        event => {
+        async event => {
           this.config.mode =
             event.currentTarget.value;
+
+          await this.render({
+            force: true
+          });
         }
       );
 
@@ -3565,6 +3766,19 @@ class PokemonChallengeWizardApp
         event => {
           this.config.newFolder =
             event.currentTarget.value;
+        }
+      );
+
+    field("challengeFolderMode")
+      ?.addEventListener(
+        "change",
+        async event => {
+          this.config.challengeFolderMode =
+            event.currentTarget.value;
+
+          await this.render({
+            force: true
+          });
         }
       );
 
@@ -3664,7 +3878,7 @@ class PokemonChallengeWizardApp
         }
 
         const next = this.element.querySelector("[data-action='builderNext']");
-        if (next && this.step === 2) next.disabled = false;
+        if (next && this.step === 1) next.disabled = false;
       });
     }
 
@@ -3831,7 +4045,7 @@ class PokemonChallengeWizardApp
           if (this.busy) return;
 
           if (
-            this.step === 2
+            this.step === 1
             &&
             this.config.mode !==
               "challenge"
@@ -3845,13 +4059,33 @@ class PokemonChallengeWizardApp
           }
 
           if (
-            this.step === 2
+            this.step === 1
+            &&
+            this.config.mode ===
+              "challenge"
+            &&
+            this.config.challengeFolderMode ===
+              "new"
+            &&
+            !String(
+              this.config.newFolder
+              ?? ""
+            ).trim()
+          ) {
+            ui.notifications.warn(
+              "Digite o nome da nova pasta."
+            );
+            return;
+          }
+
+          if (
+            this.step === 1
           ) {
             await this._ensureData();
           }
 
           if (
-            this.step === 4
+            this.step === 3
             &&
             (
               this.selectedMoveIds.size
@@ -3867,7 +4101,7 @@ class PokemonChallengeWizardApp
             return;
           }
 
-          if (this.step < 5) {
+          if (this.step < 4) {
             this.step++;
           }
 

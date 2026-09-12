@@ -31,6 +31,15 @@
         <span>{{propsCount}}</span>
       </button>
 
+      <button
+        type="button"
+        data-tab="challenges"
+        class="{{#if isChallenges}}active{{/if}}"
+      >
+        Challenges
+        <span>{{challengeCount}}</span>
+      </button>
+
     </nav>
 
 
@@ -91,6 +100,25 @@
 
       {{/if}}
 
+      {{#if isChallenges}}
+
+        <select
+          data-role="challenge-folder"
+          aria-label="Filtrar por pasta de Challenges"
+        >
+          <option value="all">
+            Todas as subpastas
+          </option>
+
+          {{#each challengeFolders}}
+            <option value="{{id}}">
+              {{path}}
+            </option>
+          {{/each}}
+        </select>
+
+      {{/if}}
+
 
       <span class="pokemon-count">
 
@@ -105,40 +133,48 @@
       </span>
 
 
-      <button
-        type="button"
-        data-action="importSelected"
-        class="pokemon-import-selected"
-      >
+      {{#unless isChallenges}}
 
-        <i class="fa-solid fa-download"></i>
+        <button
+          type="button"
+          data-action="importSelected"
+          class="pokemon-import-selected"
+        >
 
-        Importar
+          <i class="fa-solid fa-download"></i>
 
-        (<span data-role="selected-count">
-          {{selectedCount}}
-        </span>)
+          Importar
 
-      </button>
+          (<span data-role="selected-count">
+            {{selectedCount}}
+          </span>)
+
+        </button>
+
+      {{/unless}}
 
     </div>
 
 
     <div class="pokemon-selection-tools">
 
-      <button
-        type="button"
-        data-action="selectVisible"
-      >
-        Selecionar visíveis
-      </button>
+      {{#unless isChallenges}}
 
-      <button
-        type="button"
-        data-action="clearSelection"
-      >
-        Limpar seleção
-      </button>
+        <button
+          type="button"
+          data-action="selectVisible"
+        >
+          Selecionar visíveis
+        </button>
+
+        <button
+          type="button"
+          data-action="clearSelection"
+        >
+          Limpar seleção
+        </button>
+
+      {{/unless}}
 
       <button
         type="button"
@@ -165,6 +201,82 @@
 
     <div class="pokemon-importer-list">
 
+      {{#if isChallenges}}
+
+        {{#if challengeRootMissing}}
+
+          <div class="pokemon-challenge-library-empty">
+            <i class="fa-solid fa-folder-open"></i>
+            <strong>Pasta Challenges não encontrada</strong>
+            <span>Crie uma pasta de Actors chamada Challenges. As subpastas serão lidas automaticamente.</span>
+          </div>
+
+        {{else}}
+
+          {{#each items}}
+
+            <article
+              class="pokemon-asset-card pokemon-challenge-library-card"
+              data-challenge-card
+              data-challenge-actor-id="{{actorId}}"
+              data-challenge-uuid="{{uuid}}"
+              data-folder-id="{{folderId}}"
+              data-search="{{search}}"
+              title="{{folderPath}}"
+              draggable="true"
+            >
+
+              <div class="pokemon-asset-preview">
+
+                {{#if img}}
+                  <img
+                    src="{{img}}"
+                    alt="{{name}}"
+                    loading="lazy"
+                  >
+                {{else}}
+                  <i class="fa-solid fa-triangle-exclamation"></i>
+                {{/if}}
+
+              </div>
+
+              <div class="pokemon-asset-info">
+
+                <strong title="{{name}}">
+                  {{name}}
+                </strong>
+
+                {{#if rolesLabel}}
+                  <small class="pokemon-challenge-library-roles">
+                    {{rolesLabel}}
+                  </small>
+                {{/if}}
+
+                {{#if limitsLabel}}
+                  <small class="pokemon-challenge-library-limits">
+                    {{limitsLabel}}
+                  </small>
+                {{/if}}
+
+                <button
+                  type="button"
+                  data-open-challenge="{{actorId}}"
+                  title="Abrir ficha do Challenge"
+                >
+                  <i class="fa-solid fa-up-right-from-square"></i>
+                  Abrir ficha
+                </button>
+
+              </div>
+
+            </article>
+
+          {{/each}}
+
+        {{/if}}
+
+      {{else}}
+
       {{#each items}}
 
         <article
@@ -172,8 +284,10 @@
           data-asset-card
           data-search="{{search}}"
           data-person-type="{{personType}}"
+          data-gender="{{gender}}"
           data-category="{{category}}"
           data-asset-id="{{id}}"
+          data-entry-name="{{name}}"
           draggable="true"
         >
 
@@ -222,9 +336,36 @@
 
           <div class="pokemon-asset-info">
 
-            <strong title="{{name}}">
-              {{name}}
+            <strong title="{{displayName}}">
+              {{displayName}}
             </strong>
+
+            {{#if canChooseTrainerName}}
+
+              <div class="pokemon-trainer-name-row">
+
+                <input
+                  type="text"
+                  value="{{trainerName}}"
+                  data-trainer-name="{{id}}"
+                  aria-label="Nome do treinador"
+                  autocomplete="off"
+                  draggable="false"
+                >
+
+                <button
+                  type="button"
+                  data-next-trainer-name="{{id}}"
+                  title="Próximo nome"
+                  aria-label="Próximo nome"
+                  draggable="false"
+                >
+                  <i class="fa-solid fa-shuffle"></i>
+                </button>
+
+              </div>
+
+            {{/if}}
 
             {{#if meta}}
 
@@ -313,6 +454,8 @@
         </article>
 
       {{/each}}
+
+      {{/if}}
 
     </div>
 

@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "repository": "pret/pokeemerald",
+      "path": "src/data/trainers.h",
+      "url": "https://github.com/pret/pokeemerald/blob/master/src/data/trainers.h"
+    },
+    {
+      "repository": "pret/pokefirered",
+      "path": "src/data/trainers.h",
+      "url": "https://github.com/pret/pokefirered/blob/master/src/data/trainers.h"
+    }
+  ],
+  "notes": [
+    "Class pools are distinct trainerName values grouped by trainerClass; gender follows trainerPic and encounterMusic_gender.",
+    "Rematches are deduplicated. Canonical leaders, rivals, protagonists, admins and Frontier bosses are excluded; generic class labels and pairs are not first names.",
+    "Bug Maniac supplements Bug Catcher; Cue Ball supplements Biker; Super Nerd and Engineer supplement Scientist.",
+    "Grunts in these sources have no usable personal names, so selection uses the broad gender or neutral fallback.",
+    "Male and female fallbacks collect names from generic trainer classes in both sources. Neutral names are a separately curated unisex pool.",
+    "Selection keeps class names first and supplements a short class pool to at least 48 distinct names using the appropriate fallback. No external fetch is used at runtime."
+  ],
+  "classes": {
+    "youngster": {
+      "male": [
+        "Allen", "Ben", "Billy", "Calvin", "Chad", "Cordell", "Dan", "Dave",
+        "Deandre", "Demetrius", "Destin", "Dillon", "Eddie", "Jaylen", "Joey", "Johnson",
+        "Josh", "Nash", "Timmy", "Tommy", "Tyler", "Yasu"
+      ],
+      "female": []
+    },
+    "lass": {
+      "male": [],
+      "female": [
+        "Ali", "Andrea", "Ann", "Crissy", "Dalia", "Dawn", "Haley", "Iris",
+        "Janice", "Joana", "Julia", "Kay", "Lisa", "Megan", "Miriam", "Paige",
+        "Reli", "Robin", "Sally", "Tiana"
+      ]
+    },
+    "bugCatcher": {
+      "male": [
+        "Angelo", "Anthony", "Brent", "Cale", "Charlie", "Colton", "Conner", "Davis",
+        "Derek", "Donald", "Doug", "Elijah", "Garret", "Greg", "James", "Jeffrey",
+        "Jonah", "Jose", "Keigo", "Kent", "Lyle", "Rick", "Robby", "Sammy",
+        "Taylor", "Vance"
+      ],
+      "female": []
+    },
+    "hiker": {
+      "male": [
+        "Alan", "Allen", "Brice", "Clark", "Daryl", "Devan", "Dudley", "Earl",
+        "Eli", "Eric", "Franklin", "Jeremy", "Lenny", "Lucas", "Marc", "Marcos",
+        "Mike", "Nob", "Oliver", "Sawyer", "Trent", "Wayne"
+      ],
+      "female": []
+    },
+    "camper": {
+      "male": [
+        "Beau", "Branden", "Bryce", "Chris", "Drew", "Ethan", "Flint", "Jeff",
+        "Justin", "Larry", "Lawrence", "Liam", "Ricky", "Riley", "Shane", "Travis",
+        "Tyron"
+      ],
+      "female": []
+    },
+    "picnicker": {
+      "male": [],
+      "female": [
+        "Alicia", "Alma", "Angelina", "Ariana", "Ashley", "Autumn", "Becky", "Bianca",
+        "Caitlin", "Carol", "Celia", "Charlotte", "Claire", "Dana", "Diana", "Gwen",
+        "Hannah", "Heidi", "Irene", "Isabelle", "Kelsey", "Kindra", "Leah", "Marcy",
+        "Martha", "Missy", "Nancy", "Sofia", "Sophie", "Susie", "Tina", "Valerie",
+        "Yazmin"
+      ]
+    },
+    "swimmer": {
+      "male": [
+        "Axle", "Barry", "Chad", "Clarence", "Darrin", "David", "Dean", "Declan",
+        "Dominik", "Douglas", "Dudley", "Finn", "Franklin", "Garrett", "Gilbert", "Harrison",
+        "Herman", "Jack", "Jerome", "Kevin", "Leonardo", "Luis", "Matthew", "Mymo",
+        "Nolen", "Pete", "Reece", "Reed", "Richard", "Rodney", "Roland", "Samir",
+        "Santiago", "Spencer", "Stan", "Toby", "Tony"
+      ],
+      "female": [
+        "Abigail", "Alice", "Amara", "Anya", "Beth", "Beverly", "Brenda", "Carlee",
+        "Connie", "Dana", "Debra", "Denise", "Grace", "Imani", "Isabelle", "Jenny",
+        "Kara", "Katie", "Kaylee", "Kyla", "Laurel", "Linda", "Maria", "Melissa",
+        "Missy", "Nicole", "Nikki", "Nora", "Sharon", "Shirley", "Sienna", "Susie",
+        "Tanya", "Tara", "Tiffany", "Tisha"
+      ]
+    },
+    "fisherman": {
+      "male": [
+        "Andrew", "Barny", "Carter", "Chip", "Chris", "Claude", "Dale", "Darian",
+        "Elliot", "Hank", "Henry", "Ivan", "Jonah", "Kai", "Ned", "Nolan",
+        "Roger", "Ronald", "Tommy", "Tylor", "Wade", "Wayne"
+      ],
+      "female": []
+    },
+    "sailor": {
+      "male": [
+        "Brenden", "Cory", "Duncan", "Dwayne", "Dylan", "Edmond", "Ernest", "Hudson",
+        "Huey", "Kelvin", "Leonard", "Phillip", "Trevor"
+      ],
+      "female": []
+    },
+    "birdKeeper": {
+      "male": [
+        "Aidan", "Alberto", "Alex", "Beck", "Benny", "Carter", "Chaz", "Chester",
+        "Coby", "Colin", "Darius", "Donald", "Edwardo", "Edwin", "Elijah", "Harold",
+        "Hugh", "Humberto", "Jacob", "Jared", "Josue", "Keith", "Marlon", "Milo",
+        "Mitch", "Perry", "Phil", "Presley", "Ramiro", "Reed", "Robert", "Roger",
+        "Sebastian", "Wilton"
+      ],
+      "female": []
+    },
+    "biker": {
+      "male": [
+        "Alex", "Billy", "Camron", "Chase", "Corey", "Ernest", "Gerald", "Goon",
+        "Hideo", "Isaac", "Isaiah", "Jamal", "Jared", "Jaren", "Jaxon", "Koji",
+        "Lao", "Lukas", "Luke", "Malik", "Nikolas", "Paxton", "Raul", "Ricardo",
+        "Ruben", "Virgil", "William", "Zeek"
+      ],
+      "female": []
+    },
+    "blackBelt": {
+      "male": [
+        "Aaron", "Atsushi", "Cristian", "Daisuke", "Hideki", "Hitoshi", "Hugh", "Kiyo",
+        "Koichi", "Koji", "Mike", "Nob", "Rhett", "Shea", "Takao", "Takashi",
+        "Yuji", "Zander"
+      ],
+      "female": []
+    },
+    "psychic": {
+      "male": [
+        "Alvaro", "Blake", "Cameron", "Cedric", "Dario", "Edward", "Johan", "Joshua",
+        "Nicholas", "Preston", "Tyron", "Virgil", "William"
+      ],
+      "female": [
+        "Alexis", "Alix", "Brandi", "Hannah", "Jacki", "Jaclyn", "Kayla", "Laura",
+        "Macey", "Mariela", "Marlene", "Maura", "Rodette", "Samantha", "Terry"
+      ]
+    },
+    "scientist": {
+      "male": [
+        "Aidan", "Avery", "Baily", "Beau", "Bernie", "Braxton", "Braydon", "Connor",
+        "Derek", "Ed", "Erik", "Gideon", "Glenn", "Ivan", "Jerry", "Jose",
+        "Joshua", "Jovan", "Leslie", "Miguel", "Parker", "Rodney", "Taylor", "Ted",
+        "Travis", "Zac"
+      ],
+      "female": []
+    },
+    "ranger": {
+      "male": [
+        "Jackson", "Logan", "Lorenzo", "Nicolas", "Sebastian"
+      ],
+      "female": [
+        "Beth", "Catherine", "Jenna", "Katelyn", "Madeline", "Sophia"
+      ]
+    },
+    "aceTrainer": {
+      "male": [
+        "Albert", "Berke", "Braxton", "Colby", "Edgar", "Felix", "George", "Gerald",
+        "Gilbert", "Jonathan", "Leonel", "Leroy", "Marcel", "Mitchell", "Owen", "Parker",
+        "Paul", "Quincy", "Randall", "Rolando", "Ruben", "Samuel", "Vincent", "Vito",
+        "Warren", "Wilton", "Yuji"
+      ],
+      "female": [
+        "Alexa", "Alexia", "Athena", "Austina", "Brooke", "Carolina", "Caroline", "Cristin",
+        "Darcy", "Dianne", "Halle", "Hope", "Jazmyn", "Jennifer", "Jody", "Julie",
+        "Katelynn", "Keira", "Marley", "Mary", "Michelle", "Naomi", "Shannon", "Wendy"
+      ]
+    },
+    "beauty": {
+      "male": [],
+      "female": [
+        "Bridget", "Connie", "Grace", "Jessica", "Johanna", "Lauren", "Lola", "Lori",
+        "Melissa", "Olivia", "Sheila", "Shirley", "Tamia", "Thalia", "Tiffany"
+      ]
+    },
+    "gentleman": {
+      "male": [
+        "Arthur", "Brooks", "Clifford", "Everett", "Lamar", "Micah", "Nate", "Norton",
+        "Thomas", "Tucker", "Walter"
+      ],
+      "female": []
+    },
+    "pokefan": {
+      "male": [
+        "Colton", "Kaleb", "Miguel"
+      ],
+      "female": [
+        "Annika", "Bethany", "Isabel", "Vanessa"
+      ]
+    },
+    "grunt": {
+      "male": [],
+      "female": []
+    }
+  },
+  "fallbacks": {
+    "male": [
+      "Aaron", "Aidan", "Alan", "Albert", "Alberto", "Alex", "Allen", "Alvaro",
+      "Andres", "Andrew", "Angelo", "Anthony", "Arnie", "Arthur", "Ashton", "Atsushi",
+      "Auron", "Avery", "Axle", "Baily", "Barny", "Barry", "Beau", "Beck",
+      "Ben", "Benjamin", "Benny", "Berke", "Bernie", "Billy", "Blake", "Branden",
+      "Brandon", "Braxton", "Braydon", "Brenden", "Brent", "Brice", "Brooks", "Bryan",
+      "Bryant", "Bryce", "Cale", "Calvin", "Camden", "Cameron", "Camron", "Carter",
+      "Cedric", "Chad", "Charlie", "Chase", "Chaz", "Chester", "Chip", "Chris",
+      "Clarence", "Clark", "Claude", "Clifford", "Coby", "Colby", "Cole", "Colin",
+      "Colton", "Conner", "Connor", "Conor", "Cooper", "Cordell", "Corey", "Cory",
+      "Cristian", "Daisuke", "Dale", "Dalton", "Dan", "Darian", "Dario", "Darius",
+      "Darrin", "Daryl", "Dave", "David", "Davis", "Dawson", "Dayton", "Dean",
+      "Deandre", "Declan", "Demetrius", "Derek", "Destin", "Devan", "Dillon", "Dirk",
+      "Dominik", "Donald", "Doug", "Douglas", "Drew", "Dudley", "Duncan", "Dusty",
+      "Dwayne", "Dylan", "Earl", "Ed", "Eddie", "Edgar", "Edmond", "Edward",
+      "Edwardo", "Edwin", "Eli", "Elijah", "Elliot", "Eric", "Erik", "Ernest",
+      "Ethan", "Evan", "Everett", "Fabian", "Felix", "Fernando", "Finn", "Flint",
+      "Foster", "Franklin", "Fredrick", "Garret", "Garrett", "Garrison", "George", "Gerald",
+      "Gideon", "Gilbert", "Glenn", "Goon", "Greg", "Gregory", "Hank", "Harold",
+      "Harrison", "Hayden", "Hector", "Henry", "Herman", "Hideki", "Hideo", "Hitoshi",
+      "Hudson", "Huey", "Hugh", "Hugo", "Humberto", "Isaac", "Isaiah", "Ivan",
+      "Jace", "Jack", "Jackson", "Jacob", "Jaiden", "Jamal", "James", "Jared",
+      "Jaren", "Jason", "Jasper", "Jaxon", "Jaylen", "Jeff", "Jeffrey", "Jeremy",
+      "Jerome", "Jerry", "Joey", "Johan", "John", "Johnson", "Jonah", "Jonas",
+      "Jonathan", "Jose", "Joseph", "Josh", "Joshua", "Josue", "Jovan", "Julio",
+      "Justin", "Kai", "Kaleb", "Kayden", "Keegan", "Keigo", "Keith", "Kelvin",
+      "Kent", "Kevin", "Kirk", "Kiyo", "Koichi", "Koji", "Lamar", "Lao",
+      "Larry", "Lawrence", "Lawson", "Layton", "Lenny", "Leonard", "Leonardo", "Leonel",
+      "Leroy", "Leslie", "Lewis", "Liam", "Logan", "Lorenzo", "Luca", "Lucas",
+      "Luis", "Lukas", "Luke", "Lung", "Lyle", "Malik", "Marc", "Marcel",
+      "Marcos", "Mark", "Marlon", "Mason", "Matthew", "Micah", "Miguel", "Mike",
+      "Milo", "Mitch", "Mitchell", "Myles", "Mymo", "Nash", "Nate", "Ned",
+      "Nelson", "Nicholas", "Nicolas", "Nikolas", "Nob", "Nolan", "Nolen", "Norton",
+      "Oliver", "Owen", "Pablo", "Parker", "Paul", "Paxton", "Perry", "Pete",
+      "Phil", "Phillip", "Presley", "Preston", "Quincy", "Quinn", "Ramiro", "Ramon",
+      "Randall", "Raul", "Reece", "Reed", "Rhett", "Ricardo", "Rich", "Richard",
+      "Rick", "Ricky", "Riley", "Robby", "Robert", "Rodney", "Roger", "Roland",
+      "Rolando", "Ronald", "Ruben", "Samir", "Sammy", "Samuel", "Santiago", "Sawyer",
+      "Sebastian", "Shane", "Shawn", "Shea", "Simon", "Spencer", "Stan", "Stanly",
+      "Steve", "Takao", "Takashi", "Taylor", "Ted", "Thomas", "Timmy", "Timothy",
+      "Toby", "Tommy", "Tony", "Travis", "Trent", "Trevor", "Tucker", "Tyler",
+      "Tylor", "Tyron", "Vance", "Vincent", "Virgil", "Vito", "Wade", "Walter",
+      "Warren", "Wayne", "William", "Wilton", "Winston", "Wyatt", "Yasu", "Yuji",
+      "Zac", "Zander", "Zeek"
+    ],
+    "female": [
+      "Abigail", "Aisha", "Alexa", "Alexia", "Alexis", "Ali", "Alice", "Alicia",
+      "Alix", "Alize", "Allison", "Alma", "Alyssa", "Amanda", "Amara", "Amira",
+      "Andrea", "Angelica", "Angelina", "Ann", "Annika", "Anya", "Ariana", "Ashley",
+      "Athena", "Austina", "Autumn", "Becky", "Beth", "Bethany", "Beverly", "Bianca",
+      "Brandi", "Brenda", "Brianna", "Bridget", "Brooke", "Caitlin", "Callie", "Carlee",
+      "Carly", "Carol", "Carolina", "Caroline", "Catherine", "Celia", "Celina", "Chandler",
+      "Charlie", "Charlotte", "Cindy", "Claire", "Clarissa", "Connie", "Cora", "Crissy",
+      "Cristin", "Cyndy", "Daisy", "Dalia", "Dana", "Danielle", "Daphne", "Darcy",
+      "Dawn", "Debra", "Denise", "Diana", "Dianne", "Donny", "Edna", "Emilia",
+      "Gabrielle", "Georgia", "Gillian", "Grace", "Gwen", "Hailey", "Haley", "Halle",
+      "Hannah", "Heidi", "Helene", "Hope", "Imani", "Irene", "Iris", "Isabel",
+      "Isabella", "Isabelle", "Isobel", "Jacki", "Jaclyn", "Janae", "Jani", "Janice",
+      "Jasmine", "Jazmyn", "Jenna", "Jennifer", "Jenny", "Jessica", "Joana", "Jocelyn",
+      "Jody", "Johanna", "Julia", "Julie", "Kara", "Karen", "Karina", "Katelyn",
+      "Katelynn", "Kathleen", "Katie", "Kay", "Kayla", "Kaylee", "Kayley", "Keira",
+      "Kelsey", "Kindra", "Kyla", "Kyra", "Laura", "Laurel", "Lauren", "Leah",
+      "Lilith", "Linda", "Lisa", "Lola", "Lori", "Lydia", "Macey", "Madeline",
+      "Makayla", "Marcy", "Maria", "Mariela", "Marlene", "Marley", "Martha", "Mary",
+      "Maura", "Megan", "Melina", "Melissa", "Miah", "Michelle", "Miriam", "Missy",
+      "Mollie", "Nancy", "Naomi", "Nicole", "Nikki", "Nora", "Olivia", "Paige",
+      "Pat", "Patricia", "Paula", "Rachel", "Rayna", "Reli", "Reyna", "Ricky",
+      "Robin", "Rodette", "Rose", "Ruth", "Sally", "Samantha", "Sarah", "Selphy",
+      "Shannon", "Sharon", "Shayla", "Sheila", "Shelby", "Shirley", "Sienna", "Simon",
+      "Sofia", "Sophia", "Sophie", "Stacy", "Susie", "Sylvia", "Talia", "Tamia",
+      "Tammy", "Tanya", "Tara", "Tasha", "Terry", "Thalia", "Tiana", "Tiffany",
+      "Tina", "Tisha", "Valerie", "Vanessa", "Violet", "Vivian", "Wendy", "Yazmin"
+    ],
+    "neutral": [
+      "Alex", "Alexis", "Angel", "Ariel", "Ash", "Aspen", "Aubrey", "Avery",
+      "Bailey", "Blair", "Blake", "Brett", "Briar", "Brook", "Brooklyn", "Cameron",
+      "Carey", "Casey", "Cedar", "Charlie", "Chris", "Cody", "Corey", "Dakota",
+      "Dallas", "Dana", "Darcy", "Devin", "Dorian", "Drew", "Dylan", "Eden",
+      "Ellery", "Ellis", "Emerson", "Emery", "Finley", "Florian", "Frankie", "Glenn",
+      "Gray", "Harley", "Harper", "Hayden", "Hollis", "Indigo", "Jamie", "Jay",
+      "Jesse", "Jordan", "Jules", "Kai", "Kendall", "Kennedy", "Kim", "Lane",
+      "Lee", "Lennox", "Linden", "Logan", "Marion", "Marley", "Micah", "Morgan",
+      "Oakley", "Parker", "Pat", "Peyton", "Phoenix", "Quinn", "Reese", "Remy",
+      "Riley", "River", "Robin", "Rory", "Rowan", "Sage", "Sam", "Sasha",
+      "Sawyer", "Shannon", "Shawn", "Shiloh", "Sky", "Skyler", "Spencer", "Sterling",
+      "Sydney", "Taylor", "Terry", "Toby", "Tracy", "Val"
+    ]
+  }
+}

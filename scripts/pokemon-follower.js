@@ -426,18 +426,249 @@ export function refreshPokemonFollowersForActor(actor, options = {}) {
   return reconcileActorTokens(actor, options);
 }
 
-export async function setPokemonFollowerTheme(actor, themeId) {
-  if (!actor || actor.type !== "litm-character") throw new Error("Treinador não encontrado.");
-  const id = themeId ? String(themeId) : "";
-  if (id && !getPokemonThemes(actor).some(t => t.id === id)) throw new Error("Pokémon da equipe não encontrado.");
-  await actor.update({
-    [`flags.${MODULE_ID}.${FOLLOWER_FLAG}`]: id
-  }, {pokemonFollowerSync: true});
-  if (isAuthority() && !followerSyncSuspended(actor)) {
-    await reconcileActorTokens(actor, {place: Boolean(id)});
+function followerTokenForActorTheme(
+  scene,
+  actor,
+  themeId
+) {
+  if (
+    !scene
+    ||
+    !actor
+    ||
+    !themeId
+  ) {
+    return null;
   }
+
+  const theme =
+    actor.items?.get?.(
+      themeId
+    )
+    ?? null;
+
+  const instanceId =
+    theme?.getFlag?.(
+      MODULE_ID,
+      "pokemonInstanceId"
+    )
+    ?? null;
+
+  return (
+    scene.tokens?.find(
+      token => {
+        if (
+          !isManagedToken(token)
+          &&
+          !isCombatToken(token)
+        ) {
+          return false;
+        }
+
+        const ownerId =
+          token.getFlag(
+            MODULE_ID,
+            "trainerActorId"
+          )
+          ??
+          token.getFlag(
+            MODULE_ID,
+            "sourceTrainerActorId"
+          )
+          ??
+          token.actor?.getFlag?.(
+            MODULE_ID,
+            "sourceTrainerActorId"
+          )
+          ??
+          null;
+
+        if (ownerId !== actor.id) {
+          return false;
+        }
+
+        if (
+          instanceId
+          &&
+          token.getFlag(
+            MODULE_ID,
+            "pokemonInstanceId"
+          ) === instanceId
+        ) {
+          return true;
+        }
+
+        return tokenThemeId(token)
+          === themeId;
+      }
+    )
+    ?? null
+  );
+}
+
+async function playPokemonFollowerSwapVfx(
+  token,
+  mode,
+  restoreAfter = false
+) {
+  const play =
+    game.modules
+      .get(MODULE_ID)
+      ?.api
+      ?.playPokemonPokeballVfx;
+
+  if (
+    typeof play !== "function"
+    ||
+    !token?.parent?.id
+    ||
+    !token?.id
+  ) {
+    return;
+  }
+
+  try {
+    await play(
+      token.parent.id,
+      token.id,
+      mode,
+      restoreAfter
+    );
+  } catch (error) {
+    console.warn(
+      "Pokemon LITM Tools | VFX da troca de follower:",
+      error
+    );
+  }
+}
+
+
+export async function setPokemonFollowerTheme(
+  actor,
+  themeId,
+  {
+    vfx = true
+  } = {}
+) {
+  if (
+    !actor
+    ||
+    actor.type !== "litm-character"
+  ) {
+    throw new Error(
+      "Treinador não encontrado."
+    );
+  }
+
+  const id =
+    themeId
+      ? String(themeId)
+      : "";
+
+  if (
+    id
+    &&
+    !getPokemonThemes(actor)
+      .some(
+        theme =>
+          theme.id === id
+      )
+  ) {
+    throw new Error(
+      "Pokémon da equipe não encontrado."
+    );
+  }
+
+  const previousId =
+    getPokemonFollowerThemeId(
+      actor
+    )
+    ?? "";
+
+  const changed =
+    previousId !== id;
+
+  const scene =
+    canvas?.ready
+      ? canvas.scene
+      : null;
+
+  if (
+    vfx
+    &&
+    changed
+    &&
+    previousId
+  ) {
+    const previousToken =
+      followerTokenForActorTheme(
+        scene,
+        actor,
+        previousId
+      );
+
+    if (previousToken) {
+      await playPokemonFollowerSwapVfx(
+        previousToken,
+        "recollect",
+        isCombatToken(
+          previousToken
+        )
+      );
+    }
+  }
+
+  await actor.update({
+    [
+      `flags.${MODULE_ID}.${FOLLOWER_FLAG}`
+    ]:
+      id
+  }, {
+    pokemonFollowerSync:
+      true
+  });
+
+  if (
+    isAuthority()
+    &&
+    !followerSyncSuspended(
+      actor
+    )
+  ) {
+    await reconcileActorTokens(
+      actor,
+      {
+        place:
+          Boolean(id)
+      }
+    );
+  }
+
+  if (
+    vfx
+    &&
+    changed
+    &&
+    id
+  ) {
+    const nextToken =
+      followerTokenForActorTheme(
+        scene,
+        actor,
+        id
+      );
+
+    if (nextToken) {
+      await playPokemonFollowerSwapVfx(
+        nextToken,
+        "deploy"
+      );
+    }
+  }
+
   return id || null;
 }
+
 
 export async function removePokemonThemeTokens(actor, themeId) {
   if (!isAuthority() || !canvas?.ready || !canvas.scene || !actor || !themeId) return;

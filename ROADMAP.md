@@ -83,6 +83,7 @@
 - [ ] Expandir Reaction Roll com Speed, Tags relevantes e ameaças do Challenge
 
 ## Backlog visual
+- [ ] Sombra opcional usando Drop Shadow real aplicado ao sprite/placeable (abordagem TokenMagicFX `filterType: shadow`), sem elipse falsa no chão; padrão desligado.
 - [ ] Recolher Pokémon com efeito cinematográfico de retorno à Pokébola
 - [ ] VFX automático de golpes por moveId via Pokémon Showdown como provider principal, preparado para futuras gerações
 - [ ] JB2A, Eskie e outros packs de VFX permanecem apenas opcionais/fallback
@@ -100,9 +101,9 @@
 - [ ] Validar no Foundry a etapa de Golpes do Pokémon-jogador com seleção de 1–4 golpes
 - [ ] Validar Tags de Poder estruturadas de Golpe e identificação pelo VFX
 - [ ] Validar botão VFX no card de rolagem com targets congelados
-- [ ] Botão no header para reabrir Trainer/Pokémon-jogador no Criador em modo edição
+- [ ] Editor de manutenção no header do Theme Pokémon de treinador e do Actor Pokémon-jogador: abrir somente a manutenção equivalente à etapa 6 (Natureza, Habilidade, gênero, fraqueza e 1–4 golpes), sem avançar/voltar pelo Character Creator.
 - [ ] Quest dos Themes Pokémon baseada em Nature, relação e evolução
-- [ ] Regras e ativação de Mega Evolução, Z-Move, Dynamax, Gigantamax, Terastalização, Reversão Primal e Ultra Burst
+- [ ] Fluxo unificado de evolução e transformações: evolução normal é permanente; Mega Evolução, Dynamax/Gigantamax, Terastalização, Reversão Primal, Ultra Burst e outras formas temporárias devem salvar o estado-base, trocar visual/token e aplicar Tags/Status/Ability/Move overrides necessários, exibindo botão explícito para reverter ao estado anterior.
 - [ ] Pokémon-jogador com 4 Themes fixos: 2 Temas de Perfil + Natureza/Habilidade + Golpes
 - [ ] Tags de Poder, Fraquezas e Quests
 - [ ] Refinamentos de Mochila e Trocas

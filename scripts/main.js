@@ -27,9 +27,21 @@ import {
   activatePokemonFollowers
 } from "./pokemon-follower.js";
 
+
+import {
+  activatePokemonTokenDrop
+} from "./pokemon-token-drop.js";
+
 import {
   activatePokemonVisualStability
 } from "./pokemon-visual-stability.js";
+
+import {
+  registerPokemonShowcaseSettings,
+  activatePokemonShowcase,
+  showPokemonReaction,
+  playPokemonShowcaseBurst
+} from "./pokemon-showcase.js";
 
 import {
   registerPokemonContentSettings
@@ -44,7 +56,8 @@ import {
   deployPokemonTheme,
   recollectPokemonTheme,
   isPokemonThemeCanvasDrop,
-  handlePokemonThemeCanvasDrop
+  handlePokemonThemeCanvasDrop,
+  playPokemonPokeballVfx
 } from "./pokemon-combat.js";
 
 import {
@@ -63,17 +76,128 @@ import {
 const MODULE_ID = "pokemon-litm-tools";
 const LITM_SYSTEM_ID = "mist-engine-fvtt";
 
+function actorDirectoryRoot(html) {
+  if (html instanceof HTMLElement) return html;
+  if (html?.[0] instanceof HTMLElement) return html[0];
+  return null;
+}
+
+function decoratePokemonActorDirectoryKinds(_app, html) {
+  const root =
+    actorDirectoryRoot(html);
+
+  if (!root) return;
+
+  for (
+    const row
+    of root.querySelectorAll(
+      "li.directory-item.document[data-entry-id]"
+    )
+  ) {
+    if (
+      row.querySelector(
+        "[data-pokemon-actor-kind]"
+      )
+    ) {
+      continue;
+    }
+
+    const actor =
+      game.actors.get(
+        row.dataset.entryId
+      );
+
+    if (!actor) {
+      continue;
+    }
+
+    const kind =
+      actor.type === "litm-character"
+        ? {
+            key:
+              "character",
+            label:
+              "Personagem",
+            icon:
+              "fa-user"
+          }
+        : actor.type === "litm-npc"
+          ? {
+              key:
+                "challenge",
+              label:
+                "Challenge",
+              icon:
+                "fa-triangle-exclamation"
+            }
+          : null;
+
+    if (!kind) {
+      continue;
+    }
+
+    const marker =
+      document.createElement(
+        "span"
+      );
+
+    marker.className =
+      "pokemon-actor-kind-badge "
+      + "pokemon-actor-kind-"
+      + kind.key;
+
+    marker.dataset
+      .pokemonActorKind =
+        kind.key;
+
+    marker.title =
+      kind.label;
+
+    marker.setAttribute(
+      "data-tooltip",
+      kind.label
+    );
+
+    marker.innerHTML =
+      '<i class="fa-solid '
+      + kind.icon
+      + '"></i>';
+
+    const host =
+      row.querySelector(
+        ".entry-name, .document-name"
+      )
+      ?? row;
+
+    host.prepend(
+      marker
+    );
+  }
+}
+
+Hooks.on(
+  "renderActorDirectory",
+  decoratePokemonActorDirectoryKinds
+);
+
+
 Hooks.once("init", () => {
 
   registerPokemonContentSettings();
 
   registerTokenOutlineSettings();
 
+  registerPokemonShowcaseSettings();
+
   activatePokemonThemePokedexButtons();
 
   activatePokemonVisualStability();
 
+  activatePokemonShowcase();
+
   activatePokemonFollowers();
+
+  activatePokemonTokenDrop();
 
   console.log(
     "Pok\u00e9mon LITM Tools | Inicializando v0.8.0-dev"
@@ -90,6 +214,33 @@ Hooks.once("init", () => {
     }
   );
 
+  game.settings.register(
+    MODULE_ID,
+    "litmCardLanguage",
+    {
+      name:
+        "LitM · Idioma dos cards e Spend Power",
+      hint:
+        "Automático traduz a interface dos cards para PT-BR quando o Foundry estiver em português. Padrão do sistema mantém o texto original do LitM.",
+      scope:
+        "client",
+      config:
+        true,
+      type:
+        String,
+      choices: {
+        auto:
+          "Automático (seguir idioma do Foundry)",
+        "pt-BR":
+          "Português (Brasil)",
+        native:
+          "Padrão do sistema"
+      },
+      default:
+        "auto"
+    }
+  );
+
   game.modules.get(MODULE_ID).api = {
     openPokemonImporter,
     openPokemonChallengeEditor,
@@ -103,7 +254,10 @@ Hooks.once("init", () => {
     deletePokemonCombatProjection,
     migratePokemonChallengesLitmFirst,
     pokemonLitmCombatSelfTest,
-    pokemonGuidedFlowSelfTest
+    pokemonGuidedFlowSelfTest,
+    playPokemonPokeballVfx,
+    showPokemonReaction,
+    playPokemonShowcaseBurst
   };
 });
 
