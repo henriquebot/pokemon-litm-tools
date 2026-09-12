@@ -2549,7 +2549,7 @@ async function chooseActorFolder() {
         },
 
         modal:
-          true
+          false
       });
 
   if (!result) {

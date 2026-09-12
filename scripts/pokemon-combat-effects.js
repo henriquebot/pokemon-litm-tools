@@ -5693,7 +5693,7 @@ async function resolveMove(sourceActor, move, explicitTokenIds = null) {
       }
     ],
     rejectClose: false,
-    modal: true
+    modal: false
   });
 
   if (!choice) return;
@@ -5740,7 +5740,7 @@ async function openMoveAction(sourceActor, move) {
       }
     ],
     rejectClose: false,
-    modal: true
+    modal: false
   });
 
   if (choice === "use") await resolveMove(sourceActor, move);
@@ -6987,7 +6987,24 @@ function renamePokemonCharacterOtherTab(
 function isPokemonPlayerActor(actor) {
   if (actor?.type !== "litm-character") return false;
 
-  if (actor.getFlag?.(MODULE_ID, "kind") === "pokemon") return true;
+  if (
+    actor.getFlag?.(
+      MODULE_ID,
+      "kind"
+    ) === "pokemon"
+    ||
+    actor.getFlag?.(
+      MODULE_ID,
+      "kind"
+    ) === "pokemon-combat"
+    ||
+    actor.getFlag?.(
+      MODULE_ID,
+      "combatProjection"
+    ) === true
+  ) {
+    return true;
+  }
 
   return Array.from(actor.items ?? []).some(item =>
     item.getFlag?.(MODULE_ID, "themeRole") === "pokemon-moves"
@@ -7708,6 +7725,188 @@ async function pokemonMovesForMessageActor(
 ) {
   if (!actor) return [];
   return resolvedPokemonMovesForActor(actor);
+}
+
+
+function usePokemonPtBrLitmCards() {
+  let mode =
+    "auto";
+
+  try {
+    mode =
+      game.settings.get(
+        MODULE_ID,
+        "litmCardLanguage"
+      )
+      ?? "auto";
+  } catch {}
+
+  if (
+    mode === "pt-BR"
+  ) {
+    return true;
+  }
+
+  if (
+    mode === "native"
+  ) {
+    return false;
+  }
+
+  const foundryLanguage =
+    String(
+      game.i18n?.lang
+      ?? ""
+    ).toLocaleLowerCase();
+
+  return (
+    foundryLanguage === "pt"
+    ||
+    foundryLanguage.startsWith(
+      "pt-"
+    )
+  );
+}
+
+
+const LITM_CARD_PTBR_REPLACEMENTS = [
+  [
+    /SPEND POWER ON EFFECTS:/gi,
+    "GASTAR POWER EM EFEITOS:"
+  ],
+  [
+    /Spend your power:/gi,
+    "Gaste seu Power:"
+  ],
+  [
+    /No Consequences\./gi,
+    "Sem consequências."
+  ],
+  [
+    /Add or scratch a tag \(2 Power\)/gi,
+    "Adicionar ou riscar uma Tag (2 Power)"
+  ],
+  [
+    /Add or reduce a status \(1 Power per tier\)/gi,
+    "Adicionar ou reduzir um Status (1 Power por tier)"
+  ],
+  [
+    /Discover a valuable detail \(1 Power\)/gi,
+    "Descobrir um detalhe valioso (1 Power)"
+  ],
+  [
+    /See advanced options on page 154\./gi,
+    "Veja opções avançadas na página 154."
+  ],
+  [
+    /Detailed Roll/gi,
+    "Rolagem Detalhada"
+  ],
+  [
+    /\bPositive:/gi,
+    "Positivo:"
+  ],
+  [
+    /\bNegative:/gi,
+    "Negativo:"
+  ],
+  [
+    /Single-use tag \(last Power\)/gi,
+    "Tag de uso único (último Power)"
+  ],
+  [
+    /Extra feat/gi,
+    "Feito extra"
+  ],
+  [
+    /Discover a valuable detail/gi,
+    "Descobrir um detalhe valioso"
+  ]
+];
+
+
+function translateLitmCardTextNodes(
+  root
+) {
+  if (
+    !root
+    ||
+    !usePokemonPtBrLitmCards()
+  ) {
+    return;
+  }
+
+  const walker =
+    document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT
+    );
+
+  const nodes = [];
+
+  while (
+    walker.nextNode()
+  ) {
+    nodes.push(
+      walker.currentNode
+    );
+  }
+
+  for (
+    const node
+    of nodes
+  ) {
+    let value =
+      String(
+        node.nodeValue
+        ?? ""
+      );
+
+    for (
+      const [
+        pattern,
+        replacement
+      ]
+      of LITM_CARD_PTBR_REPLACEMENTS
+    ) {
+      value =
+        value.replace(
+          pattern,
+          replacement
+        );
+    }
+
+    if (
+      value !== node.nodeValue
+    ) {
+      node.nodeValue =
+        value;
+    }
+  }
+
+  const statusButton =
+    root.querySelector(
+      '[data-spend-option="status"]'
+    );
+
+  if (
+    statusButton
+  ) {
+    statusButton.textContent =
+      "Status: efeito do golpe / criar / reduzir · 1 Power por tier";
+  }
+
+  const tagButton =
+    root.querySelector(
+      '[data-spend-option="tag"]'
+    );
+
+  if (
+    tagButton
+  ) {
+    tagButton.textContent =
+      "Tag: efeito do golpe / criar / riscar / recuperar · 2 Power";
+  }
 }
 
 
@@ -8537,9 +8736,38 @@ async function chooseContextEffectSpend({ message, actor, move, sourceToken, fro
       + '<label>Destino<select name="destination">' + contextSpendDestinationHtml(destinations, destinations[0].value) + '</select></label>'
       + (isTag ? '<p>Esta Tag custa 2 Power.</p>' : '<label>Power / tier<select name="level">' + levelOptions + '</select></label>')
       + '</div>',
+    buttons: [
+      {
+        action: "pokemon-back",
+        label: "Voltar",
+        icon: "fa-solid fa-arrow-left",
+        type: "button"
+      }
+    ],
     ok: { label: "Gastar e aplicar", icon: "fa-solid fa-check" },
-    modal: true
+    modal: false
   });
+
+  if (
+    choice === "pokemon-back"
+  ) {
+    const context = {
+      message,
+      actor,
+      move,
+      sourceToken,
+      frozenTargetIds
+    };
+
+    return isTag
+      ? openNativePokemonTagSpend(
+          context
+        )
+      : openNativePokemonStatusSpend(
+          context
+        );
+  }
+
   if (!choice) return;
   const cost = isTag ? 2 : Math.max(1, Math.min(maxLevel, Number(choice.level ?? maxLevel) || maxLevel));
   const appliedEffect = foundry.utils.deepClone(effect);
@@ -8582,7 +8810,7 @@ async function promptCustomContextSpend({ message, actor, move, sourceToken, fro
       + '<label class="pokemon-context-checkbox"><input name="negative" type="checkbox" checked> Efeito negativo</label>'
       + '</div>',
     ok: { label: "Gastar e aplicar", icon: "fa-solid fa-check" },
-    modal: true
+    modal: false
   });
   if (!choice) return;
   const name = String(choice.name ?? "").trim();
@@ -8677,7 +8905,7 @@ async function promptReduceExistingStatus({ message, actor, move, sourceToken, f
     content: '<div class="pokemon-context-spend-dialog"><label>Status<select name="index">'
       + rows.map((row, index) => '<option value="' + index + '">' + esc(row.label) + '</option>').join("")
       + '</select></label></div>',
-    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: true
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: false
   });
   if (!first) return;
   const row = rows[Number(first.index)];
@@ -8688,7 +8916,7 @@ async function promptReduceExistingStatus({ message, actor, move, sourceToken, f
     content: '<div class="pokemon-context-spend-dialog"><label>Power<select name="amount">'
       + Array.from({ length: max }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + ' Power</option>').join("")
       + '</select></label></div>',
-    ok: { label: "Gastar e reduzir", icon: "fa-solid fa-check" }, modal: true
+    ok: { label: "Gastar e reduzir", icon: "fa-solid fa-check" }, modal: false
   });
   if (!second) return;
   const amount = Math.max(1, Math.min(max, Number(second.amount ?? 1) || 1));
@@ -8732,7 +8960,7 @@ async function promptRemoveExistingTag({ message, actor, move, sourceToken, froz
         ).join("")
       + '</select></label></div>',
     ok: { label: "Gastar 2 Power", icon: "fa-solid fa-check" },
-    modal: true
+    modal: false
   });
   if (!choice) return;
 
@@ -8786,7 +9014,7 @@ async function openNativePokemonStatusSpend(context) {
   const choice = await foundry.applications.api.DialogV2.input({
     window: { title: "Give / reduce a status" },
     content: '<div class="pokemon-context-spend-dialog"><label>Consequência<select name="choice">' + options.join("") + '</select></label></div>',
-    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: true
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: false
   });
   if (!choice) return;
   if (choice.choice === "custom") return promptCustomContextSpend({ ...context, kind: "status" });
@@ -8805,7 +9033,7 @@ async function openNativePokemonTagSpend(context) {
   const choice = await foundry.applications.api.DialogV2.input({
     window: { title: "Add / scratch / recover a tag" },
     content: '<div class="pokemon-context-spend-dialog"><label>Consequência<select name="choice">' + options.join("") + '</select></label></div>',
-    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: true
+    ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" }, modal: false
   });
   if (!choice) return;
   if (choice.choice === "custom") return promptCustomContextSpend({ ...context, kind: "tag" });
@@ -9452,7 +9680,7 @@ async function choosePokemonEffectPurchase(
       },
 
       modal:
-        true
+        false
     });
 
   if (!choice) {
@@ -10195,6 +10423,10 @@ async function onRenderPokemonChatMessage(
       ? html[0]
       : null;
   if (!root) return;
+
+  translateLitmCardTextNodes(
+    root
+  );
 
   decorateConsequenceVfx(message, root);
   const actor = game.actors.get(message?.speaker?.actor);

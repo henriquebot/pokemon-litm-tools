@@ -232,39 +232,89 @@ function waterPokemon(
 }
 
 
-function statusText(
+function applyPokemonPixelSampling(
   token
 ) {
-  const rows =
-    token?.actor
-      ?.system
-      ?.floatingTagsAndStatuses;
+  const candidates = [
+    token?.mesh,
+    token?.icon,
+    ...(Array.isArray(token?.mesh?.children) ? token.mesh.children : [])
+  ].filter(Boolean);
 
-  if (
-    !Array.isArray(rows)
+  const visited = new Set();
+
+  for (
+    const display
+    of candidates
   ) {
-    return "";
-  }
+    const texture =
+      display?.texture
+      ?? null;
 
-  return rows
-    .map(row => {
+    if (
+      !texture
+      ||
+      visited.has(
+        texture
+      )
+    ) {
+      continue;
+    }
+
+    visited.add(
+      texture
+    );
+
+    try {
+      const source =
+        texture.source
+        ?? texture.baseTexture
+        ?? null;
+
       if (
-        typeof row
-        === "string"
+        source?.style
+        &&
+        "scaleMode" in source.style
       ) {
-        return row;
+        source.style.scaleMode =
+          "nearest";
       }
 
-      return [
-        row?.name,
-        row?.status,
-        row?.tag,
-        row?.value,
-        row?.text
-      ]
-        .filter(Boolean)
-        .join(" ");
-    })
+      if (
+        source
+        &&
+        "scaleMode" in source
+      ) {
+        source.scaleMode =
+          "nearest";
+      }
+
+      if (
+        texture.baseTexture
+        &&
+        globalThis.PIXI
+          ?.SCALE_MODES
+          ?.NEAREST
+          !== undefined
+      ) {
+        texture.baseTexture.scaleMode =
+          PIXI.SCALE_MODES.NEAREST;
+      }
+    } catch {}
+  }
+}
+
+
+function normalizedStatusRowText(
+  row
+) {
+  return [
+    row?.name,
+    row?.status,
+    row?.tag,
+    row?.text
+  ]
+    .filter(Boolean)
     .join(" ")
     .normalize("NFD")
     .replace(
@@ -278,69 +328,131 @@ function statusText(
 function statusProfile(
   token
 ) {
-  const text =
-    statusText(
-      token
-    );
+  const rows =
+    token?.actor
+      ?.system
+      ?.floatingTagsAndStatuses;
+
+  if (
+    !Array.isArray(
+      rows
+    )
+  ) {
+    return null;
+  }
 
   const profiles = [
     {
+      id:
+        "paralysis",
       terms: [
         "paralis",
         "paraly"
       ],
-      icon: "⚡",
-      color: 0xf4d03f
+      color:
+        0xf4d03f
     },
     {
+      id:
+        "burn",
       terms: [
         "queim",
         "burn"
       ],
-      icon: "🔥",
-      color: 0xff7043
+      color:
+        0xff7043
     },
     {
+      id:
+        "poison",
       terms: [
         "enven",
         "poison",
         "toxic"
       ],
-      icon: "☠",
-      color: 0x9b59b6
+      color:
+        0x9b59b6
     },
     {
+      id:
+        "freeze",
       terms: [
         "congel",
         "freeze",
         "frozen"
       ],
-      icon: "❄",
-      color: 0x74d7ea
+      color:
+        0x74d7ea
     },
     {
+      id:
+        "sleep",
       terms: [
         "dorm",
         "sleep",
-        "asleep"
+        "asleep",
+        "sonol",
+        "drowsy"
       ],
-      icon: "Z",
-      color: 0x8e9aaf
+      color:
+        0x5c6bc0
     }
   ];
 
-  return (
-    profiles.find(
-      profile =>
-        profile.terms.some(
-          term =>
-            text.includes(
-              term
-            )
-        )
-    )
-    ?? null
-  );
+  /*
+   * floatingTagsAndStatuses preserva a ordem dos efeitos.
+   * Visualmente usamos somente o primeiro Status Pokémon
+   * reconhecido que ainda está ativo.
+   */
+  for (
+    const row
+    of rows
+  ) {
+    const isStatus =
+      row?.isStatus
+        === true
+      ||
+      Number(
+        row?.value
+        ?? 0
+      ) > 0;
+
+    if (
+      !isStatus
+      ||
+      row?.expired
+        === true
+      ||
+      row?.planned
+        === true
+    ) {
+      continue;
+    }
+
+    const text =
+      normalizedStatusRowText(
+        row
+      );
+
+    const profile =
+      profiles.find(
+        candidate =>
+          candidate.terms.some(
+            term =>
+              text.includes(
+                term
+              )
+          )
+      );
+
+    if (
+      profile
+    ) {
+      return profile;
+    }
+  }
+
+  return null;
 }
 
 
@@ -664,6 +776,110 @@ function clearTokenShowcase(
 }
 
 
+function syncStatusOutlineSprites(
+  token,
+  state
+) {
+  const mesh =
+    token?.mesh
+    ?? token?.icon
+    ?? null;
+
+  if (
+    !mesh
+    ||
+    !state?.statusOutlineSprites
+      ?.length
+  ) {
+    return;
+  }
+
+  for (
+    const entry
+    of state.statusOutlineSprites
+  ) {
+    const sprite =
+      entry.sprite;
+
+    if (
+      !sprite
+      ||
+      sprite.destroyed
+    ) {
+      continue;
+    }
+
+    try {
+      if (
+        mesh.texture
+        &&
+        sprite.texture
+          !== mesh.texture
+      ) {
+        sprite.texture =
+          mesh.texture;
+      }
+
+      sprite.anchor.set(
+        Number(
+          mesh.anchor?.x
+          ?? 0.5
+        ),
+        Number(
+          mesh.anchor?.y
+          ?? 0.5
+        )
+      );
+
+      sprite.pivot.set(
+        Number(
+          mesh.pivot?.x
+          ?? 0
+        ),
+        Number(
+          mesh.pivot?.y
+          ?? 0
+        )
+      );
+
+      sprite.position.set(
+        Number(
+          mesh.position?.x
+          ?? 0
+        )
+          + entry.dx,
+        Number(
+          mesh.position?.y
+          ?? 0
+        )
+          + entry.dy
+      );
+
+      sprite.scale.set(
+        Number(
+          mesh.scale?.x
+          ?? 1
+        ),
+        Number(
+          mesh.scale?.y
+          ?? 1
+        )
+      );
+
+      sprite.rotation =
+        Number(
+          mesh.rotation
+          ?? 0
+        );
+
+      sprite.visible =
+        mesh.visible
+          !== false;
+    } catch {}
+  }
+}
+
+
 function drawTokenShowcase(
   token
 ) {
@@ -672,13 +888,21 @@ function drawTokenShowcase(
   );
 
   if (
-    !tokenFxEnabled()
-    ||
     !isPokemonToken(
       token
     )
     ||
     token?.destroyed
+  ) {
+    return;
+  }
+
+  applyPokemonPixelSampling(
+    token
+  );
+
+  if (
+    !tokenFxEnabled()
   ) {
     return;
   }
@@ -801,83 +1025,91 @@ function drawTokenShowcase(
     );
   }
 
-  let statusRing =
-    null;
-
-  let statusIcon =
-    null;
-
-  if (status) {
-    statusRing =
-      new PIXI.Graphics();
-
-    graphicsEllipseStroke(
-      statusRing,
-      width / 2,
-      height / 2,
-      width * 0.38,
-      height * 0.38,
-      status.color,
-      0.78,
-      3
-    );
-
-    statusRing.zIndex =
-      20;
-
-    over.addChild(
-      statusRing
-    );
-
-    statusIcon =
-      makeText(
-        status.icon,
-        {
-          fontFamily:
-            "monospace",
-          fontWeight:
-            "900",
-          fontSize:
-            Math.max(
-              15,
-              Math.min(
-                24,
-                width * 0.22
-              )
-            ),
-          fill:
-            "#ffffff",
-          stroke:
-            "#14101a",
-          strokeThickness:
-            5,
-          align:
-            "center"
-        }
-      );
-
-    statusIcon.anchor
-      ?.set?.(
-        0.5
-      );
-
-    statusIcon.position.set(
-      width * 0.82,
-      height * 0.12
-    );
-
-    statusIcon.zIndex =
-      30;
-
-    over.addChild(
-      statusIcon
-    );
-  }
-
   const mesh =
     token?.mesh
     ?? token?.icon
     ?? null;
+
+  let statusOutline =
+    null;
+
+  const statusOutlineSprites =
+    [];
+
+  if (
+    status
+    &&
+    mesh?.texture
+  ) {
+    statusOutline =
+      new PIXI.Container();
+
+    statusOutline.eventMode =
+      "none";
+
+    statusOutline.zIndex =
+      -12;
+
+    under.addChild(
+      statusOutline
+    );
+
+    const offsets = [
+      [-2, 0],
+      [2, 0],
+      [0, -2],
+      [0, 2],
+      [-1.5, -1.5],
+      [1.5, -1.5],
+      [-1.5, 1.5],
+      [1.5, 1.5]
+    ];
+
+    for (
+      const [
+        dx,
+        dy
+      ]
+      of offsets
+    ) {
+      const sprite =
+        new PIXI.Sprite(
+          mesh.texture
+        );
+
+      sprite.tint =
+        status.color;
+
+      sprite.alpha =
+        1;
+
+      sprite.roundPixels =
+        true;
+
+      sprite.eventMode =
+        "none";
+
+      statusOutline.addChild(
+        sprite
+      );
+
+      statusOutlineSprites.push({
+        sprite,
+        dx,
+        dy
+      });
+    }
+
+    syncStatusOutlineSprites(
+      token,
+      {
+        statusOutlineSprites
+      }
+    );
+
+    statusOutline.alpha =
+      0.52;
+  }
 
   const basePivotY =
     Number(
@@ -893,8 +1125,11 @@ function drawTokenShowcase(
       shadow,
       waterOuter,
       waterInner,
-      statusRing,
-      statusIcon,
+      statusOutline,
+      statusOutlineSprites,
+      statusId:
+        status?.id
+        ?? null,
       flying,
       phase:
         Math.random()
@@ -1019,14 +1254,19 @@ function showcaseTick() {
     }
 
     if (
-      state.statusRing
+      state.statusOutline
     ) {
-      state.statusRing.alpha =
-        0.56
+      syncStatusOutlineSprites(
+        token,
+        state
+      );
+
+      state.statusOutline.alpha =
+        0.42
         + (
           wave + 1
         )
-        * 0.2;
+        * 0.11;
     }
   }
 }

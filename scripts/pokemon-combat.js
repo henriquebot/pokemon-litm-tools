@@ -1219,7 +1219,7 @@ async function chooseAlreadyDeployed(theme, tokenDoc) {
       }
     ],
     rejectClose: false,
-    modal: true
+    modal: false
   });
 
   if (choice === "recollect") {
@@ -1376,7 +1376,7 @@ async function openTeamDeployMenu(trainerToken) {
       label: "Selecionar",
       icon: "fa-solid fa-paw"
     },
-    modal: true
+    modal: false
   });
 
   if (!result) return;

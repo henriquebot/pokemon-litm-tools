@@ -479,7 +479,7 @@ async function discoverForGM(payload) {
       + '<label class="pokemon-guided-check"><input type="checkbox" name="speakAloud"> Vou responder em voz alta</label>'
       + '</div>',
     ok: { label: "Revelar", icon: "fa-solid fa-eye" },
-    modal: true
+    modal: false
   });
 
   if (!result) return { cancelled: true };
@@ -585,7 +585,7 @@ async function handleDiscoverSpend(message) {
       },
 
       modal:
-        true
+        false
     });
 
   if (!choice) {
@@ -780,7 +780,7 @@ async function handleFeatSpend(message) {
       },
 
       modal:
-        true
+        false
     });
 
   if (!choice) {
@@ -890,7 +890,7 @@ async function handleSingleUseSpend(message) {
       + '<p>Ela será marcada com ① e ficará riscada automaticamente depois de ser usada em uma rolagem.</p>'
       + '</div>',
     ok: { label: "Gastar o último Power", icon: "fa-solid fa-tag" },
-    modal: true
+    modal: false
   });
   if (!choice) return;
 
@@ -1387,7 +1387,7 @@ async function chooseSourceAction(source) {
       + actions.map((action, index) => '<option value="' + index + '">' + esc(action?.name ?? action?.id ?? action) + '</option>').join("")
       + '</select></label></div>',
     ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
-    modal: true
+    modal: false
   });
   return result ? actions[Number(result.index)] ?? null : null;
 }
@@ -1401,7 +1401,7 @@ async function chooseThreatOrConsequence(source, action) {
       + '<label>Resolver como<select name="mode"><option value="threat">Ameaça · anunciar na ficção</option><option value="consequence">Consequência · aplicar efeito</option></select></label>'
       + '</div>',
     ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
-    modal: true
+    modal: false
   });
 }
 
@@ -1520,7 +1520,7 @@ async function chooseConsequenceEffect(source, action, sceneId) {
       filterTargets();
       refresh();
     },
-    modal: true
+    modal: false
   });
   if (!result) return null;
 
@@ -2462,7 +2462,7 @@ async function openBossGenerator(actor, draft = null) {
       + '<p>Depois de escolher a sugestão, você poderá editar completamente o nome e o Limit.</p>'
       + '</div>',
     ok: { label: "Personalizar fase", icon: "fa-solid fa-arrow-right" },
-    modal: true
+    modal: false
   });
   if (!choice) return;
 
@@ -2528,7 +2528,7 @@ async function openBossGenerator(actor, draft = null) {
       }
     ],
     rejectClose: false,
-    modal: true
+    modal: false
   });
 
   if (!customResult) return;

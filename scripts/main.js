@@ -214,6 +214,33 @@ Hooks.once("init", () => {
     }
   );
 
+  game.settings.register(
+    MODULE_ID,
+    "litmCardLanguage",
+    {
+      name:
+        "LitM · Idioma dos cards e Spend Power",
+      hint:
+        "Automático traduz a interface dos cards para PT-BR quando o Foundry estiver em português. Padrão do sistema mantém o texto original do LitM.",
+      scope:
+        "client",
+      config:
+        true,
+      type:
+        String,
+      choices: {
+        auto:
+          "Automático (seguir idioma do Foundry)",
+        "pt-BR":
+          "Português (Brasil)",
+        native:
+          "Padrão do sistema"
+      },
+      default:
+        "auto"
+    }
+  );
+
   game.modules.get(MODULE_ID).api = {
     openPokemonImporter,
     openPokemonChallengeEditor,

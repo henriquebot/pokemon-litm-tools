@@ -1065,7 +1065,7 @@ async function askBuildConfig(entry) {
       </div>
     `,
     ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
-    modal: true
+    modal: false
   });
 
   if (!modeResult) return null;
@@ -1099,7 +1099,7 @@ async function askBuildConfig(entry) {
         </div>
       `,
       ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
-      modal: true
+      modal: false
     });
 
     if (!result) return null;
@@ -1140,7 +1140,7 @@ async function askBuildConfig(entry) {
       </div>
     `,
     ok: { label: "Continuar", icon: "fa-solid fa-arrow-right" },
-    modal: true
+    modal: false
   });
 
   if (!result) return null;
@@ -1210,7 +1210,7 @@ async function reviewBuild(entry, config, data) {
       </div>
     `,
     ok: { label: "Escolher golpes", icon: "fa-solid fa-arrow-right" },
-    modal: true
+    modal: false
   });
 
   if (!profile) return null;
@@ -1262,7 +1262,7 @@ async function reviewBuild(entry, config, data) {
         </div>
       `,
       ok: { label: "Revisar", icon: "fa-solid fa-arrow-right" },
-      modal: true
+      modal: false
     });
 
     if (!result) return null;
@@ -1311,7 +1311,7 @@ async function reviewBuild(entry, config, data) {
       </div>
     `,
     ok: { label: "Criar Pokémon", icon: "fa-solid fa-check" },
-    modal: true
+    modal: false
   });
 
   return confirm ? review : null;
@@ -2444,7 +2444,7 @@ async function createTrainerPokemon(entry, config, data, review, definition) {
         <select name="choice">${options}</select>
       </div>`,
       ok: { label: "Confirmar", icon: "fa-solid fa-check" },
-      modal: true
+      modal: false
     });
 
     if (!choice) return null;

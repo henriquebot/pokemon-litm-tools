@@ -774,7 +774,7 @@ export async function capturePokemonChallenge(pokemon) {
         <label><span>Destino</span><select name="destination"><option value="team">Time</option><option value="pc">PC</option></select></label>
       </div>`,
     ok: { label: "Converter em Tema", icon: "fa-solid fa-right-left" },
-    modal: true
+    modal: false
   });
   if (!choice) return null;
 
@@ -797,7 +797,7 @@ export async function capturePokemonChallenge(pokemon) {
           <select name="themeId">${options}</select>
         </div>`,
         ok: { label: 'Enviar para o PC', icon: 'fa-solid fa-box-archive' },
-        modal: true
+        modal: false
       });
       if (!fix) return null;
       await sendPokemonThemeToPc(trainer, String(fix.themeId ?? ''));
@@ -819,7 +819,7 @@ export async function capturePokemonChallenge(pokemon) {
           <select name="choice">${options}</select>
         </div>`,
         ok: { label: 'Confirmar', icon: 'fa-solid fa-check' },
-        modal: true
+        modal: false
       });
 
       if (!swap) return null;
@@ -1087,7 +1087,7 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
           yes: { label: "Libertar", icon: "fa-solid fa-dove" },
           no: { label: "Cancelar" },
           rejectClose: false,
-          modal: true
+          modal: false
         });
 
         if (ok) void this._run(() => releaseTeamPokemon(actor, themeId));
@@ -1109,7 +1109,7 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
           yes: { label: "Libertar", icon: "fa-solid fa-dove" },
           no: { label: "Cancelar" },
           rejectClose: false,
-          modal: true
+          modal: false
         });
 
         if (ok) void this._run(() => releasePcPokemon(actor, recordId));
@@ -1149,7 +1149,7 @@ class PokemonManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
           yes: { label: "Excluir permanentemente", icon: "fa-solid fa-trash" },
           no: { label: "Cancelar" },
           rejectClose: false,
-          modal: true
+          modal: false
         });
 
         if (ok) void this._run(() => deleteReleasedPokemon(actor, recordId));
