@@ -37,6 +37,13 @@ import {
 } from "./pokemon-visual-stability.js";
 
 import {
+  registerPokemonShowcaseSettings,
+  activatePokemonShowcase,
+  showPokemonReaction,
+  playPokemonShowcaseBurst
+} from "./pokemon-showcase.js";
+
+import {
   registerPokemonContentSettings
 } from "./pokemon-content.js";
 
@@ -180,9 +187,13 @@ Hooks.once("init", () => {
 
   registerTokenOutlineSettings();
 
+  registerPokemonShowcaseSettings();
+
   activatePokemonThemePokedexButtons();
 
   activatePokemonVisualStability();
+
+  activatePokemonShowcase();
 
   activatePokemonFollowers();
 
@@ -217,7 +228,9 @@ Hooks.once("init", () => {
     migratePokemonChallengesLitmFirst,
     pokemonLitmCombatSelfTest,
     pokemonGuidedFlowSelfTest,
-    playPokemonPokeballVfx
+    playPokemonPokeballVfx,
+    showPokemonReaction,
+    playPokemonShowcaseBurst
   };
 });
 

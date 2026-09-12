@@ -296,6 +296,17 @@ async function playPokeballVfxLocal(
       tokenDoc
     );
 
+  try {
+    game.modules
+      .get(MODULE_ID)
+      ?.api
+      ?.playPokemonShowcaseBurst
+      ?.(
+        object,
+        mode
+      );
+  } catch {}
+
   if (
     pokeballSequenceAvailable()
     &&
