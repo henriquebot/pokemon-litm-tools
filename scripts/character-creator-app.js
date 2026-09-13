@@ -1182,7 +1182,42 @@ class PokemonCharacterCreatorApp
   busy = false;
 
 
+  _rangerStepMap() {
+    const hasPartner =
+      Number(
+        this.teamSize
+        ?? 0
+      ) === 1;
+
+    return hasPartner
+      ? {
+          partner: 3,
+          customize: 4,
+          pick: 5,
+          build: 6,
+          desired: 7,
+          review: 8,
+          total: 8
+        }
+      : {
+          partner: 3,
+          customize: null,
+          pick: 4,
+          build: 5,
+          desired: 6,
+          review: 7,
+          total: 7
+        };
+  }
+
+
   get totalSteps() {
+    if (
+      this.mode === "ranger"
+    ) {
+      return this._rangerStepMap().total;
+    }
+
     return this.mode === "pokemon"
       ? 6
       : 7;
@@ -1275,6 +1310,18 @@ class PokemonCharacterCreatorApp
     if (
       this.mode === "ranger"
     ) {
+      if (
+        this.teamSize === null
+      ) {
+        return false;
+      }
+
+      if (
+        this.teamSize === 0
+      ) {
+        return true;
+      }
+
       return (
         this.teamSize === 1
         &&
@@ -1315,7 +1362,11 @@ class PokemonCharacterCreatorApp
 
 
   _pokemonReady() {
-    if (this.mode !== "trainer") return true;
+    if (
+      this.mode !== "trainer"
+      &&
+      this.mode !== "ranger"
+    ) return true;
     if (Number(this.teamSize ?? 0) === 0) return true;
     if (!this._teamReady()) return false;
 
@@ -1393,6 +1444,17 @@ class PokemonCharacterCreatorApp
         options
       );
 
+    const rangerSteps =
+      this._rangerStepMap();
+
+    const rangerHasPartner =
+      this.mode === "ranger"
+      &&
+      Number(
+        this.teamSize
+        ?? 0
+      ) === 1;
+
     let catalog = null;
 
     if (
@@ -1408,7 +1470,20 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "ranger"
-        && [3, 6, 7].includes(this.step)
+        &&
+        [
+          rangerSteps.partner,
+          rangerSteps.customize,
+          rangerSteps.desired,
+          rangerSteps.review
+        ]
+          .filter(
+            value =>
+              Number.isInteger(value)
+          )
+          .includes(
+            this.step
+          )
       )
       ||
       (
@@ -1520,7 +1595,7 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "ranger"
-        && this.step === 3
+        && this.step === rangerSteps.partner
       )
     ) {
       teamItems =
@@ -1639,8 +1714,18 @@ class PokemonCharacterCreatorApp
     let pokemonProfiles = [];
 
     if (
-      this.step === 6
-      && this.mode === "trainer"
+      (
+        (
+          this.mode === "trainer"
+          && this.step === 6
+        )
+        ||
+        (
+          this.mode === "ranger"
+          && rangerHasPartner
+          && this.step === rangerSteps.customize
+        )
+      )
       && Number(this.teamSize ?? 0) > 0
     ) {
       const byId = new Map(
@@ -1718,21 +1803,18 @@ class PokemonCharacterCreatorApp
 
     if (
       (
-        this.mode === "ranger"
-        && this.step === 7
-        && this._teamReady()
-        && this.rangerThemeSelections.length === 4
-        && this._themesReady()
-      )
-      ||
-      (
         this.mode === "trainer"
         && this.step === 7
       )
       ||
       (
         this.mode === "ranger"
-        && this.step === 6
+        &&
+        (
+          this.step === rangerSteps.desired
+          ||
+          this.step === rangerSteps.review
+        )
       )
     ) {
       dreamItems =
@@ -2228,7 +2310,11 @@ class PokemonCharacterCreatorApp
     if (
       this.mode === "ranger"
       &&
-      this.step >= 5
+      (
+        this.step === rangerSteps.build
+        ||
+        this.step === rangerSteps.review
+      )
     ) {
       themeEditorSlots =
         this.themeDrafts.map(
@@ -2326,25 +2412,32 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "ranger"
-        && this.step === 3
+        && this.step === rangerSteps.partner
         && this._teamReady()
       )
       ||
       (
         this.mode === "ranger"
-        && this.step === 4
+        && rangerHasPartner
+        && this.step === rangerSteps.customize
+        && this._pokemonReady()
+      )
+      ||
+      (
+        this.mode === "ranger"
+        && this.step === rangerSteps.pick
         && this.rangerThemeSelections.length === 4
       )
       ||
       (
         this.mode === "ranger"
-        && this.step === 5
+        && this.step === rangerSteps.build
         && this._themesReady()
       )
       ||
       (
         this.mode === "ranger"
-        && this.step === 6
+        && this.step === rangerSteps.desired
       )
       ||
       (
@@ -2384,6 +2477,16 @@ class PokemonCharacterCreatorApp
         && this._pokemonReady()
         && profileReady
         && this._themesReady()
+      )
+      ||
+      (
+        this.mode === "ranger"
+        && this.step === rangerSteps.review
+        && visualReady
+        && this._teamReady()
+        && this._pokemonReady()
+        && this.rangerThemeSelections.length === 4
+        && this._themesReady()
       );
 
 
@@ -2411,23 +2514,31 @@ class PokemonCharacterCreatorApp
 
       stepIsRangerPartner:
         this.mode === "ranger"
-        && this.step === 3,
+        && this.step === rangerSteps.partner,
 
       stepIsRangerThemePick:
         this.mode === "ranger"
-        && this.step === 4,
+        && this.step === rangerSteps.pick,
 
       stepIsRangerDesired:
         this.mode === "ranger"
-        && this.step === 6,
+        && this.step === rangerSteps.desired,
 
       stepIsRangerReview:
         this.mode === "ranger"
-        && this.step === 7,
+        && this.step === rangerSteps.review,
 
       stepIsPokemonTeam:
-        this.mode === "trainer"
-        && this.step === 6,
+        (
+          this.mode === "trainer"
+          && this.step === 6
+        )
+        ||
+        (
+          this.mode === "ranger"
+          && rangerHasPartner
+          && this.step === rangerSteps.customize
+        ),
 
       stepIsDream:
         this.mode === "trainer"
@@ -2454,7 +2565,7 @@ class PokemonCharacterCreatorApp
         )
         || (
           this.mode === "ranger"
-          && this.step === 5
+          && this.step === rangerSteps.build
         ),
 
       stepIsPokemonProfile:
@@ -2483,6 +2594,66 @@ class PokemonCharacterCreatorApp
 
       showRangerProgress:
         this.mode === "ranger",
+
+      rangerHasPartner,
+
+      rangerProgress:
+        this.mode === "ranger"
+          ? [
+              {
+                number: 3,
+                label: "Pokémon Parceiro",
+                active:
+                  this.step === rangerSteps.partner
+              },
+              ...(
+                rangerHasPartner
+                  ? [
+                      {
+                        number:
+                          rangerSteps.customize,
+                        label:
+                          "Personalizar Parceiro",
+                        active:
+                          this.step === rangerSteps.customize
+                      }
+                    ]
+                  : []
+              ),
+              {
+                number:
+                  rangerSteps.pick,
+                label:
+                  "Escolher Themes",
+                active:
+                  this.step === rangerSteps.pick
+              },
+              {
+                number:
+                  rangerSteps.build,
+                label:
+                  "Construir Themes",
+                active:
+                  this.step === rangerSteps.build
+              },
+              {
+                number:
+                  rangerSteps.desired,
+                label:
+                  "Pokémon desejados",
+                active:
+                  this.step === rangerSteps.desired
+              },
+              {
+                number:
+                  rangerSteps.review,
+                label:
+                  "Revisão",
+                active:
+                  this.step === rangerSteps.review
+              }
+            ]
+          : [],
 
       characterName:
         this.characterName,
@@ -2586,7 +2757,10 @@ class PokemonCharacterCreatorApp
       teamSizeOptions:
         Array.from(
           {
-            length: 7
+            length:
+              this.mode === "ranger"
+                ? 2
+                : 7
           },
 
           (_, value) => ({
@@ -2680,6 +2854,9 @@ class PokemonCharacterCreatorApp
     }
 
 
+    const rangerSteps =
+      this._rangerStepMap();
+
     if (
       (
         this.step === 2
@@ -2693,7 +2870,11 @@ class PokemonCharacterCreatorApp
       ||
       (
         this.mode === "ranger"
-        && [3, 6].includes(this.step)
+        &&
+        [
+          rangerSteps.partner,
+          rangerSteps.desired
+        ].includes(this.step)
       )
     ) {
       refreshPokemonAssetPreviews(
@@ -2768,19 +2949,6 @@ class PokemonCharacterCreatorApp
             this.themeDrafts =
               [];
 
-            if (
-              mode === "ranger"
-            ) {
-              this.teamSize =
-                1;
-
-              this.teamSelections = [
-                null
-              ];
-
-              this.teamSlot =
-                0;
-            }
           }
 
           for (
@@ -3165,9 +3333,12 @@ class PokemonCharacterCreatorApp
           if (
             !Number.isInteger(size)
             ||
-            size < 0
+            size < 0            || size > 6
             ||
-            size > 6
+            (
+              this.mode === "ranger"
+              && size > 1
+            )
           ) {
             return;
           }
@@ -4233,9 +4404,12 @@ class PokemonCharacterCreatorApp
             return;
           }
 
+          const rangerSteps =
+            this._rangerStepMap();
+
           if (
             this.mode === "ranger"
-            && this.step === 3
+            && this.step === rangerSteps.partner
             && !this._teamReady()
           ) {
             return;
@@ -4243,7 +4417,16 @@ class PokemonCharacterCreatorApp
 
           if (
             this.mode === "ranger"
-            && this.step === 4
+            && rangerSteps.customize
+            && this.step === rangerSteps.customize
+            && !this._pokemonReady()
+          ) {
+            return;
+          }
+
+          if (
+            this.mode === "ranger"
+            && this.step === rangerSteps.pick
             && this.rangerThemeSelections.length !== 4
           ) {
             return;
@@ -4251,7 +4434,7 @@ class PokemonCharacterCreatorApp
 
           if (
             this.mode === "ranger"
-            && this.step === 5
+            && this.step === rangerSteps.build
             && !this._themesReady()
           ) {
             return;
@@ -4565,25 +4748,32 @@ class PokemonCharacterCreatorApp
                 "ranger"
               );
 
+              const rangerPartnerAssetId =
+                this.teamSelections[0]
+                ?? null;
+
               await actor.setFlag(
                 MODULE_ID,
                 "rangerPartnerAssetId",
-                this.teamSelections[0]
-                ?? null
+                rangerPartnerAssetId
               );
 
               const partnerTheme =
-                actor.items.find(
-                  item =>
-                    item.type === "themebook"
-                    &&
-                    item.getFlag?.(
-                      MODULE_ID,
-                      "assetId"
+                rangerPartnerAssetId
+                  ? (
+                      actor.items.find(
+                        item =>
+                          item.type === "themebook"
+                          &&
+                          item.getFlag?.(
+                            MODULE_ID,
+                            "assetId"
+                          )
+                            === rangerPartnerAssetId
+                      )
+                      ?? null
                     )
-                      === this.teamSelections[0]
-                )
-                ?? null;
+                  : null;
 
               if (partnerTheme) {
                 await partnerTheme.setFlag(

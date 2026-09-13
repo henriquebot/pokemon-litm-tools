@@ -55,10 +55,11 @@ ok(
 );
 
 ok(
-  "Ranger exige exatamente um parceiro e quatro Themes",
+  "Ranger permite 0 ou 1 Parceiro e exige quatro Themes",
   creatorFlat.includes('this.mode === "ranger"')
+  && creatorFlat.includes("this.teamSize === 0")
   && creatorFlat.includes("this.teamSize === 1")
-  && creatorFlat.includes("this.teamSelections.length === 1")
+  && creator.includes("_rangerStepMap")
   && creatorFlat.includes("this.rangerThemeSelections.length === 4")
 );
 
@@ -116,6 +117,42 @@ ok(
   && guided.includes("pokemon-guided-move-badges")
   && guided.includes("pokemon-guided-move-effects")
   && guided.includes("bodyHtml:")
+);
+
+ok(
+  "Ranger com Parceiro reutiliza personalização completa do Treinador",
+  creator.includes("rangerHasPartner")
+  && creator.includes("rangerSteps.customize")
+  && creator.includes("loadPokemonTrainerCustomization")
+  && creatorTemplate.includes("Personalize seu Pokémon Parceiro")
+  && creatorTemplate.includes("data-pokemon-nature")
+  && creatorTemplate.includes("data-pokemon-ability")
+  && creatorTemplate.includes("data-pokemon-move")
+);
+
+ok(
+  "Ranger pode finalizar com 0 ou 1 Parceiro",
+  creator.includes('this.mode === "ranger"')
+  && creator.includes("this.step === rangerSteps.review")
+  && creator.includes("const canFinish")
+  && creatorTemplate.includes("Nenhum")
+);
+
+ok(
+  "Themes Ranger selecionados têm feedback visual explícito",
+  creatorTemplate.includes("pokemon-ranger-theme-selected")
+  && creatorTemplate.includes("fa-check")
+  && styles.includes(".pokemon-ranger-theme-option.selected")
+  && styles.includes("RANGER SMOKE FIXES 2026-09-12")
+);
+
+ok(
+  "Cards de Ações e golpes não recebem preenchimento",
+  styles.includes('.pokemon-biography-effect[data-pokemon-effect-kind="move"]')
+  && styles.includes('.pokemon-biography-effect[data-pokemon-move-type]')
+  && styles.includes(".pokemon-character-action-card")
+  && styles.includes("background-color: transparent !important")
+  && styles.includes("background-image: none !important")
 );
 
 console.log("Pokemon LITM Tools | next pull Ranger + UX tests passed");

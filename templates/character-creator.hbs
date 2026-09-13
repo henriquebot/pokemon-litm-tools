@@ -28,16 +28,13 @@
     {{/if}}
 
     {{#if showRangerProgress}}
-      <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsRangerPartner}}active{{/if}}"><span>3</span>Pokémon Parceiro</div>
-      <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsRangerThemePick}}active{{/if}}"><span>4</span>Escolher Themes</div>
-      <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsThemes}}active{{/if}}"><span>5</span>Construir Themes</div>
-      <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsRangerDesired}}active{{/if}}"><span>6</span>Pokémon desejados</div>
-      <div class="pokemon-wizard-line"></div>
-      <div class="pokemon-wizard-step {{#if stepIsRangerReview}}active{{/if}}"><span>7</span>Revisão</div>
+      {{#each rangerProgress}}
+        <div class="pokemon-wizard-line"></div>
+        <div class="pokemon-wizard-step {{#if active}}active{{/if}}">
+          <span>{{number}}</span>
+          {{label}}
+        </div>
+      {{/each}}
     {{/if}}
 
     {{#if isPokemon}}
@@ -521,64 +518,95 @@
 
     <section class="pokemon-wizard-page pokemon-team-page pokemon-ranger-partner-page">
 
-      <h2>Escolha seu Pokémon Parceiro</h2>
+      <h2>Com quantos Pokémon Parceiros você começa?</h2>
 
       <p>
-        Todo Ranger começa ao lado de exatamente <strong>1 Pokémon Parceiro</strong>.
-        Ele usa as mesmas estruturas de Party, Theme, follower e Pokémon Manager.
+        Seu Ranger pode iniciar a campanha <strong>sem Pokémon</strong> ou ao lado de
+        <strong>1 Pokémon Parceiro</strong>. Outros vínculos podem surgir durante a história.
       </p>
 
-      <div class="pokemon-theme-guidance">
-        Escolha o parceiro com quem seu Ranger inicia a campanha.
-      </div>
-
-      <div class="pokemon-importer-toolbar pokemon-team-toolbar">
-        <input
-          type="search"
-          data-role="asset-search"
-          placeholder="Buscar Pokémon..."
-          autocomplete="off"
-        >
-
-        <button
-          type="button"
-          data-action="togglePreviewZoom"
-          class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
-        >
-          <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
-          Zoom
-        </button>
-      </div>
-
-      <div class="pokemon-importer-list pokemon-team-list">
-        {{#each teamItems}}
-          <article
-            class="pokemon-asset-card pokemon-character-card{{#if selected}} selected{{/if}}"
-            data-team-asset
-            data-search-card
-            data-search="{{search}}"
-            data-asset-id="{{id}}"
+      <div class="pokemon-team-size-picker pokemon-ranger-partner-count">
+        {{#each teamSizeOptions}}
+          <button
+            type="button"
+            data-team-size="{{value}}"
+            class="{{#if selected}}selected{{/if}}"
           >
-            <div class="pokemon-asset-preview">
-              <img src="{{preview}}" alt="{{name}}" loading="lazy">
-            </div>
-
-            <div class="pokemon-asset-info">
-              <strong>{{name}}</strong>
-              <small>{{meta}}</small>
-
-              <button
-                type="button"
-                class="pokemon-pokedex-link"
-                data-pokedex-url="{{pokedexUrl}}"
-              >
-                <i class="fa-solid fa-mobile-screen-button"></i>
-                Pokédex
-              </button>
-            </div>
-          </article>
+            {{value}}
+          </button>
         {{/each}}
       </div>
+
+      {{#if teamSizeChosen}}
+
+        {{#if teamHasSlots}}
+
+          <div class="pokemon-theme-guidance">
+            Escolha o parceiro com quem seu Ranger inicia a campanha.
+            Na próxima etapa você definirá Natureza, Habilidade, fraqueza e golpes.
+          </div>
+
+          <div class="pokemon-importer-toolbar pokemon-team-toolbar">
+            <input
+              type="search"
+              data-role="asset-search"
+              placeholder="Buscar Pokémon..."
+              autocomplete="off"
+            >
+
+            <button
+              type="button"
+              data-action="togglePreviewZoom"
+              class="pokemon-preview-zoom{{#if previewZoomed}} active{{/if}}"
+            >
+              <i class="fa-solid {{#if previewZoomed}}fa-magnifying-glass-minus{{else}}fa-magnifying-glass-plus{{/if}}"></i>
+              Zoom
+            </button>
+          </div>
+
+          <div class="pokemon-importer-list pokemon-team-list">
+            {{#each teamItems}}
+              <article
+                class="pokemon-asset-card pokemon-character-card{{#if selected}} selected{{/if}}"
+                data-team-asset
+                data-search-card
+                data-search="{{search}}"
+                data-asset-id="{{id}}"
+              >
+                <div class="pokemon-asset-preview">
+                  <img src="{{preview}}" alt="{{name}}" loading="lazy">
+                </div>
+
+                <div class="pokemon-asset-info">
+                  <strong>{{name}}</strong>
+                  <small>{{meta}}</small>
+
+                  <button
+                    type="button"
+                    class="pokemon-pokedex-link"
+                    data-pokedex-url="{{pokedexUrl}}"
+                  >
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    Pokédex
+                  </button>
+                </div>
+              </article>
+            {{/each}}
+          </div>
+
+        {{else}}
+
+          <div class="pokemon-no-team">
+            <i class="fa-regular fa-circle-check"></i>
+            <strong>Começar sem Pokémon Parceiro</strong>
+            <span>
+              Sem problema. Seu primeiro grande vínculo pode nascer durante a campanha.
+            </span>
+          </div>
+
+        {{/if}}
+
+      {{/if}}
 
     </section>
 
@@ -606,6 +634,13 @@
             class="pokemon-ranger-theme-option{{#if selected}} selected{{/if}}"
             data-ranger-theme-id="{{id}}"
           >
+            {{#if selected}}
+              <span class="pokemon-ranger-theme-selected">
+                <i class="fa-solid fa-check"></i>
+                Selecionado
+              </span>
+            {{/if}}
+
             <strong>{{presetName}}</strong>
             <span>{{description}}</span>
           </button>
@@ -701,7 +736,10 @@
         <article>
           <small>Ranger</small>
           <h3>{{characterName}}</h3>
-          <p><strong>Pokémon Parceiro:</strong> {{rangerPartner.name}}</p>
+          <p>
+            <strong>Pokémon Parceiro:</strong>
+            {{#if rangerPartner}}{{rangerPartner.name}}{{else}}Nenhum{{/if}}
+          </p>
           <p><strong>Backpack:</strong> Styler básico</p>
         </article>
 
@@ -933,10 +971,16 @@
 
     <section class="pokemon-wizard-page pokemon-team-customization-page">
 
-      <h2>Personalize seus Pokémon</h2>
+      <h2>
+        {{#if isRanger}}Personalize seu Pokémon Parceiro{{else}}Personalize seus Pokémon{{/if}}
+      </h2>
 
       <p>
-        Defina Natureza, Habilidade, gênero, fraqueza e de 1 a 4 golpes para cada Pokémon inicial.
+        {{#if isRanger}}
+          Defina Natureza, Habilidade, gênero, fraqueza e de 1 a 4 golpes do seu Parceiro.
+        {{else}}
+          Defina Natureza, Habilidade, gênero, fraqueza e de 1 a 4 golpes para cada Pokémon inicial.
+        {{/if}}
       </p>
 
       <div class="pokemon-team-customization-workspace">
