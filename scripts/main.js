@@ -1,4 +1,8 @@
 import {
+  currentLitmCompatibilityReport
+} from "./litm-compat.js";
+
+import {
   openPokemonImporter,
   openPokemonChallengeEditor,
   handlePokemonImporterCanvasDrop,
@@ -255,6 +259,7 @@ Hooks.once("init", () => {
     migratePokemonChallengesLitmFirst,
     pokemonLitmCombatSelfTest,
     pokemonGuidedFlowSelfTest,
+    getPokemonLitmCompatibilityReport: currentLitmCompatibilityReport,
     playPokemonPokeballVfx,
     showPokemonReaction,
     playPokemonShowcaseBurst
@@ -428,14 +433,11 @@ Hooks.once("ready", () => {
 
   activateTokenOutline();
 
-  if (
-    game.system.id
-    !==
-    LITM_SYSTEM_ID
-  ) {
-    console.warn(
-      "Pok\u00e9mon LITM Tools | Mundo atual nao usa Legend in the Mist."
-    );
+  const compatibility = currentLitmCompatibilityReport();
+  if (game.user.isGM) {
+    const log = compatibility.supportedEnvironment && !compatibility.notes.length
+      ? console.info : console.warn;
+    log("Pokémon LITM Tools | Compatibilidade:", compatibility);
   }
 
   console.log(
