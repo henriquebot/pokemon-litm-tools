@@ -1,5 +1,15 @@
 # Pokémon LITM Tools — Roadmap
 
+## Fase A — Compatibilidade Foundry 14.370 / Legend in the Mist 14.5.5
+- [x] Registrar diagnóstico não destrutivo de versão e sistema, disponível na API do módulo
+- [x] Respeitar Status já selecionado/invertido no diálogo nativo do LitM, evitando duplicação da sugestão Pokémon
+- [x] Atualizar parsing de markup LitM nos minicards e botões de Status em Challenges
+- [x] Evitar cache permanente de falha em imports internos do LitM
+- [x] Adicionar testes automatizados de compatibilidade e matriz de smoke test
+- [ ] Executar workflow CI e resolver eventuais falhas
+- [ ] Validar no mundo descartável Foundry 14.370 + LitM 14.5.5 com GM e jogador
+- [ ] Somente após runtime validado: atualizar campo verified / preparar release
+
 ## Marco 1 — Ecossistema de criação
 - [x] Importer rápido de Pessoas, Pokémon e Props
 - [x] Challenge Wizard de Pokémon
