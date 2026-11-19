@@ -182,49 +182,31 @@ function messageTargetIds(message) {
 }
 
 function miniCardBodyHtml(body) {
-  const safe =
-    esc(body);
+  const safe = esc(body);
 
-  /*
-   * Replica o markup nativo do Mist Engine para Status.
-   * Ex.: [/s fuga-2] -> <mark class="draggable status">fuga-2</mark>.
-   * As classes e data-* são as mesmas usadas pelo sistema, então o card
-   * recebe a aparência/drag padrão sem expor HTML vindo do texto original.
-   */
+  // Compatível com os tokens de texto oficiais do LitM 14.5.5.
+  // Escapar ANTES de montar o <mark> evita HTML arbitrário em cards.
   return safe.replace(
-    /\[\/(sn|s)\s+([^\]]+?)\]/gi,
+    /\[\/(sn|sp|sg|sr|so|s|n|t|wo|w)\s+([^\]]+?)\]/gi,
     (token, kind, value) => {
-      const raw =
-        String(value ?? "").trim();
+      const raw = String(value ?? "").trim();
+      const markup = String(kind).toLowerCase();
+      const status = ["sn", "sp", "sg", "sr", "so", "s", "n"].includes(markup);
+      const negative = markup === "sn";
+      const weakness = markup === "w" || markup === "wo";
+      const match = status ? raw.match(/^(.*?)(?:-([1-6]))?$/) : null;
+      const name = String(match?.[1] ?? raw).trim();
+      const level = status ? Number(match?.[2] ?? 0) : 0;
+      if (!name) return token;
 
-      const match =
-        raw.match(/^(.*?)(?:-([1-6]))?$/);
-
-      const name =
-        String(match?.[1] ?? raw).trim();
-
-      const level =
-        Number(match?.[2] ?? 0);
-
-      if (!name) {
-        return token;
-      }
-
-      const negative =
-        String(kind).toLowerCase()
-        ===
-        "sn";
-
-      return (
-        '<mark class="draggable status'
+      const type = status ? "status" : weakness ? "weakness" : "tag";
+      return '<mark class="draggable ' + type
         + (negative ? ' negative' : '')
-        + '" draggable="true" data-type="status"'
+        + '" draggable="true" data-type="' + type + '"'
         + (negative ? ' data-positive="false"' : '')
-        + ' data-name="' + name + '" data-value="' + level + '">'
-        + name
-        + (level ? '-' + level : '')
-        + '</mark>'
-      );
+        + ' data-name="' + name + '"'
+        + (status ? ' data-value="' + level + '"' : '')
+        + '>' + name + (level ? '-' + level : '') + '</mark>';
     }
   );
 }

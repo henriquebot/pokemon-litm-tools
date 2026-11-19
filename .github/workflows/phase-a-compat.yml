@@ -1,0 +1,40 @@
+name: Pokémon LitM compatibility checks
+
+on:
+  push:
+    branches:
+      - feature/litm-1455-foundry14-compat
+  pull_request:
+    branches:
+      - ag/ranger-smoke-fixes
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: JavaScript syntax
+        run: |
+          node --check scripts/main.js
+          node --check scripts/litm-compat.js
+          node --check scripts/pokemon-combat-effects.js
+          node --check scripts/pokemon-guided-flow.js
+          node --check scripts/pokemon-showcase.js
+      - name: LitM and Pokémon regression tests
+        run: |
+          node --experimental-vm-modules tools/test-litm-compat.mjs
+          node --experimental-vm-modules tools/test-combat-ux.mjs
+          node tools/test-v081-bundle.mjs
+          node tools/test-next-pull-ranger.mjs
+          node tools/test-importer-assets.mjs
+          node tools/test-visual-showcase.mjs
+          node tools/test-post-smoke-round3-v4-safe.mjs

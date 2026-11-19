@@ -11,6 +11,10 @@ import {
 } from "./pokemon-combat.js";
 
 import {
+  nativeSelectedChallengeStatusOverlaps
+} from "./litm-compat.js";
+
+import {
   buildMoveEffects,
   loadPokemonMoveProfile,
   moveLitmProfile,
@@ -2608,14 +2612,12 @@ function importLitmModule(
       relativePath
     )
   ) {
-    litmModulePromises.set(
-      relativePath,
-      import(
-        litmSystemRoute(
-          relativePath
-        )
-      )
-    );
+    const promise = import(litmSystemRoute(relativePath)).catch(error => {
+      // Após uma falha de import, permitir nova tentativa na próxima chamada.
+      litmModulePromises.delete(relativePath);
+      throw error;
+    });
+    litmModulePromises.set(relativePath, promise);
   }
 
   return litmModulePromises.get(
@@ -5207,10 +5209,20 @@ function decoratePokemonRollDialog(
     );
   }
 
-  const challengeStatus =
-    challengeStatusContextForTargets(
-      targets
-    );
+  // A seleção/inversão nativa de Challenges (LitM 14.5.x) tem precedência.
+  const nativeStatusSelected = nativeSelectedChallengeStatusOverlaps(
+    app.challengeTags,
+    targets.flatMap(token => token.actor
+      ? attackHinderingStatusesForActor(token.actor).map(status => ({
+          actorId: token.actor.id,
+          name: status.name
+        }))
+      : [])
+  );
+
+  const challengeStatus = nativeStatusSelected
+    ? null
+    : challengeStatusContextForTargets(targets);
 
   if (
     challengeStatus?.value
@@ -6122,8 +6134,8 @@ function decorateStructuredStatusMarkup(
       walker.currentNode;
 
     if (
-      !node?.nodeValue?.includes(
-        "[/s "
+      !/\[\/(?:sn|s|sp|sg|sr|so|n)\s+/i.test(
+        node?.nodeValue ?? ""
       )
       ||
       node.parentElement?.closest(
@@ -6136,8 +6148,9 @@ function decorateStructuredStatusMarkup(
     nodes.push(node);
   }
 
+  // Aceita os marcadores de Status do LitM 14.5.5.
   const pattern =
-    /\[\/s\s+([^\s\]]+)-([1-6])\]/g;
+    /\[\/(?:sn|s|sp|sg|sr|so|n)\s+([^\]]+?)-([1-6])\]/gi;
 
   for (
     const node
@@ -6176,7 +6189,7 @@ function decorateStructuredStatusMarkup(
       );
 
       const name =
-        match[1];
+        match[1].trim();
 
       const level =
         Number(
