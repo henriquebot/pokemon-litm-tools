@@ -35,7 +35,7 @@ async function load(url) {
     source += "\nexport { replayVfxTargetIds, moveReplayVfxTargetIds, consequenceVfxActions, floatingSpendState, rollbackContextSpendEntry, litmModulePromises, applyFloatingSpendDelta, applyEffectsToActor };\n";
   }
   if (url.pathname.endsWith("/pokemon-guided-flow.js")) {
-    source += "\nexport { consequenceSourcesForScene, activeConsequenceSources, retainPhaseOneSources, recordPhaseOneSources, decorateGmConsequencePanel, onTargetGuidedToken };\n";
+    source += "\nexport { consequenceSourcesForScene, activeConsequenceSources, retainPhaseOneSources, recordPhaseOneSources, decorateGmConsequencePanel, onTargetGuidedToken, miniCardBodyHtml };\n";
   }
   const module = new vm.SourceTextModule(source, {
     context,
@@ -315,3 +315,14 @@ gm.targets.clear();
 context.game.scenes.delete(panelScene.id);
 context.document = previousDocument;
 console.log("PASS GM source dropdown: target suggestion, manual selection, target hook, re-render and fallback");
+
+const markup = guided.miniCardBodyHtml(
+  "[/sn Lentidão-2] [/t Veloz] [/wo Medo de água] [/sp Enredado-1] <script>alert(1)</script>"
+);
+assert.match(markup, /data-type="status" data-positive="false" data-name="Lentidão" data-value="2"/);
+assert.match(markup, /data-type="tag" data-name="Veloz"/);
+assert.match(markup, /data-type="weakness" data-name="Medo de água"/);
+assert.match(markup, /data-name="Enredado" data-value="1"/);
+assert.ok(!markup.includes("<script>"), "unsafe HTML remains escaped");
+assert.ok(markup.includes("&lt;script&gt;"), "source text is preserved safely");
+console.log("PASS LitM 14.5.5 guided card markup and HTML escaping");
